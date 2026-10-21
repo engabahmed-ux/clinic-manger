@@ -16,15 +16,13 @@ import {
 /*
  * Doctor Admin Page
  *
- * هذه الصفحة لا تنشئ حسابًا جديدًا.
- * تستخدم حساب الدكتور الموجود في Firebase Authentication.
- *
- * ملاحظة أمنية:
- * فحص UID في المتصفح هو بوابة واجهة فقط، وليس بديلًا عن
- * قواعد Firebase أو التحقق الموثوق على الخادم.
+ * تسجيل الدخول يتم عبر Firebase Authentication.
+ * لا تظهر لوحة الدكتور إلا بعد نجاح التحقق من الخادم.
+ * لا يتم تعديل Firestore أو قواعده هنا.
  */
 
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
+const DOCTOR_VERIFY_URL = "/api/doctor/verify";
 
 const app =
   getApps().find((item) => item.name === "[DEFAULT]") ||
@@ -45,7 +43,7 @@ const logoutButton = $("#logoutButton");
 const doctorAccountLabel = $("#doctorAccountLabel");
 
 let isSubmitting = false;
-let authStateReady = false;
+let verificationRequestNumber = 0;
 
 function showMessage(element, message, type = "error") {
   if (!element) return;
@@ -63,23 +61,28 @@ function hideMessage(element) {
 }
 
 function showLogin() {
-  loginSection.hidden = false;
-  dashboardSection.hidden = true;
+  if (loginSection) loginSection.hidden = false;
+  if (dashboardSection) dashboardSection.hidden = true;
 }
 
 function showDashboard(user) {
-  loginSection.hidden = true;
-  dashboardSection.hidden = false;
+  if (loginSection) loginSection.hidden = true;
+  if (dashboardSection) dashboardSection.hidden = false;
 
-  doctorAccountLabel.textContent = user.email || "حساب الدكتور";
+  if (doctorAccountLabel) {
+    doctorAccountLabel.textContent = user.email || "حساب الدكتور";
+  }
 }
 
 function setLoginBusy(busy) {
   isSubmitting = busy;
-  loginButton.disabled = busy;
-  loginButton.textContent = busy
-    ? "جارٍ التحقق..."
-    : "تسجيل الدخول";
+
+  if (loginButton) {
+    loginButton.disabled = busy;
+    loginButton.textContent = busy
+      ? "جارٍ التحقق..."
+      : "تسجيل الدخول";
+  }
 }
 
 function getFriendlyAuthError(error) {
@@ -122,90 +125,175 @@ async function rejectUnauthorizedUser(user) {
     "هذا الحساب غير معتمد للدخول إلى لوحة الدكتور."
   );
 
-  console.warn("تم رفض حساب لا يطابق حساب الدكتور المعتمد.", user.uid);
+  console.warn(
+    "تم رفض حساب لا يطابق حساب الدكتور المعتمد.",
+    user?.uid
+  );
 }
 
-loginForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-
-  if (isSubmitting) return;
-
-  hideMessage(loginError);
-
-  const email = emailInput.value.trim();
-  const password = passwordInput.value;
-
-  if (!email || !password) {
-    showMessage(loginError, "أدخل البريد الإلكتروني وكلمة المرور.");
-    return;
-  }
-
-  setLoginBusy(true);
-
+async function verifyDoctorOnServer(user, requestNumber) {
   try {
-    const credential = await signInWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
+    const idToken = await user.getIdToken();
 
-    if (credential.user.uid !== DOCTOR_ADMIN_UID) {
-      await rejectUnauthorizedUser(credential.user);
+    const response = await fetch(DOCTOR_VERIFY_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${idToken}`,
+        "Accept": "application/json"
+      },
+      cache: "no-store"
+    });
+
+    let result = {};
+
+    try {
+      result = await response.json();
+    } catch {
+      result = {};
+    }
+
+    // تجاهل نتيجة طلب قديم إذا تغيّر المستخدم أثناء التحقق.
+    if (
+      requestNumber !== verificationRequestNumber ||
+      auth.currentUser?.uid !== user.uid
+    ) {
       return;
     }
 
-    showDashboard(credential.user);
-    passwordInput.value = "";
-  } catch (error) {
-    console.error("خطأ تسجيل دخول الدكتور:", error);
+    if (response.status === 401 || response.status === 403) {
+      await rejectUnauthorizedUser(user);
+      return;
+    }
 
-    showLogin();
-    showMessage(loginError, getFriendlyAuthError(error));
-  } finally {
-    setLoginBusy(false);
-  }
-});
+    if (!response.ok) {
+      showLogin();
 
-logoutButton.addEventListener("click", async () => {
-  logoutButton.disabled = true;
+      showMessage(
+        loginError,
+        response.status === 503
+          ? "خدمة التحقق غير متاحة حاليًا. حاول مرة أخرى بعد قليل."
+          : "تعذر التحقق من صلاحيات الدكتور. حاول مرة أخرى."
+      );
 
-  try {
-    await signOut(auth);
-    showLogin();
+      console.error(
+        "فشل التحقق من الخادم:",
+        response.status,
+        result
+      );
+
+      return;
+    }
+
+    if (
+      result.authorized !== true ||
+      result.uid !== DOCTOR_ADMIN_UID ||
+      result.uid !== user.uid
+    ) {
+      await rejectUnauthorizedUser(user);
+      return;
+    }
+
     hideMessage(loginError);
-    emailInput.focus();
+    showDashboard(user);
   } catch (error) {
-    console.error("خطأ تسجيل الخروج:", error);
+    if (
+      requestNumber !== verificationRequestNumber ||
+      auth.currentUser?.uid !== user.uid
+    ) {
+      return;
+    }
+
+    console.error("تعذر الاتصال بخدمة التحقق:", error);
+
+    showLogin();
 
     showMessage(
-      $("#dashboardMessage"),
-      "تعذر تسجيل الخروج. حاول مرة أخرى."
+      loginError,
+      "تعذر الاتصال بخدمة التحقق. تحقق من الإنترنت وحاول مرة أخرى."
     );
-  } finally {
-    logoutButton.disabled = false;
   }
-});
+}
+
+if (loginForm) {
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    if (isSubmitting) return;
+
+    hideMessage(loginError);
+
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      showMessage(
+        loginError,
+        "أدخل البريد الإلكتروني وكلمة المرور."
+      );
+      return;
+    }
+
+    setLoginBusy(true);
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+
+      // onAuthStateChanged سيتولى التحقق من الخادم قبل فتح اللوحة.
+      passwordInput.value = "";
+    } catch (error) {
+      console.error("خطأ تسجيل دخول الدكتور:", error);
+
+      showLogin();
+      showMessage(loginError, getFriendlyAuthError(error));
+    } finally {
+      setLoginBusy(false);
+    }
+  });
+}
+
+if (logoutButton) {
+  logoutButton.addEventListener("click", async () => {
+    logoutButton.disabled = true;
+
+    try {
+      await signOut(auth);
+      showLogin();
+      hideMessage(loginError);
+
+      if (emailInput) emailInput.focus();
+    } catch (error) {
+      console.error("خطأ تسجيل الخروج:", error);
+
+      showMessage(
+        $("#dashboardMessage"),
+        "تعذر تسجيل الخروج. حاول مرة أخرى."
+      );
+    } finally {
+      logoutButton.disabled = false;
+    }
+  });
+}
 
 onAuthStateChanged(auth, async (user) => {
-  authStateReady = true;
+  const requestNumber = ++verificationRequestNumber;
 
   if (!user) {
     showLogin();
     return;
   }
 
-  if (user.uid !== DOCTOR_ADMIN_UID) {
-    await rejectUnauthorizedUser(user);
-    return;
-  }
+  // لا نعتمد على UID في المتصفح وحده لفتح لوحة الدكتور.
+  showLogin();
+  setLoginBusy(true);
 
-  showDashboard(user);
+  try {
+    await verifyDoctorOnServer(user, requestNumber);
+  } finally {
+    if (requestNumber === verificationRequestNumber) {
+      setLoginBusy(false);
+    }
+  }
 });
 
-/*
- * لا يتم فتح بيانات Firestore أو تعديلها في هذه المرحلة.
- * قواعد Firestore الحالية تظل كما هي.
- */
-if (!authStateReady) {
-  showLogin();
-}
+// لا تُعرض لوحة الدكتور قبل اكتمال التحقق من الخادم.
+showLogin();
