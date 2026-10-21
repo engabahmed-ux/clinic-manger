@@ -1,53 +1,27 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
-
-  <meta
-    name="theme-color"
-    content="#11141A"
-  >
-
-  <meta
-    name="description"
-    content="الموقع الرسمي لعيادة د. رضا الشربيني للنساء والتوليد."
-  >
-
-  <title>د. رضا الشربيني | نساء وتوليد</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#11141A">
+  <meta name="description" content="موقع العيادة وحجز المواعيد">
+  <title>موقع العيادة</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link
-    rel="preconnect"
-    href="https://fonts.gstatic.com"
-    crossorigin
-  >
-
-  <link
-    href="https://fonts.googleapis.com/css2?family=Stack+Sans+Headline:wght@400;500;600;700&family=Cairo:wght@400;500;600;700;800&display=swap"
-    rel="stylesheet"
-  >
-
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./style.css">
-
-  <script type="module" src="./src/main.js"></script>
 </head>
 
 <body>
-
   <header class="site-header">
     <div class="container header-inner">
-
-      <a class="brand" href="#home" aria-label="الصفحة الرئيسية">
-        <span class="brand-mark">R</span>
-
+      <a class="brand" href="#home" aria-label="الرئيسية">
+        <span class="brand-mark" aria-hidden="true">+</span>
         <span class="brand-text">
-          <strong data-doctor-name>د. رضا الشربيني</strong>
-          <small data-specialty>نساء وتوليد</small>
+          <strong data-doctor-name></strong>
+          <small data-specialty></small>
         </span>
       </a>
 
@@ -64,285 +38,163 @@
         <span></span>
       </button>
 
-      <nav class="main-nav" id="mainNav">
-        <a href="#home">الرئيسية</a>
-        <a href="#about">عن الدكتور</a>
-        <a href="#services">الخدمات</a>
-        <a href="#booking">حجز موعد</a>
-
-        <a class="nav-login" href="#patient-access">
-          بوابة المريض
-          <span aria-hidden="true">↗</span>
-        </a>
+      <nav class="main-nav" id="mainNav" aria-label="القائمة الرئيسية">
+        <a href="#home" data-nav="home"></a>
+        <a href="#about" data-nav="about"></a>
+        <a href="#services" data-nav="services"></a>
+        <a href="#booking" data-nav="booking"></a>
+        <a href="#patient-portal" data-nav="patientPortal"></a>
       </nav>
 
+      <a class="header-cta" href="#booking" data-nav="booking"></a>
     </div>
   </header>
 
   <main>
-
-    <section class="hero" id="home">
+    <section class="hero section" id="home">
       <div class="container hero-grid">
-
         <div class="hero-content">
-
-          <div class="eyebrow">
-            <span class="status-dot"></span>
-            رعاية طبية متخصصة للمرأة
-          </div>
-
-          <h1>
-            رعايتك تبدأ
-            <span class="highlight-text">باهتمام</span>
-            حقيقي.
-          </h1>
-
-          <p class="hero-description">
-            متابعة طبية متخصصة في أمراض النساء والتوليد،
-            مع اهتمام براحة المريضة ومتابعة رحلتها الصحية
-            في كل مرحلة.
+          <p class="eyebrow">
+            <span class="eyebrow-dot"></span>
+            <span data-hero="eyebrow"></span>
           </p>
 
+          <h1>
+            <span data-hero="titleLine1"></span>
+            <span class="highlight" data-hero="highlightedTitle"></span>
+            <span data-hero="titleLine2"></span>
+          </h1>
+
+          <p class="hero-description" data-hero="description"></p>
+
           <div class="hero-actions">
-            <a class="button button-primary" href="#booking">
-              احجزي موعدك
-              <span aria-hidden="true">↗</span>
-            </a>
-
-            <a class="button button-outline" href="#about">
-              تعرفي على الدكتور
-            </a>
+            <a class="button button-primary" href="#booking" data-hero="primaryButton"></a>
+            <a class="button button-outline" href="#services" data-hero="secondaryButton"></a>
           </div>
 
-          <div class="hero-note">
-            <span class="note-icon" aria-hidden="true">✳</span>
-            <span>اهتمام بالتفاصيل، ورعاية تبدأ بالاستماع إليكِ.</span>
-          </div>
+          <p class="hero-note" data-hero="note"></p>
 
+          <div class="hero-highlights" id="heroHighlights"></div>
         </div>
 
-        <div class="hero-visual" aria-label="معلومات العيادة">
-
-          <div class="visual-backdrop"></div>
-
-          <div class="visual-card">
-
-            <div class="visual-top">
-              <span class="visual-label">CLINIC PROFILE</span>
-              <span class="visual-symbol">✳</span>
+        <div class="hero-visual">
+          <div class="visual-main">
+            <div class="visual-topline">
+              <span class="visual-symbol">+</span>
+              <span data-hero="visualLabel"></span>
             </div>
 
-            <div class="doctor-placeholder">
-              <div class="doctor-initial">R</div>
-              <span class="orbit orbit-one"></span>
-              <span class="orbit orbit-two"></span>
+            <div class="doctor-image-wrap" id="doctorImageWrap">
+              <div class="doctor-image-placeholder" id="doctorImagePlaceholder">
+                <span class="placeholder-plus">+</span>
+                <span data-hero="cardLabel"></span>
+              </div>
+              <img id="doctorImage" alt="" hidden>
             </div>
 
-            <div class="visual-doctor-info">
-              <span class="info-caption">استشارات ورعاية طبية</span>
-              <h2 data-doctor-name>د. رضا الشربيني</h2>
-              <p data-specialty>نساء وتوليد</p>
+            <div class="visual-caption">
+              <span class="caption-indicator"></span>
+              <span data-hero="cardFooter"></span>
             </div>
-
-            <div class="visual-footer">
-              <span>WOMEN'S HEALTH</span>
-              <span>01 / 01</span>
-            </div>
-
           </div>
 
-          <div class="floating-note">
-            <span class="floating-icon">✦</span>
-            <span>
-              <strong>رعاية مستمرة</strong>
-              <small>لكِ في كل مرحلة</small>
-            </span>
+          <div class="floating-card">
+            <span class="floating-icon">✳</span>
+            <div>
+              <strong data-hero="floatingTitle"></strong>
+              <p data-hero="floatingDescription"></p>
+            </div>
           </div>
-
-          <div class="visual-index">01 — YOUR HEALTH MATTERS</div>
-
         </div>
-
       </div>
     </section>
 
-    <section class="intro-strip">
-      <div class="container intro-strip-inner">
-        <span>اهتمام</span>
-        <span class="strip-star">✳</span>
-        <span>خصوصية</span>
-        <span class="strip-star">✳</span>
-        <span>متابعة</span>
-        <span class="strip-star">✳</span>
-        <span>رعاية متخصصة</span>
-      </div>
+    <section class="highlights-strip">
+      <div class="container highlights-grid" id="highlightsGrid"></div>
     </section>
 
     <section class="section about-section" id="about">
       <div class="container about-grid">
-
-        <div class="section-heading">
-          <span class="section-kicker">01 / ABOUT THE DOCTOR</span>
-
+        <div class="section-intro">
+          <p class="section-label" data-about="sectionLabel"></p>
           <h2>
-            لأن صحتك
-            <span class="highlight-text">تستحق</span>
-            الاهتمام.
+            <span data-about="title"></span>
+            <span class="highlight" data-about="highlightedTitle"></span>
+            <span data-about="titleEnd"></span>
           </h2>
         </div>
 
         <div class="about-copy">
-          <p>
-            يقدم <strong data-doctor-name>د. رضا الشربيني</strong>
-            خدمات طبية في تخصص
-            <strong data-specialty>نساء وتوليد</strong>،
-            مع التركيز على توضيح المعلومات الطبية للمريضة
-            ومساعدتها على فهم خيارات الرعاية المناسبة لها.
-          </p>
-
-          <p>
-            يمكن تخصيص هذا القسم لاحقًا لإضافة المؤهلات العلمية،
-            والخبرات، والاعتمادات المهنية المعتمدة للطبيب.
-          </p>
-
-          <a class="text-link" href="#booking">
-            ابدئي بحجز موعد
-            <span aria-hidden="true">←</span>
-          </a>
+          <div id="aboutParagraphs"></div>
+          <a class="button button-dark" href="#booking" data-about="button"></a>
         </div>
-
       </div>
     </section>
 
     <section class="section services-section" id="services">
       <div class="container">
-
-        <div class="section-heading services-heading">
-          <span class="section-kicker">02 / MEDICAL SERVICES</span>
-
+        <div class="section-heading">
+          <p class="section-label" data-services="sectionLabel"></p>
           <h2>
-            رعاية طبية
-            <span class="highlight-text">لكِ.</span>
+            <span data-services="title"></span>
+            <span class="highlight" data-services="highlightedTitle"></span>
           </h2>
-
-          <p>
-            الخدمات المعروضة أدناه هي أقسام مبدئية قابلة للتعديل
-            وفق الخدمات الفعلية التي تقدمها العيادة.
-          </p>
+          <p data-services="description"></p>
         </div>
 
-        <div class="services-grid">
-
-          <article class="service-card service-card-dark">
-            <span class="service-number">01</span>
-            <span class="service-icon" aria-hidden="true">✳</span>
-
-            <h3>متابعة الحمل</h3>
-
-            <p>
-              متابعة مراحل الحمل والفحوصات المناسبة وفق تقييم الطبيب.
-            </p>
-
-            <a href="#booking" aria-label="حجز موعد لمتابعة الحمل">
-              <span aria-hidden="true">↗</span>
-            </a>
-          </article>
-
-          <article class="service-card service-card-light">
-            <span class="service-number">02</span>
-            <span class="service-icon" aria-hidden="true">＋</span>
-
-            <h3>أمراض النساء</h3>
-
-            <p>
-              استشارات وتقييم الحالات المتعلقة بصحة المرأة.
-            </p>
-
-            <a href="#booking" aria-label="حجز موعد لأمراض النساء">
-              <span aria-hidden="true">↗</span>
-            </a>
-          </article>
-
-          <article class="service-card service-card-green">
-            <span class="service-number">03</span>
-            <span class="service-icon" aria-hidden="true">◎</span>
-
-            <h3>الفحوصات الدورية</h3>
-
-            <p>
-              زيارات دورية وتقييم الاحتياجات الصحية بحسب الحالة.
-            </p>
-
-            <a href="#booking" aria-label="حجز موعد للفحوصات الدورية">
-              <span aria-hidden="true">↗</span>
-            </a>
-          </article>
-
-        </div>
-
+        <div class="services-grid" id="servicesGrid"></div>
       </div>
     </section>
 
-    <section class="booking-section" id="booking">
-      <div class="container booking-inner">
-
-        <div class="booking-copy">
-          <span class="section-kicker">03 / APPOINTMENTS</span>
-
+    <section class="section booking-section" id="booking">
+      <div class="container booking-grid">
+        <div class="booking-intro">
+          <p class="section-label" data-booking="sectionLabel"></p>
           <h2>
-            خطوتك الأولى
-            <span class="highlight-text">تبدأ هنا.</span>
+            <span data-booking="title"></span>
+            <span class="highlight" data-booking="highlightedTitle"></span>
           </h2>
+          <p data-booking="description"></p>
 
-          <p>
-            احجزي موعدك من خلال الموقع، وتابعي مواعيدك
-            مستقبلًا من خلال بوابة المريض.
-          </p>
+          <div class="booking-contact">
+            <div class="contact-icon">☎</div>
+            <div>
+              <span data-contact="phoneLabel"></span>
+              <a id="bookingPhone" href="#"></a>
+            </div>
+          </div>
         </div>
 
-        <div class="booking-panel">
-
-          <div class="booking-panel-top">
-            <span>حجز موعد جديد</span>
-            <span class="booking-indicator"></span>
-          </div>
-
-          <p>
-            ابدئي بطلب موعد في العيادة. سيتم تفعيل إرسال الحجوزات
-            وتأكيدها بعد ربط النظام بقاعدة البيانات.
-          </p>
+        <div class="form-panel">
+          <h3 data-booking="panelTitle"></h3>
+          <p class="form-description" data-booking="panelDescription"></p>
 
           <form id="bookingForm">
-
             <div class="form-field">
-              <label for="patientName">الاسم الكامل</label>
+              <label for="patientName" data-booking="patientNameLabel"></label>
               <input
                 id="patientName"
                 name="patientName"
                 type="text"
                 autocomplete="name"
-                placeholder="اكتبي اسمك"
                 required
-                maxlength="100"
               >
             </div>
 
             <div class="form-field">
-              <label for="patientPhone">رقم الهاتف</label>
+              <label for="patientPhone" data-booking="patientPhoneLabel"></label>
               <input
                 id="patientPhone"
                 name="patientPhone"
                 type="tel"
-                autocomplete="tel"
                 inputmode="tel"
-                placeholder="رقم الهاتف للتواصل"
+                autocomplete="tel"
                 required
-                maxlength="20"
               >
             </div>
 
             <div class="form-field">
-              <label for="appointmentDate">التاريخ المفضل</label>
+              <label for="appointmentDate" data-booking="appointmentDateLabel"></label>
               <input
                 id="appointmentDate"
                 name="appointmentDate"
@@ -351,86 +203,102 @@
               >
             </div>
 
-            <button
-              class="button button-primary booking-submit"
-              type="submit"
-            >
-              متابعة طلب الحجز
-              <span aria-hidden="true">↗</span>
-            </button>
+            <button class="button button-primary form-submit" type="submit" data-booking="submitButton"></button>
 
-            <p
-              class="form-message"
-              id="bookingMessage"
-              role="status"
-              aria-live="polite"
-              hidden
-            ></p>
-
-            <p class="form-disclaimer">
-              هذا النموذج تجريبي في المرحلة الحالية، ولا يرسل
-              البيانات أو يحفظها في قاعدة بيانات.
-            </p>
-
+            <p class="form-disclaimer" data-booking="disclaimer"></p>
+            <p class="form-message" id="bookingMessage" role="status" aria-live="polite"></p>
           </form>
-
         </div>
-
       </div>
     </section>
 
-    <section class="patient-section" id="patient-access">
-      <div class="container patient-inner">
-
-        <div>
-          <span class="section-kicker">04 / PATIENT PORTAL</span>
-
-          <h2>مواعيدك في مكان واحد.</h2>
-
-          <p>
-            بوابة خاصة لمتابعة الحجوزات وإدارة المواعيد بعد
-            تفعيل حساب المريض.
-          </p>
+    <section class="section portal-section" id="patient-portal">
+      <div class="container portal-grid">
+        <div class="portal-intro">
+          <p class="section-label" data-portal="sectionLabel"></p>
+          <h2>
+            <span data-portal="title"></span>
+            <span class="highlight" data-portal="highlightedTitle"></span>
+          </h2>
+          <p data-portal="description"></p>
         </div>
 
-        <a
-          class="button button-dark"
-          href="#patient-access"
-          id="patientLoginLink"
-        >
-          دخول المرضى
-          <span aria-hidden="true">↗</span>
-        </a>
+        <div class="portal-panel">
+          <div class="portal-icon">↗</div>
+          <h3 data-portal="loginTitle"></h3>
+          <p data-portal="demoMessage"></p>
 
+          <form id="patientLoginForm">
+            <div class="form-field">
+              <label for="patientEmail" data-portal="emailLabel"></label>
+              <input id="patientEmail" name="email" type="email" autocomplete="username" required>
+            </div>
+
+            <div class="form-field">
+              <label for="patientPassword" data-portal="passwordLabel"></label>
+              <input id="patientPassword" name="password" type="password" autocomplete="current-password" required>
+            </div>
+
+            <button class="button button-dark form-submit" type="submit" data-portal="loginSubmitButton"></button>
+            <p class="form-message" id="loginMessage" role="status" aria-live="polite"></p>
+          </form>
+        </div>
       </div>
     </section>
 
+    <section class="section contact-section" id="contact">
+      <div class="container contact-heading">
+        <p class="section-label" data-contact="title"></p>
+        <h2 data-contact="description"></h2>
+      </div>
+
+      <div class="container contact-grid">
+        <div class="contact-card">
+          <span class="contact-card-icon">☎</span>
+          <h3 data-contact="phoneLabel"></h3>
+          <a id="contactPhone" href="#"></a>
+        </div>
+
+        <div class="contact-card">
+          <span class="contact-card-icon">◉</span>
+          <h3 data-contact="whatsappLabel"></h3>
+          <a id="contactWhatsapp" href="#" target="_blank" rel="noopener noreferrer"></a>
+        </div>
+
+        <div class="contact-card">
+          <span class="contact-card-icon">⌖</span>
+          <h3 data-contact="addressLabel"></h3>
+          <p id="contactAddress"></p>
+        </div>
+
+        <div class="contact-card hours-card">
+          <span class="contact-card-icon">◷</span>
+          <h3 data-contact="hoursLabel"></h3>
+          <ul id="workingHours"></ul>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="site-footer">
-    <div class="container footer-inner">
-
+    <div class="container footer-top">
       <a class="brand footer-brand" href="#home">
-        <span class="brand-mark">R</span>
-
+        <span class="brand-mark" aria-hidden="true">+</span>
         <span class="brand-text">
-          <strong data-doctor-name>د. رضا الشربيني</strong>
-          <small data-specialty>نساء وتوليد</small>
+          <strong data-doctor-name></strong>
+          <small data-specialty></small>
         </span>
       </a>
 
-      <p>
-        المعلومات والخدمات المنشورة على الموقع لا تغني عن
-        استشارة الطبيب المختص.
-      </p>
+      <p data-footer="disclaimer"></p>
+    </div>
 
-      <span class="footer-copy">
-        © <span id="currentYear"></span>
-        <span data-doctor-name>د. رضا الشربيني</span>
-      </span>
-
+    <div class="container footer-bottom">
+      <span id="copyrightText"></span>
+      <a href="#home" data-footer="madeFor"></a>
     </div>
   </footer>
 
+  <script type="module" src="./src/main.js"></script>
 </body>
 </html>
