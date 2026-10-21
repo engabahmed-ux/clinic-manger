@@ -62,17 +62,17 @@ export const APP_CONFIG = {
 
   highlights: [
     {
-      number: "01",
+      number: "1",
       title: "متابعة دقيقة",
       description: "اهتمام بالتفاصيل في كل زيارة."
     },
     {
-      number: "02",
+      number: "2",
       title: "مواعيد منظمة",
       description: "إمكانية طلب موعد بسهولة."
     },
     {
-      number: "03",
+      number: "3",
       title: "خصوصية المريضة",
       description: "الخصوصية جزء أساسي من الرعاية."
     }
