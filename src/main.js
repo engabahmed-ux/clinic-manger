@@ -1,7 +1,26 @@
-
 import { APP_CONFIG } from "./config/app-config.js";
+import { FIREBASE_CONFIG } from "./config/firebase-config.js";
+
+import {
+  initializeApp,
+  getApps
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const config = APP_CONFIG;
+
+const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
+
+const firebaseApp =
+  getApps().find((item) => item.name === "[DEFAULT]") ||
+  initializeApp(FIREBASE_CONFIG);
+
+const auth = getAuth(firebaseApp);
 
 const $ = (selector, parent = document) => parent.querySelector(selector);
 const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
@@ -34,18 +53,47 @@ function applyBranding() {
   const root = document.documentElement;
   const branding = config.branding ?? {};
 
-  root.style.setProperty("--color-background", branding.background ?? "#11141A");
-  root.style.setProperty("--color-surface", branding.surface ?? "#F9F5F1");
-  root.style.setProperty("--color-accent", branding.accent ?? "#FFF25C");
-  root.style.setProperty("--color-secondary", branding.secondary ?? "#BFD2AF");
-  root.style.setProperty("--font-heading", `"${branding.headingFont ?? "Cairo"}", sans-serif`);
-  root.style.setProperty("--font-body", `"${branding.bodyFont ?? "Cairo"}", sans-serif`);
+  root.style.setProperty(
+    "--color-background",
+    branding.background ?? "#11141A"
+  );
 
-  document.documentElement.lang = config.localization?.language ?? "ar";
-  document.documentElement.dir = config.localization?.direction ?? "rtl";
-  document.title = `${config.clinic?.doctorName ?? config.appName} | ${config.clinic?.specialty ?? ""}`;
+  root.style.setProperty(
+    "--color-surface",
+    branding.surface ?? "#F9F5F1"
+  );
+
+  root.style.setProperty(
+    "--color-accent",
+    branding.accent ?? "#FFF25C"
+  );
+
+  root.style.setProperty(
+    "--color-secondary",
+    branding.secondary ?? "#BFD2AF"
+  );
+
+  root.style.setProperty(
+    "--font-heading",
+    `"${branding.headingFont ?? "Cairo"}", sans-serif`
+  );
+
+  root.style.setProperty(
+    "--font-body",
+    `"${branding.bodyFont ?? "Cairo"}", sans-serif`
+  );
+
+  document.documentElement.lang =
+    config.localization?.language ?? "ar";
+
+  document.documentElement.dir =
+    config.localization?.direction ?? "rtl";
+
+  document.title =
+    `${config.clinic?.doctorName ?? config.appName} | ${config.clinic?.specialty ?? ""}`;
 
   const description = $("meta[name='description']");
+
   if (description) {
     description.content = config.clinic?.description ?? "";
   }
@@ -53,14 +101,25 @@ function applyBranding() {
 
 function renderNavigation() {
   setNestedText("nav", config.navigation);
-  setAttribute(".brand", "aria-label", config.navigation?.logoLabel);
-  setAttribute("#menuToggle", "aria-label", config.navigation?.menuLabel);
+
+  setAttribute(
+    ".brand",
+    "aria-label",
+    config.navigation?.logoLabel
+  );
+
+  setAttribute(
+    "#menuToggle",
+    "aria-label",
+    config.navigation?.menuLabel
+  );
 }
 
 function renderHero() {
   setNestedText("hero", config.hero);
 
   const highlights = $("#heroHighlights");
+
   if (highlights) {
     highlights.replaceChildren();
 
@@ -73,6 +132,7 @@ function renderHero() {
       marker.textContent = item.number ?? "";
 
       const textWrap = document.createElement("div");
+
       const title = document.createElement("strong");
       title.textContent = item.title ?? "";
 
@@ -91,14 +151,21 @@ function renderHero() {
 
   if (image && placeholder && imageUrl) {
     image.src = imageUrl;
-    image.alt = `${config.clinic?.doctorName ?? ""} - ${config.clinic?.specialty ?? ""}`;
+
+    image.alt =
+      `${config.clinic?.doctorName ?? ""} - ${config.clinic?.specialty ?? ""}`;
+
     image.hidden = false;
     placeholder.hidden = true;
 
-    image.addEventListener("error", () => {
-      image.hidden = true;
-      placeholder.hidden = false;
-    }, { once: true });
+    image.addEventListener(
+      "error",
+      () => {
+        image.hidden = true;
+        placeholder.hidden = false;
+      },
+      { once: true }
+    );
   } else if (image && placeholder) {
     image.hidden = true;
     placeholder.hidden = false;
@@ -107,6 +174,7 @@ function renderHero() {
 
 function renderHighlights() {
   const container = $("#highlightsGrid");
+
   if (!container) return;
 
   container.replaceChildren();
@@ -120,6 +188,7 @@ function renderHighlights() {
     number.textContent = item.number ?? "";
 
     const content = document.createElement("div");
+
     const title = document.createElement("h3");
     title.textContent = item.title ?? "";
 
@@ -136,6 +205,7 @@ function renderAbout() {
   setNestedText("about", config.about);
 
   const container = $("#aboutParagraphs");
+
   if (!container) return;
 
   container.replaceChildren();
@@ -151,6 +221,7 @@ function renderServices() {
   setNestedText("services", config.services);
 
   const container = $("#servicesGrid");
+
   if (!container) return;
 
   container.replaceChildren();
@@ -184,8 +255,13 @@ function renderServices() {
       const link = document.createElement("a");
       link.className = "service-link";
       link.href = "#booking";
-      link.textContent = config.booking?.submitButton ?? "حجز موعد";
-      link.setAttribute("aria-label", `${link.textContent} - ${service.title ?? ""}`);
+      link.textContent =
+        config.booking?.submitButton ?? "حجز موعد";
+
+      link.setAttribute(
+        "aria-label",
+        `${link.textContent} - ${service.title ?? ""}`
+      );
 
       card.append(top, title, description, link);
       container.append(card);
@@ -197,7 +273,10 @@ function renderBooking() {
   setNestedText("contact", config.contact);
 
   const phone = config.clinic?.phone ?? "";
-  const phoneLink = phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : "#";
+
+  const phoneLink = phone
+    ? `tel:${phone.replace(/[^\d+]/g, "")}`
+    : "#";
 
   const bookingPhone = $("#bookingPhone");
   const contactPhone = $("#contactPhone");
@@ -225,11 +304,13 @@ function renderBooking() {
   const phoneInput = $("#patientPhone");
 
   if (nameInput) {
-    nameInput.placeholder = config.booking?.patientNamePlaceholder ?? "";
+    nameInput.placeholder =
+      config.booking?.patientNamePlaceholder ?? "";
   }
 
   if (phoneInput) {
-    phoneInput.placeholder = config.booking?.patientPhonePlaceholder ?? "";
+    phoneInput.placeholder =
+      config.booking?.patientPhonePlaceholder ?? "";
   }
 
   if (form) {
@@ -237,21 +318,35 @@ function renderBooking() {
       event.preventDefault();
 
       const message = $("#bookingMessage");
+
       if (!message) return;
 
       const formData = new FormData(form);
-      const name = String(formData.get("patientName") ?? "").trim();
-      const patientPhone = String(formData.get("patientPhone") ?? "").trim();
-      const date = String(formData.get("appointmentDate") ?? "").trim();
+
+      const name = String(
+        formData.get("patientName") ?? ""
+      ).trim();
+
+      const patientPhone = String(
+        formData.get("patientPhone") ?? ""
+      ).trim();
+
+      const date = String(
+        formData.get("appointmentDate") ?? ""
+      ).trim();
 
       if (!name || !patientPhone || !date) {
-        message.textContent = config.booking?.errorMessage ?? "يرجى إدخال البيانات المطلوبة.";
+        message.textContent =
+          config.booking?.errorMessage ??
+          "يرجى إدخال البيانات المطلوبة.";
+
         message.className = "form-message error";
         return;
       }
 
       message.textContent =
         "هذه واجهة تجريبية فقط. لم يتم إرسال أو حفظ طلب الحجز. يجب ربط النموذج بخدمة آمنة قبل استخدامه فعليًا.";
+
       message.className = "form-message";
     });
   }
@@ -261,6 +356,7 @@ function renderPatientPortal() {
   setNestedText("portal", config.patientPortal);
 
   const portal = $("#patient-portal");
+
   if (config.patientPortal?.enabled === false) {
     portal?.setAttribute("hidden", "");
   } else {
@@ -269,51 +365,213 @@ function renderPatientPortal() {
 
   const emailInput = $("#patientEmail");
   const passwordInput = $("#patientPassword");
+  const loginForm = $("#patientLoginForm");
+  const message = $("#loginMessage");
+
+  const loginButton = loginForm?.querySelector(
+    'button[type="submit"]'
+  );
 
   if (emailInput) {
-    emailInput.placeholder = config.patientPortal?.emailPlaceholder ?? "";
+    emailInput.placeholder =
+      config.patientPortal?.emailPlaceholder ?? "";
   }
 
   if (passwordInput) {
-    passwordInput.placeholder = config.patientPortal?.passwordPlaceholder ?? "";
+    passwordInput.placeholder =
+      config.patientPortal?.passwordPlaceholder ?? "";
   }
 
-  const loginForm = $("#patientLoginForm");
-  if (loginForm) {
-    loginForm.addEventListener("submit", (event) => {
-      event.preventDefault();
+  if (!loginForm || !message || !loginButton) return;
 
-      const message = $("#loginMessage");
-      if (!message) return;
+  let logoutButton = $("#patientLogoutButton");
 
-      message.textContent =
-        "تسجيل الدخول غير مفعّل حتى الآن. لم يتم إرسال بيانات الدخول أو التحقق منها.";
-      message.className = "form-message error";
-    });
+  if (!logoutButton) {
+    logoutButton = document.createElement("button");
+
+    logoutButton.id = "patientLogoutButton";
+    logoutButton.type = "button";
+    logoutButton.className =
+      "button button-dark form-submit";
+
+    logoutButton.textContent = "تسجيل الخروج";
+    logoutButton.hidden = true;
+
+    loginForm.insertAdjacentElement(
+      "afterend",
+      logoutButton
+    );
   }
+
+  function showLoginMessage(text, isError = true) {
+    message.textContent = text;
+
+    message.className = isError
+      ? "form-message error"
+      : "form-message";
+  }
+
+  function setLoginBusy(busy) {
+    loginButton.disabled = busy;
+
+    loginButton.textContent = busy
+      ? "جارٍ التحقق..."
+      : config.patientPortal?.loginSubmitButton ??
+        "تسجيل الدخول";
+
+    emailInput.disabled = busy;
+    passwordInput.disabled = busy;
+  }
+
+  function getAuthErrorMessage(error) {
+    switch (error?.code) {
+      case "auth/invalid-email":
+        return "البريد الإلكتروني غير صحيح.";
+
+      case "auth/invalid-credential":
+      case "auth/wrong-password":
+      case "auth/user-not-found":
+        return "البريد الإلكتروني أو كلمة المرور غير صحيحة.";
+
+      case "auth/too-many-requests":
+        return "محاولات كثيرة. يرجى الانتظار ثم المحاولة مرة أخرى.";
+
+      case "auth/network-request-failed":
+        return "تعذر الاتصال بالإنترنت. تحقق من اتصالك وحاول مرة أخرى.";
+
+      case "auth/user-disabled":
+        return "هذا الحساب معطّل. يرجى التواصل مع إدارة العيادة.";
+
+      default:
+        return "تعذر تسجيل الدخول. حاول مرة أخرى.";
+    }
+  }
+
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    if (loginButton.disabled) return;
+
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      showLoginMessage(
+        "أدخل البريد الإلكتروني وكلمة المرور."
+      );
+
+      return;
+    }
+
+    showLoginMessage("", false);
+    setLoginBusy(true);
+
+    try {
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      const user = credential.user;
+
+      passwordInput.value = "";
+
+      if (user.uid === DOCTOR_ADMIN_UID) {
+        window.location.href = "./admin.html";
+        return;
+      }
+
+      showLoginMessage(
+        "تم التحقق من الحساب بنجاح. عرض المواعيد وبيانات المريضة لم يُفعّل بعد.",
+        false
+      );
+
+      emailInput.disabled = true;
+      passwordInput.disabled = true;
+      loginButton.hidden = true;
+      logoutButton.hidden = false;
+    } catch (error) {
+      console.error("Clinic login error:", error);
+
+      showLoginMessage(
+        getAuthErrorMessage(error)
+      );
+    } finally {
+      setLoginBusy(false);
+    }
+  });
+
+  logoutButton.addEventListener("click", async () => {
+    logoutButton.disabled = true;
+
+    try {
+      await signOut(auth);
+
+      emailInput.disabled = false;
+      passwordInput.disabled = false;
+      loginButton.hidden = false;
+
+      passwordInput.value = "";
+
+      showLoginMessage(
+        "تم تسجيل الخروج بنجاح.",
+        false
+      );
+
+      logoutButton.hidden = true;
+      emailInput.focus();
+    } catch (error) {
+      console.error("Clinic logout error:", error);
+
+      showLoginMessage(
+        "تعذر تسجيل الخروج. حاول مرة أخرى."
+      );
+    } finally {
+      logoutButton.disabled = false;
+    }
+  });
 }
 
 function renderContact() {
   const clinic = config.clinic ?? {};
 
   const address = $("#contactAddress");
-  if (address) address.textContent = clinic.address ?? "";
 
-  const whatsapp = String(clinic.whatsapp ?? "").replace(/\D/g, "");
+  if (address) {
+    address.textContent = clinic.address ?? "";
+  }
+
+  const whatsapp = String(
+    clinic.whatsapp ?? ""
+  ).replace(/\D/g, "");
+
   const whatsappLink = $("#contactWhatsapp");
 
   if (whatsappLink) {
-    whatsappLink.textContent = config.contact?.whatsappButton ?? clinic.whatsapp ?? "";
-    whatsappLink.href = whatsapp ? `https://wa.me/${whatsapp}` : "#";
-    whatsappLink.setAttribute("rel", "noopener noreferrer");
+    whatsappLink.textContent =
+      config.contact?.whatsappButton ??
+      clinic.whatsapp ??
+      "";
+
+    whatsappLink.href = whatsapp
+      ? `https://wa.me/${whatsapp}`
+      : "#";
+
+    whatsappLink.setAttribute(
+      "rel",
+      "noopener noreferrer"
+    );
   }
 
   const hours = $("#workingHours");
+
   if (hours) {
     hours.replaceChildren();
 
     (clinic.workingHours ?? []).forEach((item) => {
       const row = document.createElement("li");
+
       const day = document.createElement("span");
       const time = document.createElement("span");
 
@@ -330,16 +588,28 @@ function renderFooter() {
   setNestedText("footer", config.footer);
 
   const copyright = $("#copyrightText");
+
   if (copyright) {
-    copyright.textContent = `${config.footer?.copyrightPrefix ?? "©"} ${new Date().getFullYear()} ${config.clinic?.doctorName ?? config.appName} — ${config.footer?.copyrightSuffix ?? ""}`;
+    copyright.textContent =
+      `${config.footer?.copyrightPrefix ?? "©"} ${new Date().getFullYear()} ${config.clinic?.doctorName ?? config.appName} — ${config.footer?.copyrightSuffix ?? ""}`;
   }
 }
 
 function renderDoctorInfo() {
-  setText("[data-doctor-name]", config.clinic?.doctorName);
-  setText("[data-specialty]", config.clinic?.specialty);
+  setText(
+    "[data-doctor-name]",
+    config.clinic?.doctorName
+  );
 
-  const whatsapp = String(config.clinic?.whatsapp ?? "").replace(/\D/g, "");
+  setText(
+    "[data-specialty]",
+    config.clinic?.specialty
+  );
+
+  const whatsapp = String(
+    config.clinic?.whatsapp ?? ""
+  ).replace(/\D/g, "");
+
   const whatsappLink = $("#contactWhatsapp");
 
   if (whatsappLink && !whatsapp) {
@@ -355,30 +625,49 @@ function setupMobileMenu() {
 
   toggle.addEventListener("click", () => {
     const isOpen = nav.classList.toggle("is-open");
-    toggle.setAttribute("aria-expanded", String(isOpen));
+
+    toggle.setAttribute(
+      "aria-expanded",
+      String(isOpen)
+    );
   });
 
   $$("a", nav).forEach((link) => {
     link.addEventListener("click", () => {
       nav.classList.remove("is-open");
-      toggle.setAttribute("aria-expanded", "false");
+
+      toggle.setAttribute(
+        "aria-expanded",
+        "false"
+      );
     });
   });
 
   document.addEventListener("click", (event) => {
-    if (!nav.contains(event.target) && !toggle.contains(event.target)) {
+    if (
+      !nav.contains(event.target) &&
+      !toggle.contains(event.target)
+    ) {
       nav.classList.remove("is-open");
-      toggle.setAttribute("aria-expanded", "false");
+
+      toggle.setAttribute(
+        "aria-expanded",
+        "false"
+      );
     }
   });
 }
 
 function setupDateInput() {
   const dateInput = $("#appointmentDate");
+
   if (!dateInput) return;
 
   const now = new Date();
-  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+
+  const localDate = new Date(
+    now.getTime() - now.getTimezoneOffset() * 60000
+  )
     .toISOString()
     .slice(0, 10);
 
