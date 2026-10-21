@@ -1,3 +1,4 @@
+
 :root {
   --color-dark: #11141A;
   --color-light: #F9F5F1;
@@ -23,6 +24,10 @@
   --transition: 0.25s ease;
 }
 
+/* =========================================
+   Global
+========================================= */
+
 *,
 *::before,
 *::after {
@@ -32,6 +37,7 @@
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 90px;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -85,6 +91,13 @@ select {
   border-radius: 0;
 }
 
+input,
+textarea,
+select,
+button {
+  max-width: 100%;
+}
+
 [hidden] {
   display: none !important;
 }
@@ -116,6 +129,7 @@ h3 {
   font-family: var(--font-heading);
   line-height: 1.35;
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 h1 {
@@ -136,6 +150,7 @@ h3 {
 
 p {
   margin-bottom: 18px;
+  overflow-wrap: anywhere;
 }
 
 .highlight {
@@ -269,6 +284,7 @@ p {
   width: 44px;
   height: 44px;
   padding: 10px;
+  flex-shrink: 0;
   background: transparent;
   border: 1px solid var(--color-border);
   border-radius: 12px;
@@ -374,6 +390,7 @@ p {
 .hero-content {
   position: relative;
   z-index: 2;
+  min-width: 0;
 }
 
 .eyebrow {
@@ -476,6 +493,7 @@ p {
 .visual-main {
   position: relative;
   width: min(100%, 460px);
+  min-width: 0;
   min-height: 420px;
   padding: 20px;
   overflow: hidden;
@@ -574,7 +592,7 @@ p {
 }
 
 /* =========================================
-   Highlights strip
+   Highlights
 ========================================= */
 
 .highlights-strip {
@@ -617,7 +635,7 @@ p {
 }
 
 /* =========================================
-   Section labels and headings
+   Section Headings
 ========================================= */
 
 .section-label {
@@ -669,6 +687,7 @@ p {
 }
 
 .about-copy {
+  min-width: 0;
   color: #666971;
   font-size: 1rem;
   line-height: 2.05;
@@ -793,6 +812,7 @@ p {
 }
 
 .booking-intro {
+  min-width: 0;
   padding-top: 18px;
 }
 
@@ -836,6 +856,7 @@ p {
 
 .booking-contact a {
   width: fit-content;
+  max-width: 100%;
   color: var(--color-light);
   font-size: 1.05rem;
   font-weight: 800;
@@ -883,7 +904,9 @@ p {
   color: var(--color-light);
   border: 1px solid rgba(249, 245, 241, 0.16);
   border-radius: 12px;
-  transition: border-color var(--transition), box-shadow var(--transition);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
 }
 
 .form-field input:focus,
@@ -894,6 +917,10 @@ p {
   box-shadow: 0 0 0 3px rgba(255, 242, 92, 0.1);
 }
 
+.form-field textarea {
+  resize: vertical;
+}
+
 .form-submit {
   width: 100%;
   margin-top: 5px;
@@ -901,7 +928,7 @@ p {
 }
 
 /* =========================================
-   Patient portal & Contact
+   Patient Portal
 ========================================= */
 
 .portal-section {
@@ -925,6 +952,10 @@ p {
   box-shadow: 0 24px 60px rgba(17, 20, 26, 0.16);
 }
 
+/* =========================================
+   Contact
+========================================= */
+
 .contact-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -938,7 +969,9 @@ p {
   background: #EFEAE4;
   border: 1px solid rgba(17, 20, 26, 0.06);
   border-radius: 20px;
-  transition: transform var(--transition), box-shadow var(--transition);
+  transition:
+    transform var(--transition),
+    box-shadow var(--transition);
 }
 
 .contact-card:hover {
@@ -947,11 +980,7 @@ p {
 }
 
 /* =========================================
-   Footer & Responsive
-========================================= */
-
-/* =========================================
-   Footer & Responsive
+   Footer
 ========================================= */
 
 .site-footer {
@@ -982,38 +1011,10 @@ p {
   font-size: 0.8rem;
 }
 
-/* منع العناصر من تجاوز عرض الشاشة */
-.container,
-.header-inner,
-.hero-grid,
-.about-grid,
-.booking-grid,
-.portal-grid,
-.services-grid,
-.contact-grid,
-.form-panel,
-.portal-panel {
-  min-width: 0;
-}
+/* =========================================
+   Medium Screens
+========================================= */
 
-.container {
-  width: min(var(--container-width), calc(100% - 48px));
-  margin-inline: auto;
-}
-
-input,
-textarea,
-select,
-button {
-  max-width: 100%;
-}
-
-img {
-  max-width: 100%;
-  height: auto;
-}
-
-/* الشاشات المتوسطة واللابتوب الصغير */
 @media (max-width: 1100px) {
   .header-inner {
     gap: 16px;
@@ -1021,6 +1022,14 @@ img {
 
   .main-nav {
     gap: 16px;
+  }
+
+  .main-nav a {
+    font-size: 0.85rem;
+  }
+
+  .header-cta {
+    padding-inline: 16px;
   }
 
   .hero-grid {
@@ -1038,7 +1047,10 @@ img {
   }
 }
 
-/* التابلت */
+/* =========================================
+   Tablet & Mobile Navigation
+========================================= */
+
 @media (max-width: 800px) {
   .container {
     width: calc(100% - 36px);
@@ -1049,7 +1061,74 @@ img {
   }
 
   .header-inner {
+    position: relative;
     min-height: 76px;
+    gap: 10px;
+  }
+
+  /* إظهار زر القائمة على الشاشات الصغيرة */
+  .menu-toggle {
+    display: block;
+    position: relative;
+    z-index: 1002;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    padding: 10px;
+  }
+
+  /* القائمة المنسدلة */
+  .main-nav {
+    position: absolute;
+    top: 100%;
+    inset-inline: 0;
+    z-index: 1001;
+
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0;
+
+    width: 100%;
+    max-height: calc(100vh - 90px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+
+    padding: 12px 20px;
+    background: var(--color-light);
+    border: 1px solid var(--color-border);
+    border-top: 0;
+    border-radius: 0 0 16px 16px;
+    box-shadow: 0 20px 40px rgba(17, 20, 26, 0.15);
+  }
+
+  .main-nav.is-open {
+    display: flex;
+  }
+
+  .main-nav a {
+    display: block;
+    width: 100%;
+    padding: 13px 0;
+    color: var(--color-dark);
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.7;
+    text-align: right;
+    border-bottom: 1px solid rgba(17, 20, 26, 0.08);
+  }
+
+  .main-nav a::after {
+    display: none;
+  }
+
+  .main-nav a:last-child {
+    border-bottom: 0;
+  }
+
+  .main-nav a:hover {
+    color: #6B725F;
   }
 
   .hero {
@@ -1094,8 +1173,8 @@ img {
   }
 
   .highlights-grid > * {
-    border-inline-start: 0;
     padding: 12px;
+    border-inline-start: 0;
   }
 
   .highlights-grid > *:nth-child(odd) {
@@ -1108,7 +1187,10 @@ img {
   }
 }
 
-/* الموبايل */
+/* =========================================
+   Mobile
+========================================= */
+
 @media (max-width: 600px) {
   html {
     scroll-padding-top: 72px;
@@ -1124,11 +1206,12 @@ img {
 
   .header-inner {
     min-height: 70px;
-    gap: 10px;
+    gap: 8px;
   }
 
   .brand {
     gap: 9px;
+    flex-shrink: 1;
   }
 
   .brand-mark {
@@ -1155,7 +1238,7 @@ img {
   .menu-toggle {
     width: 42px;
     height: 42px;
-    flex-shrink: 0;
+    padding: 9px;
   }
 
   h1 {
@@ -1400,10 +1483,17 @@ img {
   }
 }
 
-/* التليفونات الصغيرة */
+/* =========================================
+   Small Mobile Screens
+========================================= */
+
 @media (max-width: 380px) {
   .container {
     width: calc(100% - 24px);
+  }
+
+  .header-inner {
+    gap: 6px;
   }
 
   .brand {
@@ -1425,8 +1515,24 @@ img {
   }
 
   .header-cta {
-    padding-inline: 9px;
+    min-height: 38px;
+    padding: 7px 9px;
     font-size: 0.74rem;
+  }
+
+  .menu-toggle {
+    width: 38px;
+    height: 38px;
+    padding: 7px;
+  }
+
+  .main-nav {
+    padding: 10px 15px;
+  }
+
+  .main-nav a {
+    padding-block: 12px;
+    font-size: 0.92rem;
   }
 
   .hero-visual {
@@ -1460,7 +1566,10 @@ img {
   }
 }
 
-/* تحسين الاستخدام على الأجهزة التي لا تستخدم الماوس */
+/* =========================================
+   Touch Devices
+========================================= */
+
 @media (hover: none) {
   .button:hover,
   .service-card:hover,
@@ -1470,7 +1579,10 @@ img {
   }
 }
 
-/* احترام إعداد تقليل الحركة في الجهاز */
+/* =========================================
+   Reduced Motion
+========================================= */
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
