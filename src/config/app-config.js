@@ -101,21 +101,21 @@ export const APP_CONFIG = {
         id: "pregnancy-followup",
         title: "متابعة الحمل",
         description: "متابعة دورية للحمل وفق الخطة الطبية التي يحددها الطبيب.",
-        icon: "✳",
+        icon: "⛨",
         enabled: true
       },
       {
         id: "women-health",
         title: "صحة المرأة",
         description: "استشارات ومتابعة للحالات المتعلقة بصحة المرأة.",
-        icon: "✺",
+        icon: "⛨",
         enabled: true
       },
       {
         id: "consultation",
         title: "استشارات طبية",
         description: "مراجعة الحالة ومناقشة الاستفسارات الطبية مع الطبيب.",
-        icon: "＋",
+        icon: "⛨",
         enabled: true
       }
     ]
