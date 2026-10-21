@@ -1,8 +1,9 @@
 export const FIREBASE_CONFIG = {
-  apiKey: "YOUR_FIREBASE_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_FIREBASE_APP_ID"
+  apiKey: "AIzaSyBxt8wTe2270V7QzF_Jg_T3EWzDuSS6AXI",
+  authDomain: "clinics-manger.firebaseapp.com",
+  projectId: "clinics-manger",
+  storageBucket: "clinics-manger.firebasestorage.app",
+  messagingSenderId: "533391920345",
+  appId: "1:533391920345:web:0e2daa9bdb134feeec82c8",
+  measurementId: "G-FMFK0V5VS3"
 };
