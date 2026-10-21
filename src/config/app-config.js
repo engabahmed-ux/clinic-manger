@@ -12,7 +12,7 @@ export const APP_CONFIG = {
     whatsapp: "201000000000",
     address: "اكتب عنوان العيادة هنا",
     logo: "",
-    doctorImage: "",
+doctorImage: "./doctor.jpg",
     workingHours: [
       { day: "السبت", hours: "5:00 مساءً - 9:00 مساءً" },
       { day: "الأحد", hours: "5:00 مساءً - 9:00 مساءً" },
