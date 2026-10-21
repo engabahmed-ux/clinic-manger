@@ -1596,3 +1596,6 @@ p {
 .service-number {
   display: none !important;
 }
+.floating-card {
+  display: none !important;
+}
