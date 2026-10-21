@@ -950,6 +950,10 @@ p {
    Footer & Responsive
 ========================================= */
 
+/* =========================================
+   Footer & Responsive
+========================================= */
+
 .site-footer {
   padding-top: 34px;
   background: var(--color-light);
@@ -970,31 +974,510 @@ p {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding-block: 14px;
   border-top: 1px solid rgba(17, 20, 26, 0.09);
   color: #777A82;
   font-size: 0.8rem;
 }
 
-@media (max-width: 800px) {
-  .hero-grid,
+/* منع العناصر من تجاوز عرض الشاشة */
+.container,
+.header-inner,
+.hero-grid,
+.about-grid,
+.booking-grid,
+.portal-grid,
+.services-grid,
+.contact-grid,
+.form-panel,
+.portal-panel {
+  min-width: 0;
+}
+
+.container {
+  width: min(var(--container-width), calc(100% - 48px));
+  margin-inline: auto;
+}
+
+input,
+textarea,
+select,
+button {
+  max-width: 100%;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* الشاشات المتوسطة واللابتوب الصغير */
+@media (max-width: 1100px) {
+  .header-inner {
+    gap: 16px;
+  }
+
+  .main-nav {
+    gap: 16px;
+  }
+
+  .hero-grid {
+    gap: 36px;
+  }
+
   .about-grid,
   .booking-grid,
   .portal-grid {
-    grid-template-columns: 1fr;
-    gap: 32px;
+    gap: 40px;
   }
-  .services-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+
   .contact-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 520px) {
-  .services-grid,
+/* التابلت */
+@media (max-width: 800px) {
+  .container {
+    width: calc(100% - 36px);
+  }
+
+  .section {
+    padding-block: 64px;
+  }
+
+  .header-inner {
+    min-height: 76px;
+  }
+
+  .hero {
+    padding-block: 56px 64px;
+  }
+
+  .hero-grid,
+  .about-grid,
+  .booking-grid,
+  .portal-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 36px;
+  }
+
+  .hero-content {
+    order: 1;
+  }
+
+  .hero-visual {
+    order: 2;
+    width: 100%;
+    min-height: 400px;
+  }
+
+  .visual-main {
+    width: min(100%, 500px);
+  }
+
+  .about-grid,
+  .booking-grid,
+  .portal-grid {
+    align-items: stretch;
+  }
+
+  .services-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .highlights-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .highlights-grid > * {
+    border-inline-start: 0;
+    padding: 12px;
+  }
+
+  .highlights-grid > *:nth-child(odd) {
+    border-inline-start: 1px solid rgba(17, 20, 26, 0.16);
+  }
+
+  .footer-top {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+/* الموبايل */
+@media (max-width: 600px) {
+  html {
+    scroll-padding-top: 72px;
+  }
+
+  .container {
+    width: calc(100% - 32px);
+  }
+
+  .section {
+    padding-block: 48px;
+  }
+
+  .header-inner {
+    min-height: 70px;
+    gap: 10px;
+  }
+
+  .brand {
+    gap: 9px;
+  }
+
+  .brand-mark {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    font-size: 1.7rem;
+  }
+
+  .brand-text strong {
+    font-size: 0.9rem;
+  }
+
+  .brand-text small {
+    font-size: 0.7rem;
+  }
+
+  .header-cta {
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  .menu-toggle {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+  }
+
+  h1 {
+    margin-bottom: 18px;
+    font-size: clamp(2rem, 8vw, 3rem);
+    letter-spacing: -0.7px;
+    line-height: 1.4;
+  }
+
+  h2 {
+    margin-bottom: 17px;
+    font-size: clamp(1.7rem, 6.5vw, 2.4rem);
+    letter-spacing: -0.4px;
+  }
+
+  h3 {
+    font-size: 1.15rem;
+  }
+
+  p {
+    margin-bottom: 15px;
+  }
+
+  .hero {
+    padding-block: 42px 48px;
+  }
+
+  .hero-grid {
+    gap: 28px;
+  }
+
+  .eyebrow {
+    margin-bottom: 16px;
+    font-size: 0.82rem;
+  }
+
+  .hero-description {
+    font-size: 0.96rem;
+    line-height: 1.9;
+  }
+
+  .hero-actions {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .hero-actions .button {
+    width: 100%;
+  }
+
+  .button {
+    min-height: 48px;
+    padding: 12px 18px;
+    font-size: 0.9rem;
+  }
+
+  .hero-highlights {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+    margin-top: 22px;
+  }
+
+  .hero-visual {
+    min-height: 320px;
+  }
+
+  .hero-visual::before {
+    inset: 12px 8px 8px;
+  }
+
+  .visual-main {
+    min-height: 0;
+    padding: 13px;
+    border-radius: 19px;
+  }
+
+  .visual-topline {
+    gap: 9px;
+    margin-bottom: 12px;
+    font-size: 0.8rem;
+  }
+
+  .visual-symbol {
+    width: 32px;
+    height: 32px;
+    font-size: 1.4rem;
+  }
+
+  .doctor-image-wrap {
+    height: clamp(210px, 65vw, 290px);
+    border-radius: 14px;
+  }
+
+  .floating-card {
+    inset-inline-start: 5px;
+    bottom: 12px;
+    width: min(255px, 88%);
+    gap: 10px;
+    padding: 12px;
+    border-radius: 14px;
+  }
+
+  .floating-icon {
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
+  }
+
+  .floating-card strong {
+    font-size: 0.86rem;
+  }
+
+  .floating-card p {
+    font-size: 0.75rem;
+  }
+
+  .highlights-strip {
+    padding-block: 18px;
+  }
+
+  .highlights-grid {
+    gap: 8px;
+  }
+
+  .highlights-grid > * {
+    padding: 9px;
+  }
+
+  .highlights-grid strong,
+  .highlights-grid h3 {
+    font-size: 0.9rem;
+  }
+
+  .highlights-grid p {
+    font-size: 0.78rem;
+    line-height: 1.7;
+  }
+
+  .section-heading {
+    margin-bottom: 28px;
+  }
+
+  .section-heading > p:last-child {
+    font-size: 0.92rem;
+  }
+
+  .about-grid,
+  .booking-grid,
+  .portal-grid {
+    gap: 25px;
+  }
+
+  .about-copy {
+    font-size: 0.94rem;
+    line-height: 1.95;
+  }
+
+  .services-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .service-card {
+    min-height: 0;
+    padding: 22px;
+    border-radius: 20px;
+  }
+
+  .service-card::before {
+    margin-bottom: 17px;
+  }
+
+  .service-card h3 {
+    font-size: 1.15rem;
+  }
+
+  .service-card p {
+    font-size: 0.88rem;
+  }
+
+  .booking-intro {
+    padding-top: 0;
+  }
+
+  .booking-contact {
+    gap: 12px;
+    margin-top: 22px;
+    padding: 14px;
+  }
+
+  .contact-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+  }
+
+  .booking-contact a {
+    font-size: 0.94rem;
+    overflow-wrap: anywhere;
+  }
+
+  .form-panel,
+  .portal-panel {
+    padding: 21px 17px;
+    border-radius: 20px;
+  }
+
+  .form-field {
+    margin-bottom: 16px;
+  }
+
+  .form-field input,
+  .form-field textarea,
+  .form-field select {
+    min-height: 48px;
+    padding: 11px 12px;
+    font-size: 16px;
+  }
+
   .contact-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .contact-card {
+    min-height: 0;
+    padding: 20px;
+  }
+
+  .footer-top {
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .footer-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    gap: 7px;
+    padding-block: 16px;
+  }
+}
+
+/* التليفونات الصغيرة */
+@media (max-width: 380px) {
+  .container {
+    width: calc(100% - 24px);
+  }
+
+  .brand {
+    gap: 7px;
+  }
+
+  .brand-mark {
+    width: 35px;
+    height: 35px;
+    font-size: 1.45rem;
+  }
+
+  .brand-text strong {
+    font-size: 0.8rem;
+  }
+
+  .brand-text small {
+    font-size: 0.65rem;
+  }
+
+  .header-cta {
+    padding-inline: 9px;
+    font-size: 0.74rem;
+  }
+
+  .hero-visual {
+    min-height: 285px;
+  }
+
+  .visual-main {
+    padding: 10px;
+  }
+
+  .doctor-image-wrap {
+    height: 205px;
+  }
+
+  .floating-card {
+    width: 92%;
+    padding: 10px;
+  }
+
+  .highlights-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .highlights-grid > *:nth-child(odd) {
+    border-inline-start: 0;
+  }
+
+  .form-panel,
+  .portal-panel {
+    padding: 17px 13px;
+  }
+}
+
+/* تحسين الاستخدام على الأجهزة التي لا تستخدم الماوس */
+@media (hover: none) {
+  .button:hover,
+  .service-card:hover,
+  .contact-card:hover,
+  .header-cta:hover {
+    transform: none;
+  }
+}
+
+/* احترام إعداد تقليل الحركة في الجهاز */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
