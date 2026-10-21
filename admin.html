@@ -1,0 +1,127 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#11141A">
+
+  <title>إدارة العيادة</title>
+
+  <link rel="stylesheet" href="./admin.css">
+</head>
+<body>
+  <main class="admin-shell">
+    <section class="brand-panel">
+      <div class="brand-mark" aria-hidden="true">ط</div>
+      <p class="eyebrow">نظام إدارة العيادة</p>
+      <h1>إدارة العيادة</h1>
+      <p class="brand-description">
+        مساحة خاصة بالدكتور لإدارة العمل وتجهيز صلاحيات فريق العيادة.
+      </p>
+    </section>
+
+    <section id="loginSection" class="panel login-panel">
+      <div class="panel-heading">
+        <span class="panel-icon" aria-hidden="true">↪</span>
+        <div>
+          <h2>دخول الدكتور</h2>
+          <p>سجّل الدخول باستخدام حساب الدكتور المسجل في Firebase.</p>
+        </div>
+      </div>
+
+      <form id="doctorLoginForm" novalidate>
+        <label for="doctorEmail">البريد الإلكتروني</label>
+        <input
+          id="doctorEmail"
+          name="email"
+          type="email"
+          autocomplete="username"
+          placeholder="name@example.com"
+          required
+        >
+
+        <label for="doctorPassword">كلمة المرور</label>
+        <input
+          id="doctorPassword"
+          name="password"
+          type="password"
+          autocomplete="current-password"
+          placeholder="أدخل كلمة المرور"
+          required
+        >
+
+        <p id="loginError" class="message error-message" role="alert" hidden></p>
+
+        <button id="loginButton" class="primary-button" type="submit">
+          تسجيل الدخول
+        </button>
+      </form>
+
+      <p class="security-note">
+        هذه الصفحة مخصصة لحساب الدكتور المعتمد فقط.
+      </p>
+    </section>
+
+    <section id="dashboardSection" class="panel dashboard-panel" hidden>
+      <div class="dashboard-top">
+        <div>
+          <p class="eyebrow">مساحة العمل الخاصة</p>
+          <h2>أهلاً بك يا دكتور</h2>
+          <p id="doctorAccountLabel" class="muted-text"></p>
+        </div>
+
+        <button id="logoutButton" class="secondary-button" type="button">
+          تسجيل الخروج
+        </button>
+      </div>
+
+      <div class="welcome-card">
+        <span class="welcome-icon" aria-hidden="true">✓</span>
+        <div>
+          <h3>تم التحقق من حساب الدكتور</h3>
+          <p>
+            يمكنك الوصول إلى مساحة الإدارة. ستتم إضافة الوظائف تدريجيًا
+            بعد تأمين صلاحيات البيانات.
+          </p>
+        </div>
+      </div>
+
+      <h3 class="section-heading">إدارة العيادة</h3>
+
+      <div class="management-grid">
+        <article class="management-card">
+          <span class="card-icon" aria-hidden="true">♙</span>
+          <h3>إدارة الموظفين</h3>
+          <p>تجهيز حسابات الموظفين وتحديد صلاحيات كل موظف.</p>
+          <span class="status-label">ضمن المرحلة الحالية</span>
+        </article>
+
+        <article class="management-card">
+          <span class="card-icon" aria-hidden="true">▤</span>
+          <h3>صلاحيات الوصول</h3>
+          <p>تحديد المشاهدة والتعديل والحذف بشكل منفصل لكل تبويب.</p>
+          <span class="status-label">ضمن المرحلة الحالية</span>
+        </article>
+
+        <article class="management-card upcoming-card">
+          <span class="card-icon" aria-hidden="true">▦</span>
+          <h3>الحجوزات والمرضى</h3>
+          <p>ستتم معالجة هذا القسم في مرحلة لاحقة دون تغيير وظائفه الحالية.</p>
+          <span class="status-label">مرحلة لاحقة</span>
+        </article>
+      </div>
+
+      <p id="dashboardMessage" class="message" role="status" hidden></p>
+    </section>
+
+    <footer class="admin-footer">
+      <a href="./index.html">العودة إلى الموقع العام</a>
+      <span>إدارة العيادة</span>
+    </footer>
+  </main>
+
+  <script type="module" src="./src/admin.js"></script>
+</body>
+</html>
