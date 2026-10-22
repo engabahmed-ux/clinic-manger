@@ -113,7 +113,7 @@ export async function onRequestPost({ request, env }) {
   catch (error) { console.error("Accounts authorization error:", error); return jsonResponse({ message: "تعذر التحقق من صلاحية الدكتور." }, 503); }
   if (verified.error) return jsonResponse({ message: verified.error }, verified.status);
   const projectId = verified.account.project_id, token = verified.token;
-  if (["list","createCategory","createEntry","approveDailyExpense","rejectDailyExpense","finalizeSettlement","listSettlements"].includes(data.action) && verified.accountType !== "doctor") return jsonResponse({ message:"هذه الوظيفة متاحة للدكتور فقط." },403);
+  if (["list","createCategory","createEntry","approveDailyExpense","rejectDailyExpense","finalizeSettlement","listSettlements","previewSettlement"].includes(data.action) && verified.accountType !== "doctor") return jsonResponse({ message:"هذه الوظيفة متاحة للدكتور فقط." },403);
   if (data.action === "createDailyExpense" && verified.accountType === "staff" && verified.permission !== "edit") return jsonResponse({ message:"لا تملك صلاحية تسجيل المصروفات." },403);
   try {
     if (data.action === "listDailyExpenses") {
