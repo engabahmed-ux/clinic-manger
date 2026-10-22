@@ -474,7 +474,7 @@ async function loadBookings() {
   try {
     const result = await bookingApiRequest("list");
     allBookings = Array.isArray(result.bookings) ? result.bookings : [];
-    renderPendingBookings(); renderDailyAppointments(); renderDoctorArchive();
+    renderPendingBookings(); renderDailyAppointments(); renderDoctorArchive(); renderDoctorAccounts();
   } catch (error) {
     console.error("تعذر تحميل الحجوزات:", error);
     showMessage(bookingListMessage,error.message||"تعذر تحميل الحجوزات.");
