@@ -702,3 +702,13 @@ a {
     line-height: 1.45;
   }
 }
+
+/* سجل المصروفات الشهرية للموظف */
+.staff-monthly-expenses { margin-top: 22px; }
+.staff-monthly-expenses .staff-section-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.staff-monthly-expenses .staff-accounts-date-label { min-width: 160px; }
+.staff-expense-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 10px; }
+@media (max-width: 640px) {
+  .staff-monthly-expenses .staff-section-heading { align-items: stretch; }
+  .staff-monthly-expenses .staff-accounts-date-label { width: 100%; }
+}
