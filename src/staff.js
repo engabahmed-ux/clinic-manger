@@ -238,6 +238,122 @@ async function loadStaffBookings(container, permission, refreshButton, message) 
   }
 }
 
+function createStaffPatientAccountForm(card) {
+  const panel = document.createElement("div");
+  panel.className = "staff-patient-create";
+  const heading = document.createElement("h4");
+  heading.textContent = "إنشاء حساب مريضة";
+  panel.append(heading);
+
+  const form = document.createElement("form");
+  form.className = "staff-patient-form";
+  const fields = [
+    { key: "displayName", label: "اسم المريضة", type: "text", maxLength: 120 },
+    { key: "email", label: "البريد الإلكتروني", type: "email", maxLength: 254 },
+    { key: "phone", label: "رقم الهاتف", type: "tel", maxLength: 40 },
+    { key: "username", label: "اسم المستخدم", type: "text", minLength: 3, maxLength: 30 }
+  ];
+  const inputs = {};
+  for (const field of fields) {
+    const label = document.createElement("label");
+    label.textContent = field.label;
+    const input = document.createElement("input");
+    input.type = field.type;
+    input.name = field.key;
+    input.required = true;
+    input.maxLength = field.maxLength;
+    if (field.minLength) input.minLength = field.minLength;
+    input.autocomplete = "off";
+    inputs[field.key] = input;
+    label.append(input);
+    form.append(label);
+  }
+
+  const message = document.createElement("p");
+  message.className = "staff-message";
+  message.hidden = true;
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "staff-primary";
+  submit.textContent = "إنشاء حساب المريضة";
+  const credentials = document.createElement("div");
+  credentials.className = "staff-patient-credentials";
+  credentials.hidden = true;
+  form.append(message, submit);
+  panel.append(form, credentials);
+  card.append(panel);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (submit.disabled) return;
+    submit.disabled = true;
+    submit.textContent = "جارٍ إنشاء الحساب...";
+    message.hidden = true;
+    credentials.hidden = true;
+    try {
+      const response = await fetch("/api/doctor/patients", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${await auth.currentUser.getIdToken()}`,
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          action: "create",
+          displayName: inputs.displayName.value.trim(),
+          email: inputs.email.value.trim(),
+          phone: inputs.phone.value.trim(),
+          username: inputs.username.value.trim().toLowerCase()
+        }),
+        cache: "no-store"
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.success !== true) {
+        throw new Error(result.message || "تعذر إنشاء حساب المريضة.");
+      }
+      const values = [
+        ["اسم المستخدم", result.credentials?.username],
+        ["البريد الإلكتروني", result.credentials?.email],
+        ["كلمة المرور المؤقتة", result.credentials?.temporaryPassword]
+      ];
+      credentials.replaceChildren();
+      const title = document.createElement("strong");
+      title.textContent = "بيانات الدخول — سلّميها للمريضة بشكل خاص";
+      credentials.append(title);
+      for (const [labelText, value] of values) {
+        const row = document.createElement("p");
+        row.textContent = `${labelText}: ${value || ""}`;
+        credentials.append(row);
+      }
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "staff-secondary";
+      copy.textContent = "نسخ بيانات الدخول";
+      copy.addEventListener("click", async () => {
+        const text = values.map(([labelText, value]) => `${labelText}: ${value || ""}`).join("\n");
+        try {
+          await navigator.clipboard.writeText(text);
+          copy.textContent = "تم النسخ";
+        } catch {
+          message.textContent = "تعذر النسخ التلقائي. انسخي البيانات يدويًا.";
+          message.hidden = false;
+        }
+      });
+      credentials.append(copy);
+      credentials.hidden = false;
+      form.reset();
+      message.textContent = "تم إنشاء الحساب. كلمة المرور المؤقتة معروضة الآن فقط.";
+      message.hidden = false;
+    } catch (error) {
+      message.textContent = error.message || "تعذر إنشاء حساب المريضة.";
+      message.hidden = false;
+    } finally {
+      submit.disabled = false;
+      submit.textContent = "إنشاء حساب المريضة";
+    }
+  });
+}
+
 function renderPermissions(permissions) {
   permissionsGrid.replaceChildren();
 
@@ -273,7 +389,9 @@ function renderPermissions(permissions) {
 
     card.append(heading, description);
 
-    if (section.key === "bookings") {
+    if (section.key === "patients" && permission === "edit") {
+      createStaffPatientAccountForm(card);
+    } else if (section.key === "bookings") {
       const controls = document.createElement("div");
       controls.className = "staff-bookings-controls";
       const refresh = document.createElement("button");
