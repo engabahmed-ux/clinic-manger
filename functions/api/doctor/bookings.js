@@ -9,7 +9,7 @@ const FIREBASE_LOOKUP_URL =
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 
-const STATUSES = ["pending", "confirmed", "waiting", "completed", "postponed", "no_show", "apologized", "cancelled"];
+const STATUSES = ["pending", "confirmed", "waiting", "completed", "postponed", "no_show", "apologized", "cancelled", "archived"];
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
