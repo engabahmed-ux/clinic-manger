@@ -409,28 +409,44 @@ function renderBookingCard(booking) {
   summary.type = "button"; summary.className = "booking-request-summary";
   const main = document.createElement("span"); main.className = "booking-request-main";
   const title = document.createElement("strong"); title.textContent = booking.patientName || "طلب حجز جديد";
-  const meta = document.createElement("small"); meta.textContent = `تاريخ الطلب: ${formatSubmittedAt(booking.createdAt)} · الموعد المطلوب: ${formatRequestDate(booking.appointmentDate)}`;
-  main.append(title,meta); const badge=document.createElement("span");badge.className="booking-request-badge";badge.textContent="طلب جديد";summary.append(main,badge);
+  const meta = document.createElement("small"); meta.textContent = `الدور: ${queueNumberFor(booking)} · تاريخ الطلب: ${formatSubmittedAt(booking.createdAt)} · الموعد: ${formatRequestDate(booking.appointmentDate)} · ${booking.patientPhone||"الهاتف غير مسجل"} · ${booking.service||"الخدمة غير محددة"}`;
+  main.append(title,meta); const badge=document.createElement("span");badge.className="booking-request-badge";badge.textContent=bookingStatusLabel(booking.status);summary.append(main,badge);
   const details=document.createElement("div");details.className="booking-request-details";details.hidden=true;
   const fields=document.createElement("div");fields.className="booking-edit-grid";
   fields.append(createBookingInput("اسم المريضة",booking.patientName,"patientName"),createBookingInput("رقم الهاتف",booking.patientPhone,"patientPhone","tel"),createBookingInput("الموعد",String(booking.appointmentDate||"").slice(0,10),"appointmentDate","date"),createBookingInput("الخدمة",booking.service,"service"),createBookingInput("ملاحظات",booking.notes,"notes"));
   const actions=document.createElement("div");actions.className="booking-card-actions";
-  for(const [action,label,cls] of [["save-booking","حفظ التعديلات","secondary-button"],["confirm-booking","تأكيد الحجز","primary-button"],["cancel-booking","إلغاء الطلب","secondary-button"]]){const button=document.createElement("button");button.type="button";button.className=cls;button.dataset.action=action;button.textContent=label;actions.append(button)}
+  const actionItems=[["save-booking","حفظ التعديلات","secondary-button"]];
+  if(booking.status==="pending")actionItems.push(["confirm-booking","تأكيد الحجز","primary-button"]);
+  if(["pending","confirmed"].includes(booking.status))actionItems.push(["cancel-booking","إلغاء الحجز","secondary-button"]);
+  for(const [action,label,cls] of actionItems){const button=document.createElement("button");button.type="button";button.className=cls;button.dataset.action=action;button.textContent=label;actions.append(button)}
   details.append(fields,actions);summary.addEventListener("click",()=>{details.hidden=!details.hidden});card.append(summary,details);return card;
 }
 function formatRequestDate(value){if(!value)return"التاريخ غير محدد";const date=new Date(`${String(value).slice(0,10)}T12:00:00`);return Number.isNaN(date.getTime())?value:new Intl.DateTimeFormat("ar-EG",{dateStyle:"medium"}).format(date)}
 function formatSubmittedAt(value){if(!value)return"وقت الطلب غير متاح";const date=new Date(value);return Number.isNaN(date.getTime())?"وقت الطلب غير متاح":new Intl.DateTimeFormat("ar-EG",{dateStyle:"medium",timeStyle:"short"}).format(date)}
+function queueNumberFor(booking){
+  const date=String(booking.appointmentDate||"").slice(0,10);
+  if(!date)return "—";
+  const rows=allBookings.filter(item=>String(item.appointmentDate||"").slice(0,10)===date)
+    .sort((x,y)=>(Date.parse(x.createdAt||"")||0)-(Date.parse(y.createdAt||"")||0));
+  const index=rows.findIndex(item=>item.id===booking.id);
+  return index<0?"—":index+1;
+}
+function bookingStatusLabel(status){
+  return ({pending:"قيد المراجعة",confirmed:"مؤكد",completed:"مكتمل",cancelled:"ملغي"})[status]||"غير محدد";
+}
 function renderDailyAppointments(){
   dailyAppointmentsList.replaceChildren();
   const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
-  const rows=allBookings.filter(b=>b.status==="confirmed"&&String(b.appointmentDate||"").slice(0,10)===today);
+  const rows=allBookings.filter(b=>b.status==="confirmed"&&String(b.appointmentDate||"").slice(0,10)===today)
+    .sort((a,b)=>queueNumberFor(a)-queueNumberFor(b));
   if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد مواعيد مؤكدة اليوم.";dailyAppointmentsList.append(empty);return}
-  for(const b of rows){const card=document.createElement("article");card.className="employee-card daily-appointment-card";const h=document.createElement("h4");h.textContent=b.patientName||"مريضة";const p=document.createElement("p");p.textContent=[b.patientPhone,b.service].filter(Boolean).join(" · ");card.append(h,p);dailyAppointmentsList.append(card)}
+  for(const b of rows){const card=document.createElement("article");card.className="employee-card daily-appointment-card";const h=document.createElement("h4");h.textContent=`الدور ${queueNumberFor(b)} · ${b.patientName||"مريضة"}`;const p=document.createElement("p");p.textContent=[b.patientPhone,b.service].filter(Boolean).join(" · ");card.append(h,p);dailyAppointmentsList.append(card)}
 }
 function renderPendingBookings(){
   bookingList.replaceChildren();const query=(bookingSearchInput?.value||"").trim().toLocaleLowerCase("ar"),date=bookingDateFilter?.value||"";
-  const rows=allBookings.filter(b=>b.status==="pending").filter(b=>(!query||`${b.patientName||""} ${b.patientPhone||""}`.toLocaleLowerCase("ar").includes(query))&&(!date||String(b.createdAt||"").slice(0,10)===date));
-  if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد طلبات حجز معلقة.";bookingList.append(empty);return}
+  const rows=allBookings.filter(b=>(date?(b.status!=="cancelled"&&String(b.appointmentDate||"").slice(0,10)===date):b.status==="pending"))
+    .filter(b=>(!query||`${b.patientName||""} ${b.patientPhone||""}`.toLocaleLowerCase("ar").includes(query)));
+  if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent=date?"لا توجد حجوزات في هذا اليوم.":"لا توجد طلبات حجز معلقة.";bookingList.append(empty);return}
   rows.forEach(b=>bookingList.append(renderBookingCard(b)));
 }
 async function loadBookings() {
