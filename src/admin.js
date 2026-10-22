@@ -401,7 +401,8 @@ function createBookingInput(labelText, value, field, type = "text") {
       ["postponed", "تم التأجيل"],
       ["no_show", "لم يأتِ"],
       ["apologized", "اعتذر"],
-      ["cancelled", "ملغي"]
+      ["cancelled", "ملغي"],
+      ["archived", "في الأرشيف"]
     ]) {
       const option = document.createElement("option");
       option.value = value;
