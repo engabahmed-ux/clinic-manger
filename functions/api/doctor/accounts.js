@@ -129,7 +129,7 @@ export async function onRequestPost({ request, env }) {
     }
     if (data.action === "listMonthlyExpenses") {
       const month = String(data.month || "");
-      if (!/^\\d{4}-\\d{2}$/.test(month)) return jsonResponse({message:"الشهر المحدد غير صحيح."},400);
+      if (!/^\d{4}-\d{2}$/.test(month)) return jsonResponse({message:"الشهر المحدد غير صحيح."},400);
       const records = await listRecords(projectId, token);
       const expenses = records.filter(x=>x.type==="dailyExpense" && String(x.date||"").startsWith(month))
         .filter(x=>verified.accountType==="doctor" || !x.enteredBy || x.enteredBy===verified.uid)
