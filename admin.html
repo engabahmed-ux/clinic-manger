@@ -80,14 +80,16 @@
       <nav class="dashboard-tabs" aria-label="أقسام إدارة العيادة">
         <button id="openHomeTabButton" class="dashboard-tab" type="button" aria-selected="true">الرئيسية</button>
         <button id="openArchiveTabButton" class="dashboard-tab" type="button" aria-selected="false">أرشيف الحجوزات</button>
+        <button id="openAccountsTabButton" class="dashboard-tab" type="button" aria-selected="false">حسابات</button>
         <button id="openBookingsButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الحجوزات</button>
         <button id="openPatientsButton" class="dashboard-tab" type="button" aria-selected="false">حسابات المريضات</button>
         <button id="openEmployeesButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الموظفين</button>
       </nav>
       <section id="homeAppointmentsSection" class="employee-section home-appointments-section">
         <div class="employee-section-heading doctor-schedule-heading"><h3>جدول المواعيد <span id="doctorScheduleDateLabel" class="schedule-date-label"></span></h3><div class="doctor-home-actions"><button id="openDoctorScheduleFilter" class="schedule-filter-button" type="button" aria-label="فلترة جدول المواعيد" title="فلترة جدول المواعيد">☷</button><button id="homeAddBookingButton" class="primary-button home-add-booking-button" type="button">＋ إضافة حجز</button></div></div><input id="doctorHomeDateFilter" type="date" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1"><input id="doctorHomeSearch" type="search" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1">
+        <div class="schedule-status-legend" id="doctorStatusLegend" aria-label="فلترة حسب حالة الحجز"><button type="button" data-status-filter="all" class="is-active">✓ الكل</button><button type="button" data-status-filter="waiting">✓ في الانتظار</button><button type="button" data-status-filter="completed">✓ تم الكشف</button><button type="button" data-status-filter="postponed">✓ مؤجل</button><button type="button" data-status-filter="no_show">✓ لم يأتِ</button><button type="button" data-status-filter="apologized">✓ اعتذر</button></div>
         <p id="dailyAppointmentsMessage" class="message" role="status" hidden></p>
-        <div id="dailyAppointmentsList" class="employee-list" aria-live="polite"></div>
+        <div id="dailyAppointmentsList" class="employee-list" aria-live="polite"></div><div class="schedule-bulk-actions"><span id="selectedAppointmentsCount">لم يتم تحديد حجوزات</span><button id="archiveSelectedAppointments" class="secondary-button" type="button" disabled>نقل المحدد إلى الأرشيف</button></div>
         
       </section>
 
@@ -131,6 +133,7 @@
         </div>
       </section>
 
+      <section id="doctorAccountsSection" class="employee-section" hidden><div class="employee-section-heading"><h3>حسابات اليوم</h3><span id="accountsDateLabel" class="schedule-date-label"></span></div><p class="muted-text">تُحتسب قيمة الخدمة ضمن الإجمالي فقط عندما تكون حالة الحجز «تم الكشف».</p><div id="doctorAccountsContent" class="accounts-content"></div></section>
       <section id="doctorArchiveSection" class="employee-section" hidden><div class="employee-section-heading"><h3>أرشيف الحجوزات</h3></div><div class="booking-list-filters"><label>بحث بالاسم أو الهاتف أو الخدمة<input id="doctorArchiveSearch" type="search" placeholder="ابحث في الأرشيف"></label><label>تصفية بتاريخ الموعد<input id="doctorArchiveDateFilter" type="date"></label></div><div id="doctorArchiveList" class="employee-list" aria-live="polite"></div></section>
 
       <section id="bookingManagementSection" class="employee-section" hidden>
@@ -151,6 +154,7 @@
             <input id="newBookingDate" name="appointmentDate" type="date" required>
             <label for="newBookingService">نوع الحجز أو الخدمة</label>
             <input id="newBookingService" name="service" type="text" maxlength="120" list="clinicServiceOptions" placeholder="اختر خدمة أو اكتبها يدويًا">
+            <label for="newBookingServicePrice">قيمة الكشف أو الاستشارة (جنيه)</label><input id="newBookingServicePrice" name="servicePrice" type="number" min="0" max="99999999" step="0.01" inputmode="decimal" placeholder="مثال: 300">
             <datalist id="clinicServiceOptions"><option value="كشف"><option value="استشارة"><option value="متابعة"><option value="سونار"><option value="إعادة كشف"><option value="خدمة أخرى"></datalist>
             <label for="newBookingNotes">ملاحظات</label>
             <textarea id="newBookingNotes" name="notes" maxlength="2000" rows="3"></textarea>
