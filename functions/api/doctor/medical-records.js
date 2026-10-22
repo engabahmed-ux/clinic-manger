@@ -106,9 +106,14 @@ async function searchPatients(projectId,token,query){
   const [patientDocs,bookingDocs]=await Promise.all([collection(projectId,token,PATIENTS_COLLECTION),collection(projectId,token,BOOKINGS_COLLECTION)]);
   const result=new Map();
   for(const doc of patientDocs){const p=decode(doc);if(norm(p.displayName).includes(q)||norm(p.phone).includes(q)||norm(p.patientNumber).includes(q))result.set(p.id,{...p,legacy:false});}
-  for(const doc of bookingDocs){const f=doc.fields||{},name=read(f,"patientName"),phone=read(f,"patientPhone"),id=read(f,"patientId");if(!name||(!norm(name).includes(q)&&!norm(phone).includes(q)))continue;
+  for(const doc of bookingDocs){
+    const f=doc.fields||{},name=read(f,"patientName"),phone=read(f,"patientPhone"),id=read(f,"patientId");
+    if(!name||(!norm(name).includes(q)&&!norm(phone).includes(q)))continue;
     if(id){if(!result.has(id)){const p=await findPatient(projectId,token,id);if(p)result.set(id,{...p,legacy:false});}continue;}
-    const key=norm(name)+"|"+normPhone(phone);if(!result.has(key))result.set(key,{id:"",legacyBookingId:(doc.name||"").split("/").pop(),displayName:name,phone,patientNumber:"",legacy:true});
+    const alreadyHasProfile=[...result.values()].some(p=>norm(p.displayName)===norm(name)&&normPhone(p.phone)===normPhone(phone));
+    if(alreadyHasProfile)continue;
+    const key=norm(name)+"|"+normPhone(phone);
+    if(!result.has(key))result.set(key,{id:"",legacyBookingId:(doc.name||"").split("/").pop(),displayName:name,phone,patientNumber:"",legacy:true});
   }
   return [...result.values()].filter(p=>norm(p.displayName).includes(q)||norm(p.phone).includes(q)||norm(p.patientNumber).includes(q)).slice(0,20);
 }
@@ -116,7 +121,7 @@ async function getPatientHistory(projectId,token,patientId){
   const patient=await findPatient(projectId,token,patientId);if(!patient)throw new Error("ملف المريض غير موجود.");
   const [visitDocs,bookingDocs]=await Promise.all([collection(projectId,token,VISITS_COLLECTION),collection(projectId,token,BOOKINGS_COLLECTION)]);
   const visits=visitDocs.map(decodeVisit).filter(v=>v.patientId===patientId).sort((a,b)=>String(b.visitDate).localeCompare(String(a.visitDate))||String(b.createdAt).localeCompare(String(a.createdAt)));
-  const bookings=bookingDocs.map(doc=>({doc,fields:doc.fields||{}})).filter(x=>read(x.fields,"patientId")===patientId).map(x=>({id:(x.doc.name||"").split("/").pop(),appointmentDate:read(x.fields,"appointmentDate"),patientName:read(x.fields,"patientName"),patientPhone:read(x.fields,"patientPhone"),service:read(x.fields,"service"),status:read(x.fields,"status"),bloodPressure:read(x.fields,"bloodPressure"),weight:read(x.fields,"weight"),bloodSugar:read(x.fields,"bloodSugar"),preVisitNotes:read(x.fields,"preVisitNotes"),createdAt:read(x.fields,"createdAt")}));
+  const bookings=bookingDocs.map(doc=>({doc,fields:doc.fields||{}})).filter(x=>read(x.fields,"patientId")===patientId||(!read(x.fields,"patientId")&&norm(read(x.fields,"patientName"))===norm(patient.displayName)&&normPhone(read(x.fields,"patientPhone"))===normPhone(patient.phone))).map(x=>({id:(x.doc.name||"").split("/").pop(),appointmentDate:read(x.fields,"appointmentDate"),patientName:read(x.fields,"patientName"),patientPhone:read(x.fields,"patientPhone"),service:read(x.fields,"service"),status:read(x.fields,"status"),bloodPressure:read(x.fields,"bloodPressure"),weight:read(x.fields,"weight"),bloodSugar:read(x.fields,"bloodSugar"),preVisitNotes:read(x.fields,"preVisitNotes"),createdAt:read(x.fields,"createdAt")}));
   return {patient,visits,bookings};
 }
 export async function onRequest({request,env}){
@@ -128,12 +133,12 @@ export async function onRequest({request,env}){
   let account,token,access;try{account=parseServiceAccount(env);token=await accessToken(account);access=await accessFor(user,account.project_id,token);}catch(error){console.error("Medical records authorization failed:",error);return jsonResponse({message:"تعذر التحقق من صلاحيات السجلات الطبية."},503);}
   if(!access.ok)return jsonResponse({message:access.message},access.status);
   if(data.action==="search"&&!canSearch(access))return jsonResponse({message:"لا تملك صلاحية البحث في ملفات المرضى."},403);
-  if(data.action==="resolve"&&!canResolve(access))return jsonResponse({message:"لا تملك صلاحية ربط الحجز بملف مريض."},403);
+  if(data.action==="resolve"&&!canResolve(access)&&!(data.patientId&&canSearch(access)))return jsonResponse({message:"لا تملك صلاحية ربط الحجز بملف مريض."},403);
   if(data.action==="history"&&!canViewRecords(access))return jsonResponse({message:"لا تملك صلاحية عرض السجلات الطبية."},403);
   if(data.action==="saveVisit"&&!canEditRecords(access))return jsonResponse({message:"تحتاج إلى صلاحية تعديل السجلات الطبية."},403);
   try{
     if(data.action==="search"){const query=String(data.query||"").trim();if(query.length>120)return jsonResponse({message:"نص البحث أطول من المسموح."},400);return jsonResponse({patients:await searchPatients(account.project_id,token,query)});}
-    if(data.action==="resolve"){const patient=await resolvePatient(account.project_id,token,data,access);return jsonResponse({patient});}
+    if(data.action==="resolve"){if(data.patientId&&!canResolve(access)){const patient=await findPatient(account.project_id,token,String(data.patientId));return patient?jsonResponse({patient}):jsonResponse({message:"ملف المريض غير موجود."},404);}const patient=await resolvePatient(account.project_id,token,data,access);return jsonResponse({patient});}
     if(data.action==="history"){if(!validId(data.patientId))return jsonResponse({message:"رقم ملف المريض غير صحيح."},400);return jsonResponse(await getPatientHistory(account.project_id,token,data.patientId));}
     const patientId=String(data.patientId||""),bookingId=String(data.bookingId||"");
     if(!validId(patientId)||!validId(bookingId))return jsonResponse({message:"حدد ملف المريض والحجز المرتبط بالكشف."},400);
