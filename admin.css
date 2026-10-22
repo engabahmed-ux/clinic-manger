@@ -610,3 +610,60 @@ button:disabled {
     padding: 15px;
   }
 }
+
+.employee-list-actions,
+.booking-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.booking-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.booking-edit-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.booking-edit-field input,
+.booking-edit-field select {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--color-dark);
+  font: inherit;
+}
+
+.booking-card-actions {
+  margin-top: 16px;
+}
+
+.booking-card-actions button {
+  flex: 1 1 160px;
+}
+
+@media (max-width: 600px) {
+  .booking-edit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .employee-list-actions {
+    width: 100%;
+  }
+
+  .employee-list-actions button {
+    flex: 1 1 100%;
+  }
+}
