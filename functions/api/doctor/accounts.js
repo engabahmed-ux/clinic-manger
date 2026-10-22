@@ -216,7 +216,7 @@ export async function onRequestPost({ request, env }) {
     }
     if (data.action === "list") {
       const records = await listRecords(projectId, token);
-      return jsonResponse({ categories: records.filter(x => x.type === "category"), entries: records.filter(x => x.type === "entry") });
+      return jsonResponse({ categories: records.filter(x => x.type === "category"), entries: records.filter(x => x.type === "entry"), records });
     }
     if (data.action === "createCategory") {
       const name = String(data.name || "").trim(), kind = data.kind;
