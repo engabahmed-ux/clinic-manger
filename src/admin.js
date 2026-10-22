@@ -1095,8 +1095,14 @@ async function handleBookingCardAction(event, container) {
       const acceptedBooking = allBookings.find(item => item.id === id);
       const queueTitle = $("#doctorQueueDialogTitle");
       if (queueTitle) queueTitle.textContent = "تم تأكيد الحجز";
-      if (doctorQueueNumber) doctorQueueNumber.textContent = queueNumberFor(acceptedBooking || { id, appointmentDate: previousDate });
-      if (doctorQueueDialog?.showModal) doctorQueueDialog.showModal();
+      const acceptedQueueNumber = queueNumberFor(acceptedBooking || { id, appointmentDate: previousDate });
+      if (doctorQueueNumber) doctorQueueNumber.textContent = acceptedQueueNumber;
+      if (doctorQueueDialog?.showModal) {
+        try { doctorQueueDialog.showModal(); }
+        catch { showMessage(container === dailyAppointmentsList ? dailyAppointmentsMessage : bookingListMessage, "تم تأكيد الحجز. رقم الدور: " + acceptedQueueNumber, "success"); }
+      } else {
+        showMessage(container === dailyAppointmentsList ? dailyAppointmentsMessage : bookingListMessage, "تم تأكيد الحجز. رقم الدور: " + acceptedQueueNumber, "success");
+      }
     }
     showMessage(
       container === dailyAppointmentsList ? dailyAppointmentsMessage : bookingListMessage,
