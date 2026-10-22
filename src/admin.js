@@ -391,7 +391,7 @@ function createBookingInput(labelText, value, field, type = "text") {
     input.value = value || "";
     if (field === "patientName") input.maxLength = 120;
     if (field === "patientPhone") input.maxLength = 40;
-    if (field === "service") input.maxLength = 120;
+    if (field === "service") { input.maxLength = 120; input.setAttribute("list", "clinicServiceOptions"); }
     if (field === "notes") input.maxLength = 2000;
     if (field === "appointmentDate") input.type = "date";
   }
