@@ -563,12 +563,12 @@ function renderPatientPortal() {
 
     if (loginButton.disabled) return;
 
-    const email = emailInput?.value.trim() ?? "";
+    const identifier = emailInput?.value.trim() ?? "";
     const password = passwordInput?.value ?? "";
 
-    if (!email || !password) {
+    if (!identifier || !password) {
       showLoginMessage(
-        "أدخل البريد الإلكتروني وكلمة المرور."
+        "أدخل اسم المستخدم أو البريد الإلكتروني وكلمة المرور."
       );
 
       return;
@@ -580,9 +580,34 @@ function renderPatientPortal() {
     let user;
 
     try {
+      let loginEmail = identifier;
+
+      if (!identifier.includes("@")) {
+        const resolveResponse = await fetch("/api/auth/resolve-login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({ username: identifier, password }),
+          cache: "no-store"
+        });
+
+        let resolveResult = {};
+        try {
+          resolveResult = await resolveResponse.json();
+        } catch {}
+
+        if (!resolveResponse.ok || resolveResult.success !== true || !resolveResult.email) {
+          throw new Error(resolveResult.message || "اسم المستخدم أو كلمة المرور غير صحيحة.");
+        }
+
+        loginEmail = resolveResult.email;
+      }
+
       const credential = await signInWithEmailAndPassword(
         auth,
-        email,
+        loginEmail,
         password
       );
 
