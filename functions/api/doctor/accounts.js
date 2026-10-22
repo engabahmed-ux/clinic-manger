@@ -133,7 +133,7 @@ export async function onRequestPost({ request, env }) {
       const expenses = records.filter(x=>x.type==="dailyExpense" && String(x.date||"").startsWith(month))
         .filter(x=>verified.accountType==="doctor" || !x.enteredBy || x.enteredBy===verified.uid)
         .sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))
-        .map(x=>({id:x.id,description:x.personName,amount:x.amount,date:x.date,notes:x.notes,status:x.status||"approved",enteredByName:x.enteredByName,approvedByName:x.approvedByName}));
+        .map(x=>({id:x.id,description:x.personName,amount:x.amount,date:x.date,notes:x.notes,status:x.status||"approved",enteredByName:x.enteredByName,approvedByName:x.approvedByName,rejectionReason:x.rejectionReason}));
       return jsonResponse({expenses,month});
     }
     if (data.action === "createDailyExpense") {
