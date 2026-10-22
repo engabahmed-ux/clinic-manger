@@ -89,7 +89,7 @@ async function verifyUser(request, env) {
 }
 
 export async function onRequest({ request, env }) {
-  if (request.method !== "GET" && request.method !== "POST") return jsonResponse({ message: "طريقة الطلب غير مسموحة." }, 405);
+  if (request.method !== "GET") return jsonResponse({ message: "طريقة الطلب غير مسموحة." }, 405);
   const user = await verifyUser(request, env);
   if (!user.ok) return jsonResponse({ message: user.message }, user.status);
 
