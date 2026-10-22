@@ -1113,6 +1113,8 @@ async function handleBookingCardAction(event, container) {
         if (input) booking[field] = input.value;
       }
       booking.status = "waiting";
+      const resolvedPatient = await medicalRecordsApiRequest("resolve", { patientName: booking.patientName, patientPhone: booking.patientPhone });
+      booking.patientId = resolvedPatient.patient.id;
       await bookingApiRequest("update", { booking });
     } else if (action === "archive-booking") {
       await bookingApiRequest("update", { booking: { id, status: "archived" } });
@@ -1121,6 +1123,11 @@ async function handleBookingCardAction(event, container) {
       for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "servicePrice", "bloodPressure", "weight", "bloodSugar", "preVisitNotes", "notes", "status"]) {
         const input = card.querySelector(`[data-booking-field="${field}"]`);
         if (input) booking[field] = input.value;
+      }
+      const originalBooking = allBookings.find(item => item.id === id);
+      if (originalBooking && (booking.patientName !== originalBooking.patientName || booking.patientPhone !== originalBooking.patientPhone || !originalBooking.patientId)) {
+        const resolvedPatient = await medicalRecordsApiRequest("resolve", { patientName: booking.patientName || originalBooking.patientName, patientPhone: booking.patientPhone || originalBooking.patientPhone });
+        booking.patientId = resolvedPatient.patient.id;
       }
       await bookingApiRequest("update", { booking });
       const nextDate = String(booking.appointmentDate || "").slice(0, 10);
