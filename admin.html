@@ -84,9 +84,11 @@
         <button id="openEmployeesButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الموظفين</button>
       </nav>
       <section id="homeAppointmentsSection" class="employee-section home-appointments-section">
-        <div class="employee-section-heading"><div><h3>مواعيد اليوم</h3></div><button id="refreshDailyAppointmentsButton" class="secondary-button" type="button">تحديث المواعيد</button></div>
+        <div class="employee-section-heading"><div><h3>جدول المواعيد</h3></div><button id="refreshDailyAppointmentsButton" class="secondary-button" type="button">تحديث المواعيد</button></div>
+        <div class="booking-list-filters"><label>اختيار يوم المواعيد<input id="doctorHomeDateFilter" type="date"></label><label>بحث بالاسم أو الهاتف أو الخدمة<input id="doctorHomeSearch" type="search" placeholder="ابحث في مواعيد اليوم المختار"></label></div>
         <p id="dailyAppointmentsMessage" class="message" role="status" hidden></p>
         <div id="dailyAppointmentsList" class="employee-list" aria-live="polite"></div>
+        <section class="doctor-archive-section"><div class="employee-section-heading"><h4>أرشيف الحجوزات</h4></div><div class="booking-list-filters"><label>تصفية الأرشيف بتاريخ الموعد<input id="doctorArchiveDateFilter" type="date"></label></div><div id="doctorArchiveList" class="employee-list" aria-live="polite"></div></section>
       </section>
 
       <section id="patientManagementSection" class="employee-section" hidden>
