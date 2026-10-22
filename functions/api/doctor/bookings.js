@@ -235,6 +235,11 @@ function decodeBooking(document) {
   return {
     id,
     patientName: readString(fields, "patientName"),
+    patientId: readString(fields, "patientId"),
+    bloodPressure: readString(fields, "bloodPressure"),
+    weight: readString(fields, "weight"),
+    bloodSugar: readString(fields, "bloodSugar"),
+    preVisitNotes: readString(fields, "preVisitNotes"),
     patientPhone: readString(fields, "patientPhone"),
     appointmentDate: readString(fields, "appointmentDate"),
     service: readString(fields, "service"),
@@ -256,7 +261,12 @@ function encodeBooking(data) {
 
   for (const key of [
     "patientName",
+    "patientId",
     "patientPhone",
+    "bloodPressure",
+    "weight",
+    "bloodSugar",
+    "preVisitNotes",
     "appointmentDate",
     "service",
     "servicePrice",
@@ -334,10 +344,15 @@ function validateBooking(data, partial = false) {
 
   const allowed = [
     "patientName",
+    "patientId",
     "patientPhone",
     "appointmentDate",
     "service",
     "servicePrice",
+    "bloodPressure",
+    "weight",
+    "bloodSugar",
+    "preVisitNotes",
     "notes",
     "status"
   ];
@@ -385,6 +400,11 @@ function validateBooking(data, partial = false) {
   }
 
   if (data.paidAmount !== undefined && data.paidAmount !== "" && (!/^\d{1,8}(\.\d{1,2})?$/.test(String(data.paidAmount)) || Number(data.paidAmount) < 0)) return "قيمة المبلغ المدفوع غير صحيحة.";
+
+  for (const key of ["bloodPressure", "weight", "bloodSugar"]) {
+    if (data[key] !== undefined && String(data[key]).length > 40) return "إحدى القياسات أطول من المسموح.";
+  }
+  if (data.preVisitNotes && data.preVisitNotes.length > 1000) return "ملاحظات ما قبل الكشف أطول من المسموح.";
 
   if (data.notes && data.notes.length > 2000) {
     return "الملاحظات أطول من المسموح.";
