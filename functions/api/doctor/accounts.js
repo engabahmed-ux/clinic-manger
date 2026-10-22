@@ -111,14 +111,14 @@ export async function onRequestPost({ request, env }) {
   try {
     if (data.action === "listDailyExpenses") {
       const date = String(data.date || "");
-      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
       const records = await listRecords(projectId, token);
       const expenses = records.filter(x => x.type === "dailyExpense" && x.date === date).map(x => ({ id:x.id, description:x.personName, amount:x.amount, date:x.date, notes:x.notes, createdAt:x.createdAt }));
       return jsonResponse({ expenses, date });
     }
     if (data.action === "createDailyExpense") {
       const entry = data.entry || {}, description = String(entry.description || "").trim(), date = String(entry.date || ""), notes = String(entry.notes || "").trim(), amount = String(entry.amount ?? "");
-      if (!cleanString(description,160) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00")) || !/^\\d{1,8}(\\.\\d{1,2})?$/.test(amount) || Number(amount) <= 0 || notes.length > 500) return jsonResponse({ message:"راجع وصف المصروف والمبلغ والتاريخ." },400);
+      if (!cleanString(description,160) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00")) || !/^\d{1,8}(\\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || notes.length > 500) return jsonResponse({ message:"راجع وصف المصروف والمبلغ والتاريخ." },400);
       const now = new Date().toISOString();
       const result = await fsRequest(projectId, token, "/" + COLLECTION, { method:"POST", body:JSON.stringify(encode({ type:"dailyExpense", personName:description, amount, date, notes, createdAt:now, updatedAt:now })) });
       return jsonResponse({ expense:decode(result) },201);
