@@ -111,6 +111,133 @@ function permissionLabel(value) {
   return "لا توجد صلاحية";
 }
 
+async function staffBookingsRequest(action, data = {}) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("انتهت جلسة الدخول. سجّل الدخول مجددًا.");
+  const idToken = await user.getIdToken();
+  const response = await fetch("/api/doctor/bookings", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify({ action, ...data }),
+    cache: "no-store"
+  });
+  let result = {};
+  try { result = await response.json(); } catch {}
+  if (!response.ok) {
+    throw new Error(result.message || "تعذر تحميل الحجوزات.");
+  }
+  return result;
+}
+
+async function loadStaffBookings(container, permission, refreshButton, message) {
+  if (refreshButton) {
+    refreshButton.disabled = true;
+    refreshButton.textContent = "جارٍ التحديث...";
+  }
+  if (message) {
+    message.hidden = true;
+    message.textContent = "";
+  }
+  try {
+    const result = await staffBookingsRequest("list");
+    container.replaceChildren();
+    const bookings = Array.isArray(result.bookings) ? result.bookings : [];
+    if (!bookings.length) {
+      const empty = document.createElement("p");
+      empty.className = "staff-empty";
+      empty.textContent = "لا توجد طلبات حجز حتى الآن.";
+      container.append(empty);
+      return;
+    }
+    for (const booking of bookings) {
+      if (!booking?.id) continue;
+      const card = document.createElement("article");
+      card.className = "staff-permission-card";
+
+      const heading = document.createElement("div");
+      heading.className = "staff-permission-heading";
+      const title = document.createElement("h3");
+      title.textContent = booking.patientName || "طلب حجز";
+      const status = document.createElement("span");
+      status.className = "staff-permission-status";
+      status.textContent = ({
+        pending: "قيد المراجعة",
+        confirmed: "مؤكد",
+        completed: "مكتمل",
+        cancelled: "ملغي"
+      })[booking.status] || "قيد المراجعة";
+      heading.append(title, status);
+
+      const details = document.createElement("p");
+      details.textContent = `الهاتف: ${booking.patientPhone || "—"} | التاريخ: ${booking.appointmentDate || "—"} | الخدمة: ${booking.service || "—"}`;
+      const notes = document.createElement("p");
+      notes.textContent = booking.notes ? `ملاحظات: ${booking.notes}` : "لا توجد ملاحظات.";
+      card.append(heading, details, notes);
+
+      if (permission === "edit" && booking.status !== "cancelled") {
+        const actions = document.createElement("div");
+        actions.className = "staff-booking-actions";
+        const confirmButton = document.createElement("button");
+        confirmButton.type = "button";
+        confirmButton.className = "staff-primary";
+        confirmButton.textContent = booking.status === "confirmed" ? "تم تأكيد الموعد" : "تأكيد الحجز";
+        confirmButton.disabled = booking.status === "confirmed";
+        confirmButton.addEventListener("click", async () => {
+          confirmButton.disabled = true;
+          try {
+            await staffBookingsRequest("update", {
+              booking: { id: booking.id, status: "confirmed" }
+            });
+            await loadStaffBookings(container, permission, refreshButton, message);
+          } catch (error) {
+            if (message) {
+              message.textContent = error.message || "تعذر تحديث الحجز.";
+              message.hidden = false;
+            }
+            confirmButton.disabled = false;
+          }
+        });
+        const cancelButton = document.createElement("button");
+        cancelButton.type = "button";
+        cancelButton.className = "staff-secondary";
+        cancelButton.textContent = "إلغاء الحجز";
+        cancelButton.addEventListener("click", async () => {
+          if (!window.confirm("هل تريد إلغاء هذا الحجز؟")) return;
+          cancelButton.disabled = true;
+          try {
+            await staffBookingsRequest("cancel", { id: booking.id });
+            await loadStaffBookings(container, permission, refreshButton, message);
+          } catch (error) {
+            if (message) {
+              message.textContent = error.message || "تعذر إلغاء الحجز.";
+              message.hidden = false;
+            }
+            cancelButton.disabled = false;
+          }
+        });
+        actions.append(confirmButton, cancelButton);
+        card.append(actions);
+      }
+      container.append(card);
+    }
+  } catch (error) {
+    console.error("Staff bookings load failed:", error);
+    if (message) {
+      message.textContent = error.message || "تعذر تحميل الحجوزات.";
+      message.hidden = false;
+    }
+  } finally {
+    if (refreshButton) {
+      refreshButton.disabled = false;
+      refreshButton.textContent = "تحديث الحجوزات";
+    }
+  }
+}
+
 function renderPermissions(permissions) {
   permissionsGrid.replaceChildren();
 
@@ -144,12 +271,34 @@ function renderPermissions(permissions) {
     const description = document.createElement("p");
     description.textContent = section.description;
 
-    const unavailable = document.createElement("p");
-    unavailable.className = "staff-feature-unavailable";
-    unavailable.textContent =
-      "سيتم تفعيل عمليات هذا القسم بعد استكمال ربطه الآمن.";
+    card.append(heading, description);
 
-    card.append(heading, description, unavailable);
+    if (section.key === "bookings") {
+      const controls = document.createElement("div");
+      controls.className = "staff-bookings-controls";
+      const refresh = document.createElement("button");
+      refresh.type = "button";
+      refresh.className = "staff-secondary";
+      refresh.textContent = "تحديث الحجوزات";
+      const message = document.createElement("p");
+      message.className = "staff-message";
+      message.hidden = true;
+      const list = document.createElement("div");
+      list.className = "staff-bookings-list";
+      refresh.addEventListener("click", () => {
+        loadStaffBookings(list, permission, refresh, message);
+      });
+      controls.append(refresh, message, list);
+      card.append(controls);
+      loadStaffBookings(list, permission, refresh, message);
+    } else {
+      const unavailable = document.createElement("p");
+      unavailable.className = "staff-feature-unavailable";
+      unavailable.textContent =
+        "سيتم تفعيل عمليات هذا القسم بعد استكمال ربطه الآمن.";
+      card.append(unavailable);
+    }
+
     permissionsGrid.append(card);
   });
 }
