@@ -150,6 +150,7 @@ export async function onRequest({request,env}){
     const keys=["bloodPressure","weight","bloodSugar","preVisitNotes","diagnosis","clinicalNotes","treatment","followUp"];
     const visit={patientId,bookingId,visitDate,queueNumber:String(data.queueNumber||""),createdByName:access.displayName||"الدكتور"};
     for(const key of keys){visit[key]=String(data[key]||"").trim();if(visit[key].length>(key==="clinicalNotes"||key==="treatment"?4000:1000))return jsonResponse({message:"أحد حقول الكشف أطول من المسموح."},400);}
+    if(visit.weight && (!/^\d{1,3}(\.\d{1,2})?$/.test(visit.weight)||Number(visit.weight)<0||Number(visit.weight)>500))return jsonResponse({message:"قيمة الوزن غير صحيحة."},400);
     const now=new Date().toISOString(),existing=(await collection(account.project_id,token,VISITS_COLLECTION)).map(decodeVisit).find(v=>v.bookingId===bookingId);
     visit.updatedAt=now;visit.createdAt=existing?.createdAt||now;
     let saved;
