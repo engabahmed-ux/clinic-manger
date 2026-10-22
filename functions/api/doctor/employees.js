@@ -678,31 +678,25 @@ async function updateEmployeePermissions(
     };
   }
 
-  const path =
-    `/${FIRESTORE_COLLECTION}/${encodeURIComponent(uid)}` +
-    "?updateMask.fieldPaths=permissions";
+  const fields = { permissions: encodePermissions(permissions) };
+  let path = `/${FIRESTORE_COLLECTION}/${encodeURIComponent(uid)}?updateMask.fieldPaths=permissions`;
+  let expenseMode;
+  if (data.expenseMode !== undefined) {
+    if (!["auto","approval"].includes(data.expenseMode)) return {status:400,body:{message:"طريقة اعتماد المصروفات غير صحيحة."}};
+    expenseMode = data.expenseMode;
+    fields.expenseMode = encodeString(expenseMode);
+    path += "&updateMask.fieldPaths=expenseMode";
+  }
 
   try {
-    await firestoreRequest(
-      projectId,
-      accessToken,
-      path,
-      {
-        method: "PATCH",
-        body: JSON.stringify({
-          fields: {
-            permissions: encodePermissions(permissions)
-          }
-        })
-      }
-    );
+    await firestoreRequest(projectId, accessToken, path, {
+      method: "PATCH",
+      body: JSON.stringify({ fields })
+    });
 
     return {
       status: 200,
-      body: {
-        uid,
-        permissions
-      }
+      body: { uid, permissions, ...(expenseMode ? {expenseMode} : {}) }
     };
   } catch (error) {
     return {
