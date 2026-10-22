@@ -179,6 +179,28 @@ export async function onRequestPost({ request, env }) {
       const expenses = records.filter(x => x.type === "dailyExpense");
       return jsonResponse({settlements, expenses, pendingExpenses:expenses.filter(x=>(x.status || "approved")==="pending").length});
     }
+    if (data.action === "previewSettlement") {
+      const periodType = data.periodType === "month" ? "month" : data.periodType === "day" ? "day" : "";
+      const periodKey = String(data.periodKey || "");
+      const employeeUid = String(data.employeeUid || "");
+      if (!periodType || !(periodType === "day" ? /^\\d{4}-\\d{2}-\\d{2}$/.test(periodKey) : /^\\d{4}-\\d{2}$/.test(periodKey)) ||
+          !/^[A-Za-z0-9_-]{1,128}$/.test(employeeUid)) return jsonResponse({message:"حدد الموظف والفترة بصورة صحيحة."},400);
+      const records = await listRecords(projectId, token);
+      const prior = records.find(x=>x.type==="settlement" && x.employeeUid===employeeUid && x.periodType===periodType && x.periodKey===periodKey);
+      const inPeriod = date => periodType === "day" ? date === periodKey : String(date || "").startsWith(periodKey);
+      const expenses = records.filter(x=>x.type==="dailyExpense" && x.enteredBy===employeeUid && inPeriod(x.date));
+      const pendingExpenses = expenses.filter(x=>(x.status || "approved")==="pending").length;
+      const approvedExpenses = expenses.filter(x=>(x.status || "approved")==="approved").reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+      const query = await fsRequest(projectId, token, ":runQuery", {method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:"clinicBookings"}]}})});
+      const bookings = (Array.isArray(query)?query:[]).filter(x=>x.document).map(x=>{
+        const fields=x.document.fields||{}, get=k=>fields[k]?.stringValue || "";
+        return {date:get("appointmentDate").slice(0,10),paymentEnteredByUid:get("paymentEnteredByUid"),paid:Number(get("paidAmount"))||0};
+      }).filter(x=>inPeriod(x.date) && x.paymentEnteredByUid===employeeUid && x.paid>0);
+      const receipts = bookings.reduce((sum,x)=>sum+x.paid,0);
+      return jsonResponse({periodType,periodKey,employeeUid,totalReceipts:receipts.toFixed(2),totalExpenses:approvedExpenses.toFixed(2),
+        netTotal:(receipts-approvedExpenses).toFixed(2),bookingCount:bookings.length,pendingExpenses,
+        alreadySettled:!!prior,settlement:prior||null,currentBalance:prior?"0.00":(receipts-approvedExpenses).toFixed(2)});
+    }
     if (data.action === "finalizeSettlement") {
       const periodType = data.periodType === "month" ? "month" : data.periodType === "day" ? "day" : "";
       const periodKey = String(data.periodKey || "");
