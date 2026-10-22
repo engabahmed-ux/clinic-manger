@@ -339,6 +339,7 @@ function decodeEmployeeDocument(document) {
     email: decodeString(fields.email),
     displayName: decodeString(fields.displayName),
     permissions: decodePermissions(fields.permissions),
+    expenseMode: decodeString(fields.expenseMode) === "approval" ? "approval" : "auto",
     createdAt: fields.createdAt?.timestampValue || null
   };
 }
@@ -460,6 +461,9 @@ async function createEmployeeAccount(env, data) {
     };
   }
 
+  const expenseMode = data.expenseMode === "approval" ? "approval" : data.expenseMode === "auto" || data.expenseMode == null ? "auto" : null;
+  if (!expenseMode) return { status:400, body:{ message:"طريقة اعتماد المصروفات غير صحيحة." } };
+
   let permissions;
 
   try {
@@ -564,6 +568,7 @@ async function createEmployeeAccount(env, data) {
         role: encodeString("staff"),
         active: { booleanValue: true },
         permissions: encodePermissions(permissions),
+        expenseMode: encodeString(expenseMode),
         createdAt: {
           timestampValue: new Date().toISOString()
         }
@@ -591,7 +596,8 @@ async function createEmployeeAccount(env, data) {
           uid,
           email,
           displayName,
-          permissions
+          permissions,
+          expenseMode
         }
       }
     };
@@ -628,6 +634,22 @@ async function createEmployeeAccount(env, data) {
           "تعذر حفظ بيانات الموظف وصلاحياته. حاول مرة أخرى، وتحقق من قائمة الحسابات قبل إعادة المحاولة."
       }
     };
+  }
+}
+
+async function updateEmployeeExpenseMode(projectId, accessToken, data) {
+  const uid = typeof data.uid === "string" ? data.uid.trim() : "";
+  const expenseMode = data.expenseMode;
+  if (!uid || uid.length > 128 || uid.includes("/") || !["auto","approval"].includes(expenseMode)) {
+    return { status:400, body:{ message:"بيانات طريقة اعتماد المصروفات غير صحيحة." } };
+  }
+  try {
+    await firestoreRequest(projectId, accessToken,
+      `/${FIRESTORE_COLLECTION}/${encodeURIComponent(uid)}?updateMask.fieldPaths=expenseMode`,
+      { method:"PATCH", body:JSON.stringify({fields:{expenseMode:encodeString(expenseMode)}}) });
+    return { status:200, body:{uid, expenseMode} };
+  } catch {
+    return { status:404, body:{message:"تعذر تحديث إعدادات مصروفات الموظف."} };
   }
 }
 
@@ -807,6 +829,11 @@ export async function onRequestPost({ request, env }) {
       case "create": {
         const result = await createEmployeeAccount(env, data);
 
+        return jsonResponse(result.body, result.status);
+      }
+
+      case "updateExpenseMode": {
+        const result = await updateEmployeeExpenseMode(serviceAccount.project_id, accessToken, data);
         return jsonResponse(result.body, result.status);
       }
 
