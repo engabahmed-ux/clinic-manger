@@ -339,7 +339,7 @@ function decodeEmployeeDocument(document) {
     email: decodeString(fields.email),
     displayName: decodeString(fields.displayName),
     permissions: decodePermissions(fields.permissions),
-    expenseMode: decodeString(fields.expenseMode) === "approval" ? "approval" : "auto",
+    expenseMode: decodeString(fields.expenseMode) === "auto" ? "auto" : "approval",
     createdAt: fields.createdAt?.timestampValue || null
   };
 }
@@ -461,7 +461,7 @@ async function createEmployeeAccount(env, data) {
     };
   }
 
-  const expenseMode = data.expenseMode === "approval" ? "approval" : data.expenseMode === "auto" || data.expenseMode == null ? "auto" : null;
+  const expenseMode = data.expenseMode === "approval" ? "approval" : data.expenseMode === "auto" ? "auto" : data.expenseMode == null ? "approval" : null;
   if (!expenseMode) return { status:400, body:{ message:"طريقة اعتماد المصروفات غير صحيحة." } };
 
   let permissions;
