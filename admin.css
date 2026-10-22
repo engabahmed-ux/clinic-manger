@@ -770,3 +770,7 @@ button:disabled {
 .doctor-daily-expense-form button,.doctor-daily-expense-form .message{grid-column:1/-1}
 .doctor-daily-expense-row{display:flex;justify-content:space-between;gap:12px;padding:11px 12px;border-bottom:1px solid var(--color-border);font-size:13px}
 @media(max-width:600px){.doctor-daily-expense-form{grid-template-columns:1fr}.doctor-daily-expense-form button,.doctor-daily-expense-form .message{grid-column:auto}}
+
+.doctor-accounts-date-label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700}
+.doctor-accounts-date-label input{min-height:38px;padding:5px 8px;border:1px solid var(--color-border);border-radius:8px;font:inherit}
+@media(max-width:600px){.doctor-accounts-date-label{flex-wrap:wrap}.doctor-accounts-date-label input{font-size:16px}}
