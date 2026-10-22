@@ -867,3 +867,67 @@ a {
     text-overflow: clip;
   }
 }
+
+/* إصلاح محاذاة الترحيب وإظهار قلم تعديل الطلب */
+.staff-welcome {
+  display: block !important;
+  width: 100%;
+  min-width: 0;
+  text-align: right !important;
+  direction: rtl;
+}
+.staff-compact-welcome {
+  display: block !important;
+  width: 100%;
+  margin: 0 !important;
+  text-align: right !important;
+  direction: rtl;
+  white-space: normal;
+  line-height: 1.6;
+}
+.staff-request-card {
+  position: relative;
+  cursor: default;
+  padding-inline-end: 58px;
+}
+.staff-request-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: right;
+  cursor: pointer;
+}
+.staff-request-edit {
+  position: absolute;
+  inset-inline-end: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--staff-border);
+  border-radius: 10px;
+  background: #f7f8f3;
+  color: var(--staff-dark);
+  font-size: 20px;
+  cursor: pointer;
+}
+.staff-request-edit:hover { background: var(--staff-green); }
+@media (max-width: 640px) {
+  .staff-welcome { padding: 8px 0 !important; }
+  .staff-compact-welcome { font-size: 14px !important; }
+  .staff-request-card { align-items: center; padding: 13px 50px 13px 12px; }
+  .staff-request-open { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .staff-request-status { align-self: flex-start; }
+  .staff-request-edit { inset-inline-end: 8px; width: 34px; height: 34px; }
+}
