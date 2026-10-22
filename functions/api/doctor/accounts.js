@@ -87,12 +87,13 @@ function decode(doc) {
     approvedBy: read(f,"approvedBy"), approvedByName: read(f,"approvedByName"), approvedAt: read(f,"approvedAt"),
     reviewedBy: read(f,"reviewedBy"), reviewedByName: read(f,"reviewedByName"), reviewedAt: read(f,"reviewedAt"),
     rejectionReason: read(f,"rejectionReason"), periodType: read(f,"periodType"), periodKey: read(f,"periodKey"),
+    employeeUid: read(f,"employeeUid"), employeeName: read(f,"employeeName"),
     closedBy: read(f,"closedBy"), closedByName: read(f,"closedByName"), closedAt: read(f,"closedAt"),
     totalReceipts: read(f,"totalReceipts"), totalExpenses: read(f,"totalExpenses"), netTotal: read(f,"netTotal"), bookingCount: read(f,"bookingCount") };
 }
 function encode(record) {
   const fields = {};
-  for (const key of ["type","name","kind","categoryId","personName","amount","date","notes","createdAt","updatedAt","status","enteredBy","enteredByName","approvedBy","approvedByName","approvedAt","reviewedBy","reviewedByName","reviewedAt","rejectionReason","periodType","periodKey","closedBy","closedByName","closedAt","totalReceipts","totalExpenses","netTotal","bookingCount"]) if (record[key] !== undefined) fields[key] = str(record[key]);
+  for (const key of ["type","name","kind","categoryId","personName","amount","date","notes","createdAt","updatedAt","status","enteredBy","enteredByName","approvedBy","approvedByName","approvedAt","reviewedBy","reviewedByName","reviewedAt","rejectionReason","periodType","periodKey","employeeUid","employeeName","closedBy","closedByName","closedAt","totalReceipts","totalExpenses","netTotal","bookingCount"]) if (record[key] !== undefined) fields[key] = str(record[key]);
   return { fields };
 }
 async function listRecords(projectId, token) {
@@ -141,7 +142,7 @@ export async function onRequestPost({ request, env }) {
       if (!cleanString(description,160) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00")) || !/^\d{1,8}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || notes.length > 500) return jsonResponse({ message:"راجع وصف المصروف والمبلغ والتاريخ." },400);
       const now = new Date().toISOString();
       const records = await listRecords(projectId, token);
-      if (records.some(x => x.type === "settlement" && ((x.periodType === "day" && x.periodKey === date) || (x.periodType === "month" && x.periodKey === date.slice(0,7))))) {
+      if (verified.accountType === "staff" && records.some(x => x.type === "settlement" && x.employeeUid === verified.uid && ((x.periodType === "day" && x.periodKey === date) || (x.periodType === "month" && x.periodKey === date.slice(0,7)))) {
         return jsonResponse({ message:"هذه الفترة تمت تصفيتها بالفعل. لا يمكن إضافة مصروف إليها بعد الإقفال." },409);
       }
       const isDoctor = verified.accountType === "doctor";
@@ -181,26 +182,35 @@ export async function onRequestPost({ request, env }) {
     if (data.action === "finalizeSettlement") {
       const periodType = data.periodType === "month" ? "month" : data.periodType === "day" ? "day" : "";
       const periodKey = String(data.periodKey || "");
-      if (!periodType || !(periodType === "day" ? /^\\d{4}-\\d{2}-\\d{2}$/.test(periodKey) : /^\\d{4}-\\d{2}$/.test(periodKey))) return jsonResponse({message:"حدد اليوم أو الشهر بصورة صحيحة."},400);
+      const employeeUid = String(data.employeeUid || "");
+      if (!periodType || !(periodType === "day" ? /^\d{4}-\d{2}-\d{2}$/.test(periodKey) : /^\d{4}-\d{2}$/.test(periodKey)) ||
+          !/^[A-Za-z0-9_-]{1,128}$/.test(employeeUid)) return jsonResponse({message:"حدد الموظف والفترة بصورة صحيحة."},400);
+      let employeeDoc;
+      try { employeeDoc = await fsRequest(projectId, token, "/clinicStaff/" + encodeURIComponent(employeeUid)); }
+      catch { return jsonResponse({message:"الموظف المحدد غير موجود."},404); }
+      const employeeFields = employeeDoc?.fields || {};
+      if (employeeFields.active?.booleanValue !== true || read(employeeFields,"role") !== "staff") return jsonResponse({message:"حساب الموظف غير نشط أو غير صالح للتصفية."},400);
+      const employeeName = read(employeeFields,"displayName") || "الموظف";
       const records = await listRecords(projectId, token);
-      if (records.some(x=>x.type==="settlement" && x.periodType===periodType && x.periodKey===periodKey)) return jsonResponse({message:"تمت تصفية هذه الفترة من قبل."},409);
-      if (periodType === "day" && records.some(x=>x.type==="settlement" && x.periodType==="month" && x.periodKey===periodKey.slice(0,7))) return jsonResponse({message:"هذا اليوم يقع داخل شهر تمت تصفيته بالفعل."},409);
+      if (records.some(x=>x.type==="settlement" && x.employeeUid===employeeUid && x.periodType===periodType && x.periodKey===periodKey)) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف لهذه الفترة من قبل."},409);
+      if (periodType === "day" && records.some(x=>x.type==="settlement" && x.employeeUid===employeeUid && x.periodType==="month" && x.periodKey===periodKey.slice(0,7))) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف للشهر بالفعل."},409);
       const inPeriod = date => periodType === "day" ? date === periodKey : String(date || "").startsWith(periodKey);
-      const expenses = records.filter(x=>x.type==="dailyExpense" && inPeriod(x.date));
+      const expenses = records.filter(x=>x.type==="dailyExpense" && x.enteredBy===employeeUid && inPeriod(x.date));
       const pending = expenses.filter(x=>(x.status || "approved")==="pending");
-      if (pending.length) return jsonResponse({message:"لا يمكن تصفية الفترة قبل اعتماد أو رفض كل المصروفات المعلقة."},409);
+      if (pending.length) return jsonResponse({message:"لا يمكن تصفية عهدة الموظف قبل اعتماد أو رفض كل مصروفاته المعلقة."},409);
       const approvedExpenses = expenses.filter(x=>(x.status || "approved")==="approved").reduce((sum,x)=>sum+(Number(x.amount)||0),0);
       const query = await fsRequest(projectId, token, ":runQuery", {method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:"clinicBookings"}]}})});
       const bookings = (Array.isArray(query)?query:[]).filter(x=>x.document).map(x=>{
-        const d=x.document, fields=d.fields||{};
-        const get=k=>fields[k]?.stringValue || "";
-        return {date:get("appointmentDate").slice(0,10),status:get("status"),paid:Number(get("paidAmount"))||0};
-      }).filter(x=>inPeriod(x.date));
+        const fields=x.document.fields||{}, get=k=>fields[k]?.stringValue || "";
+        return {date:get("appointmentDate").slice(0,10),paymentEnteredByUid:get("paymentEnteredByUid"),paid:Number(get("paidAmount"))||0};
+      }).filter(x=>inPeriod(x.date) && x.paymentEnteredByUid===employeeUid && x.paid>0);
       const receipts = bookings.reduce((sum,x)=>sum+x.paid,0);
       const now = new Date().toISOString();
-      const settlement = {type:"settlement",periodType,periodKey,date:periodKey, status:"closed", closedBy:DOCTOR_ADMIN_UID, closedByName:"الدكتور",closedAt:now,
-        totalReceipts:receipts.toFixed(2),totalExpenses:approvedExpenses.toFixed(2),netTotal:(receipts-approvedExpenses).toFixed(2),bookingCount:String(bookings.length),createdAt:now,updatedAt:now};
-      const settlementId = "settlement-" + periodType + "-" + periodKey;
+      const settlement = {type:"settlement",periodType,periodKey,date:periodKey,employeeUid,employeeName,status:"closed",
+        closedBy:DOCTOR_ADMIN_UID,closedByName:"الدكتور",closedAt:now,
+        totalReceipts:receipts.toFixed(2),totalExpenses:approvedExpenses.toFixed(2),netTotal:(receipts-approvedExpenses).toFixed(2),
+        bookingCount:String(bookings.length),createdAt:now,updatedAt:now};
+      const settlementId = "settlement-" + periodType + "-" + periodKey + "-" + employeeUid;
       const result = await fsRequest(projectId, token, "/" + COLLECTION + "/" + encodeURIComponent(settlementId) + "?currentDocument.exists=false", {method:"PATCH",body:JSON.stringify(encode(settlement))});
       return jsonResponse({settlement:decode(result)},201);
     }
