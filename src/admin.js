@@ -32,7 +32,8 @@ const PERMISSION_SECTIONS = [
   { key: "bookings", label: "الحجوزات" },
   { key: "patients", label: "بيانات المرضى" },
   { key: "medicalRecords", label: "السجلات الطبية" },
-  { key: "settings", label: "إعدادات العيادة" }
+  { key: "settings", label: "إعدادات العيادة" },
+  { key: "accounts", label: "حسابات اليوم" }
 ];
 
 const PERMISSION_OPTIONS = [
