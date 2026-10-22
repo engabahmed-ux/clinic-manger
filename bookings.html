@@ -1,0 +1,202 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#F9F5F1">
+  <title>إدارة الحجوزات | العيادة</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./bookings.css">
+</head>
+<body>
+  <main class="bookings-shell">
+    <header class="bookings-header">
+      <a class="brand" href="./index.html">
+        <span class="brand-mark" aria-hidden="true">ط</span>
+        <span>
+          <strong>إدارة العيادة</strong>
+          <small>نظام الحجوزات</small>
+        </span>
+      </a>
+
+      <div class="header-actions">
+        <a class="back-link" href="./admin.html">لوحة الدكتور</a>
+        <button id="logoutButton" class="button button-light" type="button">
+          تسجيل الخروج
+        </button>
+      </div>
+    </header>
+
+    <section id="loadingSection" class="panel loading-panel" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <h1>جارٍ التحقق من الحساب</h1>
+      <p>نتحقق من صلاحياتك قبل تحميل الحجوزات.</p>
+    </section>
+
+    <section id="errorSection" class="panel error-panel" hidden>
+      <h1>تعذر فتح الحجوزات</h1>
+      <p id="errorMessage" role="alert"></p>
+      <button id="retryButton" class="button button-primary" type="button">
+        إعادة المحاولة
+      </button>
+      <a href="./index.html#patient-portal">العودة إلى تسجيل الدخول</a>
+    </section>
+
+    <div id="appSection" hidden>
+      <section class="page-heading">
+        <div>
+          <p class="eyebrow">إدارة المواعيد</p>
+          <h1>الحجوزات</h1>
+          <p>عرض طلبات الحجز ومتابعة حالة كل موعد.</p>
+        </div>
+        <button id="newBookingButton" class="button button-primary" type="button">
+          + إضافة حجز
+        </button>
+      </section>
+
+      <section class="stats-grid" aria-label="ملخص الحجوزات">
+        <article class="stat-card">
+          <span>كل الحجوزات المعروضة</span>
+          <strong id="totalCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>طلبات جديدة</span>
+          <strong id="pendingCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>مواعيد مؤكدة</span>
+          <strong id="confirmedCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>مواعيد ملغاة</span>
+          <strong id="cancelledCount">0</strong>
+        </article>
+      </section>
+
+      <section id="editorPanel" class="panel editor-panel" hidden>
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">بيانات الموعد</p>
+            <h2 id="editorTitle">إضافة حجز جديد</h2>
+          </div>
+          <button id="closeEditorButton" class="icon-button" type="button" aria-label="إغلاق">×</button>
+        </div>
+
+        <form id="bookingForm">
+          <input id="bookingId" type="hidden">
+
+          <div class="form-grid">
+            <label>
+              اسم المريضة *
+              <input id="patientName" name="patientName" maxlength="120" required>
+            </label>
+
+            <label>
+              رقم الهاتف *
+              <input id="patientPhone" name="patientPhone" type="tel" maxlength="40" required>
+            </label>
+
+            <label>
+              تاريخ ووقت الموعد *
+              <input id="appointmentDate" name="appointmentDate" type="datetime-local" required>
+            </label>
+
+            <label>
+              الخدمة
+              <input id="service" name="service" maxlength="120" placeholder="مثال: متابعة حمل">
+            </label>
+
+            <label id="statusField" class="status-field">
+              حالة الحجز
+              <select id="bookingStatus" name="status">
+                <option value="pending">طلب جديد</option>
+                <option value="confirmed">مؤكد</option>
+                <option value="completed">مكتمل</option>
+                <option value="cancelled">ملغي</option>
+              </select>
+            </label>
+
+            <label class="full-width">
+              ملاحظات إدارية
+              <textarea id="notes" name="notes" rows="3" maxlength="2000" placeholder="ملاحظات متعلقة بترتيب الموعد فقط"></textarea>
+            </label>
+          </div>
+
+          <p class="privacy-note">
+            لا تكتب تفاصيل طبية أو معلومات حساسة في ملاحظات الحجز.
+          </p>
+
+          <p id="formMessage" class="message" role="status" hidden></p>
+
+          <div class="form-actions">
+            <button id="saveBookingButton" class="button button-primary" type="submit">
+              حفظ الحجز
+            </button>
+            <button id="cancelEditorButton" class="button button-light" type="button">
+              إلغاء
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel list-panel">
+        <div class="panel-heading list-heading">
+          <div>
+            <h2>قائمة الحجوزات</h2>
+            <p id="permissionLabel" class="muted"></p>
+          </div>
+          <button id="refreshButton" class="button button-light" type="button">
+            تحديث القائمة
+          </button>
+        </div>
+
+        <div class="filters">
+          <label class="search-field">
+            البحث
+            <input id="searchInput" type="search" placeholder="اسم المريضة أو الهاتف أو الخدمة">
+          </label>
+
+          <label>
+            التاريخ
+            <input id="filterDate" type="date">
+          </label>
+
+          <label>
+            الحالة
+            <select id="filterStatus">
+              <option value="all">كل الحالات</option>
+              <option value="pending">طلب جديد</option>
+              <option value="confirmed">مؤكد</option>
+              <option value="completed">مكتمل</option>
+              <option value="cancelled">ملغي</option>
+            </select>
+          </label>
+        </div>
+
+        <p id="listMessage" class="message" role="status" hidden></p>
+        <div id="bookingsList" class="bookings-list"></div>
+
+        <p id="emptyState" class="empty-state" hidden>
+          لا توجد حجوزات مطابقة للفلاتر الحالية.
+        </p>
+
+        <p class="list-limit-note">
+          تعرض هذه النسخة أول 300 حجز. سنضيف التقسيم إلى صفحات عند استكمال المرحلة التالية.
+        </p>
+      </section>
+    </div>
+
+    <footer class="bookings-footer">
+      <a href="./index.html">الموقع العام</a>
+      <span>نظام إدارة العيادة</span>
+    </footer>
+  </main>
+
+  <script type="module" src="./src/bookings.js"></script>
+</body>
+</html>
