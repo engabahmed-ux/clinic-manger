@@ -1001,3 +1001,6 @@ a {
 .staff-tab .booking-notification-badge[hidden]{display:none!important}
 .reschedule-notice-card{grid-template-columns:minmax(0,1fr);border-inline-start:4px solid #b87922;background:#fffaf0}
 .reschedule-notice-card .reschedule-notice-text{color:#8a5717;font-weight:800;font-size:13px}
+
+@keyframes booking-notification-pulse{0%,100%{box-shadow:0 0 0 0 rgba(198,40,40,.32)}50%{box-shadow:0 0 0 5px rgba(198,40,40,0)}}
+@media(prefers-reduced-motion:reduce){.staff-tab .booking-notification-badge:not([hidden]){animation:none}}
