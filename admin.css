@@ -849,6 +849,9 @@ button:disabled {
 
 
 
+/* إبراز رقم الطلب على تبويب الحجوزات في لوحة الدكتور */
+.dashboard-tab .booking-notification-badge:not([hidden]){display:inline-flex!important;flex:0 0 auto;visibility:visible!important;margin-inline-start:4px;position:relative;z-index:1}
+
 /* إشعار واضح على تبويب الحجوزات وسجل نقل المواعيد */
 .dashboard-tab.has-pending-bookings{position:relative}
 .dashboard-tab.has-pending-bookings::after{content:"";position:absolute;top:7px;inset-inline-end:8px;width:8px;height:8px;border-radius:50%;background:#c62828;box-shadow:0 0 0 3px rgba(198,40,40,.12)}
