@@ -397,8 +397,7 @@ async function listBookings(projectId, accessToken) {
       method: "POST",
       body: JSON.stringify({
         structuredQuery: {
-          from: [{ collectionId: BOOKINGS_COLLECTION }],
-          limit: 300
+          from: [{ collectionId: BOOKINGS_COLLECTION }]
         }
       })
     }
