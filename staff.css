@@ -400,3 +400,46 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+.staff-bookings-controls {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.staff-bookings-list {
+  display: grid;
+  gap: 10px;
+}
+
+.staff-bookings-list .staff-permission-card {
+  background: #fff;
+}
+
+.staff-booking-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.staff-secondary {
+  border: 1px solid var(--staff-border, #dedbd5);
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.staff-booking-actions button {
+  flex: 1 1 140px;
+}
+
+.staff-secondary:disabled,
+.staff-primary:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
