@@ -68,6 +68,18 @@ const bookingManagementSection = $("#bookingManagementSection");
 const bookingList = $("#bookingList");
 const bookingListMessage = $("#bookingListMessage");
 const refreshBookingsButton = $("#refreshBookingsButton");
+const openPatientsButton = $("#openPatientsButton");
+const backFromPatientsButton = $("#backFromPatientsButton");
+const patientManagementSection = $("#patientManagementSection");
+const createPatientForm = $("#createPatientForm");
+const createPatientButton = $("#createPatientButton");
+const createPatientMessage = $("#createPatientMessage");
+const patientCredentialsPanel = $("#patientCredentialsPanel");
+const patientCredentialsMessage = $("#patientCredentialsMessage");
+const createdPatientUsername = $("#createdPatientUsername");
+const createdPatientEmail = $("#createdPatientEmail");
+const createdPatientPassword = $("#createdPatientPassword");
+const copyPatientCredentialsButton = $("#copyPatientCredentialsButton");
 const createEmployeeForm = $("#createEmployeeForm");
 const createEmployeeButton = $("#createEmployeeButton");
 const createEmployeeMessage = $("#createEmployeeMessage");
@@ -79,6 +91,7 @@ let isSubmitting = false;
 let isCreatingEmployee = false;
 let isLoadingEmployees = false;
 let isLoadingBookings = false;
+let isCreatingPatient = false;
 let verificationRequestNumber = 0;
 
 function showMessage(element, message, type = "error") {
@@ -120,6 +133,7 @@ function showEmployeeSection(show) {
   }
 
   if (bookingManagementSection) bookingManagementSection.hidden = true;
+  if (patientManagementSection) patientManagementSection.hidden = true;
 
   const managementGrid = $(".management-grid");
   const welcomeCard = $(".welcome-card");
@@ -136,6 +150,7 @@ function showBookingSection(show) {
   }
 
   if (employeeManagementSection) employeeManagementSection.hidden = true;
+  if (patientManagementSection) patientManagementSection.hidden = true;
 
   const managementGrid = $(".management-grid");
   const welcomeCard = $(".welcome-card");
@@ -283,6 +298,38 @@ async function verifyDoctorOnServer(user, requestNumber) {
       "تعذر الاتصال بخدمة التحقق. تحقق من الإنترنت وحاول مرة أخرى."
     );
   }
+}
+
+function showPatientSection(show) {
+  if (patientManagementSection) patientManagementSection.hidden = !show;
+  if (employeeManagementSection) employeeManagementSection.hidden = true;
+  if (bookingManagementSection) bookingManagementSection.hidden = true;
+  const managementGrid = $(".management-grid");
+  const welcomeCard = $(".welcome-card");
+  const sectionHeading = $(".section-heading");
+  if (managementGrid) managementGrid.hidden = show;
+  if (welcomeCard) welcomeCard.hidden = show;
+  if (sectionHeading) sectionHeading.hidden = show;
+}
+
+async function patientApiRequest(action, data = {}) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى.");
+  const idToken = await user.getIdToken();
+  const response = await fetch("/api/doctor/patients", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify({ action, ...data }),
+    cache: "no-store"
+  });
+  let result = {};
+  try { result = await response.json(); } catch {}
+  if (!response.ok) throw new Error(result.message || "تعذر إنشاء حساب المريضة.");
+  return result;
 }
 
 async function bookingApiRequest(action, data = {}) {
@@ -732,6 +779,83 @@ if (backFromBookingsButton) {
 
 if (refreshBookingsButton) {
   refreshBookingsButton.addEventListener("click", loadBookings);
+}
+
+if (openPatientsButton) {
+  openPatientsButton.addEventListener("click", () => {
+    showPatientSection(true);
+    if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
+    hideMessage(createPatientMessage);
+  });
+}
+
+if (backFromPatientsButton) {
+  backFromPatientsButton.addEventListener("click", () => {
+    showPatientSection(false);
+    if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
+  });
+}
+
+if (createPatientForm) {
+  createPatientForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (isCreatingPatient) return;
+    hideMessage(createPatientMessage);
+    if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
+
+    const displayName = $("#patientAccountName")?.value.trim() || "";
+    const email = $("#patientAccountEmail")?.value.trim() || "";
+    const phone = $("#patientAccountPhone")?.value.trim() || "";
+    const username = $("#patientAccountUsername")?.value.trim().toLowerCase() || "";
+
+    if (!displayName || !email || !username) {
+      showMessage(createPatientMessage, "أدخل اسم المريضة والبريد الإلكتروني واسم المستخدم.");
+      return;
+    }
+
+    isCreatingPatient = true;
+    if (createPatientButton) {
+      createPatientButton.disabled = true;
+      createPatientButton.textContent = "جارٍ إنشاء الحساب...";
+    }
+
+    try {
+      const result = await patientApiRequest("create", { displayName, email, phone, username });
+      const credentials = result.credentials || {};
+      if (createdPatientUsername) createdPatientUsername.textContent = credentials.username || "";
+      if (createdPatientEmail) createdPatientEmail.textContent = credentials.email || "";
+      if (createdPatientPassword) createdPatientPassword.textContent = credentials.temporaryPassword || "";
+      if (patientCredentialsMessage) patientCredentialsMessage.textContent = result.message || "تم إنشاء الحساب.";
+      if (patientCredentialsPanel) patientCredentialsPanel.hidden = false;
+      createPatientForm.reset();
+      showMessage(createPatientMessage, "تم إنشاء الحساب بنجاح. انسخي بيانات الدخول وسلّميها للمريضة بشكل خاص.", "success");
+    } catch (error) {
+      console.error("Patient account creation failed:", error);
+      showMessage(createPatientMessage, error.message || "تعذر إنشاء حساب المريضة.");
+    } finally {
+      isCreatingPatient = false;
+      if (createPatientButton) {
+        createPatientButton.disabled = false;
+        createPatientButton.textContent = "إنشاء حساب المريضة";
+      }
+    }
+  });
+}
+
+if (copyPatientCredentialsButton) {
+  copyPatientCredentialsButton.addEventListener("click", async () => {
+    const text = [
+      "اسم المستخدم: " + (createdPatientUsername?.textContent || ""),
+      "البريد الإلكتروني: " + (createdPatientEmail?.textContent || ""),
+      "كلمة المرور المؤقتة: " + (createdPatientPassword?.textContent || "")
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      copyPatientCredentialsButton.textContent = "تم النسخ";
+    } catch {
+      showMessage(createPatientMessage, "تعذر النسخ تلقائيًا. انسخي البيانات يدويًا.");
+    }
+  });
 }
 
 if (bookingList) {
