@@ -135,10 +135,12 @@ doctorImage: "./doctor.jpg",
     patientPhoneLabel: "رقم الهاتف",
     patientPhonePlaceholder: "01xxxxxxxxx",
     appointmentDateLabel: "التاريخ المفضل",
+    serviceLabel: "الخدمة المطلوبة",
+    servicePlaceholder: "اختاري الخدمة (اختياري)",
     submitButton: "إرسال طلب الحجز",
     disclaimer:
       "إرسال الطلب لا يعني تأكيد الموعد. يجب تأكيده من العيادة.",
-    successMessage: "تم تجهيز طلبك في هذه الواجهة التجريبية.",
+    successMessage: "تم استلام طلب الحجز، وسيتم التواصل معك لتأكيد الموعد.",
     errorMessage: "يرجى التأكد من إدخال البيانات المطلوبة.",
     allowGuestBooking: true,
     requireDoctorApproval: true
