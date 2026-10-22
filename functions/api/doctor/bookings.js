@@ -336,7 +336,6 @@ function validateBooking(data, partial = false) {
     "appointmentDate",
     "service",
     "servicePrice",
-    "paidAmount",
     "notes",
     "status"
   ];
