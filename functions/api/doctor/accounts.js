@@ -125,6 +125,16 @@ export async function onRequestPost({ request, env }) {
           approvedByName:x.approvedByName, approvedAt:x.approvedAt, rejectionReason:x.rejectionReason }));
       return jsonResponse({ expenses, date, accountType:verified.accountType, expenseMode:verified.expenseMode || "auto" });
     }
+    if (data.action === "listMonthlyExpenses") {
+      const month = String(data.month || "");
+      if (!/^\\d{4}-\\d{2}$/.test(month)) return jsonResponse({message:"الشهر المحدد غير صحيح."},400);
+      const records = await listRecords(projectId, token);
+      const expenses = records.filter(x=>x.type==="dailyExpense" && String(x.date||"").startsWith(month))
+        .filter(x=>verified.accountType==="doctor" || !x.enteredBy || x.enteredBy===verified.uid)
+        .sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))
+        .map(x=>({id:x.id,description:x.personName,amount:x.amount,date:x.date,notes:x.notes,status:x.status||"approved",enteredByName:x.enteredByName,approvedByName:x.approvedByName}));
+      return jsonResponse({expenses,month});
+    }
     if (data.action === "createDailyExpense") {
       const entry = data.entry || {}, description = String(entry.description || "").trim(), date = String(entry.date || ""), notes = String(entry.notes || "").trim(), amount = String(entry.amount ?? "");
       if (!cleanString(description,160) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00")) || !/^\d{1,8}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || notes.length > 500) return jsonResponse({ message:"راجع وصف المصروف والمبلغ والتاريخ." },400);
@@ -172,6 +182,7 @@ export async function onRequestPost({ request, env }) {
       if (!periodType || !(periodType === "day" ? /^\\d{4}-\\d{2}-\\d{2}$/.test(periodKey) : /^\\d{4}-\\d{2}$/.test(periodKey))) return jsonResponse({message:"حدد اليوم أو الشهر بصورة صحيحة."},400);
       const records = await listRecords(projectId, token);
       if (records.some(x=>x.type==="settlement" && x.periodType===periodType && x.periodKey===periodKey)) return jsonResponse({message:"تمت تصفية هذه الفترة من قبل."},409);
+      if (periodType === "day" && records.some(x=>x.type==="settlement" && x.periodType==="month" && x.periodKey===periodKey.slice(0,7))) return jsonResponse({message:"هذا اليوم يقع داخل شهر تمت تصفيته بالفعل."},409);
       const inPeriod = date => periodType === "day" ? date === periodKey : String(date || "").startsWith(periodKey);
       const expenses = records.filter(x=>x.type==="dailyExpense" && inPeriod(x.date));
       const pending = expenses.filter(x=>(x.status || "approved")==="pending");
