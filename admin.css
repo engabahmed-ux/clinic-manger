@@ -774,3 +774,19 @@ button:disabled {
 .doctor-accounts-date-label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700}
 .doctor-accounts-date-label input{min-height:38px;padding:5px 8px;border:1px solid var(--color-border);border-radius:8px;font:inherit}
 @media(max-width:600px){.doctor-accounts-date-label{flex-wrap:wrap}.doctor-accounts-date-label input{font-size:16px}}
+
+/* مصروفات الموظفين والتصفية المالية */
+.doctor-settlement-tools { margin-top: 22px; padding: 16px; border: 1px solid var(--color-border, #ddd); border-radius: 14px; }
+.doctor-settlement-tools h4, .doctor-settlement-tools h5 { margin: 14px 0 10px; }
+.settlement-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 14px 0; }
+.settlement-controls label { display: grid; gap: 6px; min-width: 180px; }
+.doctor-daily-expense-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--color-border, #ddd); }
+.doctor-daily-expense-row p { margin: 5px 0 0; }
+.doctor-daily-expense-row .booking-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.employee-permission-row select { max-width: 100%; min-width: 0; }
+@media (max-width: 640px) {
+  .doctor-settlement-tools { padding: 12px; }
+  .settlement-controls { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .settlement-controls label, .settlement-controls button { width: 100%; min-width: 0; }
+  .doctor-daily-expense-row { align-items: flex-start; }
+}
