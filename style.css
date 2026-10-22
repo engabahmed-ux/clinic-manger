@@ -1599,3 +1599,61 @@ p {
 .floating-card {
   display: none !important;
 }
+
+.patient-appointments-panel {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.patient-appointments-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.patient-appointments-heading h3 {
+  margin: 0;
+}
+
+.patient-appointments-heading .button {
+  min-height: 40px;
+  padding: 9px 14px;
+  font-size: 12px;
+}
+
+.patient-appointments-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.patient-appointment-card {
+  padding: 15px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.patient-appointment-card h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.patient-appointment-card p {
+  margin: 0 0 10px;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.patient-appointment-status {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #f1f4ec;
+  color: #42513a;
+  font-size: 12px;
+  font-weight: 800;
+}
