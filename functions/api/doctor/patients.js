@@ -211,6 +211,16 @@ export async function onRequest({ request, env }) {
         body: JSON.stringify(encodeDocument({ uid: fsString(uid), email: fsString(email), username: fsString(username), active: fsBool(true), createdAt: fsString(now) }))
       });
     } catch (error) {
+      try {
+        await firestore(account.project_id, token, "/" + PATIENTS_COLLECTION + "/" + encodeURIComponent(uid), {
+          method: "DELETE"
+        });
+        await firestore(account.project_id, token, "/" + USERNAMES_COLLECTION + "/" + encodeURIComponent(username), {
+          method: "DELETE"
+        });
+      } catch (cleanupError) {
+        console.error("Patient account rollback cleanup failed:", cleanupError);
+      }
       await deleteAuthUser(env.FIREBASE_API_KEY, signupResult.idToken);
       throw error;
     }
