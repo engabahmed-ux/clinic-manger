@@ -993,3 +993,11 @@ a {
     margin-bottom: 14px !important;
   }
 }
+
+
+/* إشعار الطلبات أعلى لوحة الموظف وإظهار نقل المواعيد */
+.staff-tab .booking-notification-badge{margin-inline-start:6px;vertical-align:middle}
+.staff-tab .booking-notification-badge:not([hidden]){animation:booking-notification-pulse 1.8s ease-in-out infinite}
+.staff-tab .booking-notification-badge[hidden]{display:none!important}
+.reschedule-notice-card{grid-template-columns:minmax(0,1fr);border-inline-start:4px solid #b87922;background:#fffaf0}
+.reschedule-notice-card .reschedule-notice-text{color:#8a5717;font-weight:800;font-size:13px}
