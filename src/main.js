@@ -342,10 +342,68 @@ function renderBooking() {
         return;
       }
 
-      message.textContent =
-        "هذه واجهة تجريبية فقط. لم يتم إرسال أو حفظ طلب الحجز. يجب ربط النموذج بخدمة آمنة قبل استخدامه فعليًا.";
+      const submitButton = form.querySelector('button[type="submit"]');
+      const service = String(formData.get("service") ?? "").trim();
+      const notes = String(formData.get("notes") ?? "").trim();
 
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.setAttribute("aria-busy", "true");
+      }
+
+      message.textContent = "جارٍ إرسال طلب الحجز...";
       message.className = "form-message";
+
+      try {
+        const response = await fetch("/api/public/bookings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({
+            patientName: name,
+            patientPhone,
+            appointmentDate: date,
+            service,
+            notes
+          }),
+          cache: "no-store"
+        });
+
+        let result = {};
+        try {
+          result = await response.json();
+        } catch {
+          result = {};
+        }
+
+        if (!response.ok || result.success !== true) {
+          throw new Error(
+            result.message ||
+            "تعذر إرسال طلب الحجز. حاولي مرة أخرى لاحقًا."
+          );
+        }
+
+        message.textContent =
+          result.message ||
+          config.booking?.successMessage ||
+          "تم استلام طلب الحجز، وسيتم التواصل معك لتأكيد الموعد.";
+        message.className = "form-message";
+        form.reset();
+        setupDateInput();
+      } catch (error) {
+        console.error("تعذر إرسال طلب الحجز:", error);
+        message.textContent =
+          error.message ||
+          "تعذر الاتصال بخدمة الحجز. تحققي من الإنترنت وحاولي مرة أخرى.";
+        message.className = "form-message error";
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.removeAttribute("aria-busy");
+        }
+      }
     });
   }
 }
