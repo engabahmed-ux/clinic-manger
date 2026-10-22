@@ -160,6 +160,7 @@ export async function onRequest({ request, env }) {
   if (displayName.length < 2 || displayName.length > 120) return jsonResponse({ message: "اسم المريضة مطلوب ويجب ألا يتجاوز 120 حرفًا." }, 400);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return jsonResponse({ message: "البريد الإلكتروني غير صحيح." }, 400);
   if (!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(username)) return jsonResponse({ message: "اسم المستخدم يجب أن يكون من 3 إلى 30 حرفًا إنجليزيًا أو رقمًا، ويمكن أن يحتوي على نقطة أو شرطة أو شرطة سفلية." }, 400);
+  if (!phone) return jsonResponse({ message: "رقم هاتف المريضة مطلوب لربط حجوزاتها بحسابها." }, 400);
   if (phone.length > 40) return jsonResponse({ message: "رقم الهاتف أطول من المسموح." }, 400);
 
   let account, token;
