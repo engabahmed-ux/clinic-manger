@@ -1316,7 +1316,7 @@ finalizeDailySettlementButton?.addEventListener("click",async()=>{
   finalizeDailySettlementButton.disabled=true;
   try{const result=await accountsApiRequest("finalizeSettlement",{periodType:"day",periodKey,employeeUid});showMessage(doctorSettlementMessage,"تمت تصفية عهدة "+employeeName+". الصافي: "+doctorMoney(result.settlement?.netTotal),"success");await loadDoctorSettlements();renderDoctorAccounts();await previewDoctorSettlement("day")}
   catch(error){showMessage(doctorSettlementMessage,error.message||"تعذر تصفية اليوم.")}
-  finally{finalizeDailySettlementButton.disabled=false}
+  finally{await previewDoctorSettlement("day")}
 });
 finalizeMonthlySettlementButton?.addEventListener("click",async()=>{
   const periodKey=doctorAccountsMonth?.value,employeeUid=doctorSettlementEmployee?.value;
