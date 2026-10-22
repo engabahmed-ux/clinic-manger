@@ -630,7 +630,7 @@ export async function onRequest(context) {
         const date = typeof data.date === "string" ? data.date : "";
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
         const bookings = await listBookings(serviceAccount.project_id, accessToken);
-        const daily = bookings.filter(b => String(b.appointmentDate || "").slice(0,10) === date && !["pending","archived","cancelled"].includes(b.status)).map(b => ({ id:b.id, patientName:b.patientName, appointmentDate:b.appointmentDate, service:b.service, servicePrice:b.servicePrice, paidAmount:b.paidAmount || "0", status:b.status }));
+        const daily = bookings.filter(b => String(b.appointmentDate || "").slice(0,10) === date && (b.status !== "pending" || Number(b.paidAmount) > 0)).map(b => ({ id:b.id, patientName:b.patientName, appointmentDate:b.appointmentDate, service:b.service, servicePrice:b.servicePrice, paidAmount:b.paidAmount || "0", status:b.status }));
         return jsonResponse({ bookings:daily, date });
       }
       case "updatePaidAmount": {
