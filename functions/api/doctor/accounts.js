@@ -195,7 +195,7 @@ export async function onRequestPost({ request, env }) {
         const d=x.document, fields=d.fields||{};
         const get=k=>fields[k]?.stringValue || "";
         return {date:get("appointmentDate").slice(0,10),status:get("status"),paid:Number(get("paidAmount"))||0};
-      }).filter(x=>inPeriod(x.date) && !["pending","archived","cancelled"].includes(x.status));
+      }).filter(x=>inPeriod(x.date));
       const receipts = bookings.reduce((sum,x)=>sum+x.paid,0);
       const now = new Date().toISOString();
       const settlement = {type:"settlement",periodType,periodKey,date:periodKey, status:"closed", closedBy:DOCTOR_ADMIN_UID, closedByName:"الدكتور",closedAt:now,
