@@ -379,7 +379,7 @@ function validateBooking(data, partial = false) {
     return "اسم الخدمة أطول من المسموح.";
   }
 
-  if (data.servicePrice !== undefined && data.servicePrice !== "" && (!/^\\d{1,8}(\\.\\d{1,2})?$/.test(String(data.servicePrice)) || Number(data.servicePrice) < 0)) {
+  if (data.servicePrice !== undefined && data.servicePrice !== "" && (!/^\d{1,8}(\.\d{1,2})?$/.test(String(data.servicePrice)) || Number(data.servicePrice) < 0)) {
     return "قيمة الخدمة يجب أن تكون رقمًا موجبًا أو صفرًا وبحد أقصى منزلتين عشريتين.";
   }
 
