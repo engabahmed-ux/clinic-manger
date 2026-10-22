@@ -238,6 +238,7 @@ function decodeBooking(document) {
     patientPhone: readString(fields, "patientPhone"),
     appointmentDate: readString(fields, "appointmentDate"),
     service: readString(fields, "service"),
+    servicePrice: readString(fields, "servicePrice"),
     notes: readString(fields, "notes"),
     status: readString(fields, "status") || "pending",
     createdAt: readString(fields, "createdAt"),
@@ -253,6 +254,7 @@ function encodeBooking(data) {
     "patientPhone",
     "appointmentDate",
     "service",
+    "servicePrice",
     "notes",
     "status",
     "createdAt",
@@ -334,6 +336,7 @@ function validateBooking(data, partial = false) {
     "patientPhone",
     "appointmentDate",
     "service",
+    "servicePrice",
     "notes",
     "status"
   ];
@@ -374,6 +377,10 @@ function validateBooking(data, partial = false) {
 
   if (data.service && data.service.length > 120) {
     return "اسم الخدمة أطول من المسموح.";
+  }
+
+  if (data.servicePrice !== undefined && data.servicePrice !== "" && (!/^\\d{1,8}(\\.\\d{1,2})?$/.test(String(data.servicePrice)) || Number(data.servicePrice) < 0)) {
+    return "قيمة الخدمة يجب أن تكون رقمًا موجبًا أو صفرًا وبحد أقصى منزلتين عشريتين.";
   }
 
   if (data.notes && data.notes.length > 2000) {
@@ -469,6 +476,7 @@ async function updateBooking(projectId, accessToken, data) {
     appointmentDate:
       changes.appointmentDate?.trim() ?? existing.appointmentDate,
     service: changes.service?.trim() ?? existing.service,
+    servicePrice: changes.servicePrice !== undefined ? String(changes.servicePrice).trim() : existing.servicePrice,
     notes: changes.notes?.trim() ?? existing.notes,
     updatedAt: new Date().toISOString()
   };
@@ -480,6 +488,7 @@ async function updateBooking(projectId, accessToken, data) {
     "patientPhone",
     "appointmentDate",
     "service",
+    "servicePrice",
     "notes",
     "status",
     "updatedAt"
