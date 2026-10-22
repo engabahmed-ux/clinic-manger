@@ -1314,7 +1314,7 @@ finalizeDailySettlementButton?.addEventListener("click",async()=>{
   if(!periodKey){showMessage(doctorSettlementMessage,"اختر تاريخ اليوم المراد تصفيته.");return}
   if(!window.confirm("هل تريد تصفية عهدة "+employeeName+" ليوم "+formatRequestDate(periodKey)+"؟ لن يمكن إضافة مصروفات أو تعديل مقبوضات هذه العهدة بعد الإقفال."))return;
   finalizeDailySettlementButton.disabled=true;
-  try{const result=await accountsApiRequest("finalizeSettlement",{periodType:"day",periodKey,employeeUid});showMessage(doctorSettlementMessage,"تمت تصفية عهدة "+employeeName+". الصافي: "+doctorMoney(result.settlement?.netTotal),"success");await loadDoctorSettlements();renderDoctorAccounts()}
+  try{const result=await accountsApiRequest("finalizeSettlement",{periodType:"day",periodKey,employeeUid});showMessage(doctorSettlementMessage,"تمت تصفية عهدة "+employeeName+". الصافي: "+doctorMoney(result.settlement?.netTotal),"success");await loadDoctorSettlements();renderDoctorAccounts();await previewDoctorSettlement("day")}
   catch(error){showMessage(doctorSettlementMessage,error.message||"تعذر تصفية اليوم.")}
   finally{finalizeDailySettlementButton.disabled=false}
 });
