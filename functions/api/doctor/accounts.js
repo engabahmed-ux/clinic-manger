@@ -85,13 +85,14 @@ function decode(doc) {
     date: read(f,"date"), notes: read(f,"notes"), createdAt: read(f,"createdAt"), updatedAt: read(f,"updatedAt"),
     status: read(f,"status"), enteredBy: read(f,"enteredBy"), enteredByName: read(f,"enteredByName"),
     approvedBy: read(f,"approvedBy"), approvedByName: read(f,"approvedByName"), approvedAt: read(f,"approvedAt"),
+    reviewedBy: read(f,"reviewedBy"), reviewedByName: read(f,"reviewedByName"), reviewedAt: read(f,"reviewedAt"),
     rejectionReason: read(f,"rejectionReason"), periodType: read(f,"periodType"), periodKey: read(f,"periodKey"),
     closedBy: read(f,"closedBy"), closedByName: read(f,"closedByName"), closedAt: read(f,"closedAt"),
     totalReceipts: read(f,"totalReceipts"), totalExpenses: read(f,"totalExpenses"), netTotal: read(f,"netTotal"), bookingCount: read(f,"bookingCount") };
 }
 function encode(record) {
   const fields = {};
-  for (const key of ["type","name","kind","categoryId","personName","amount","date","notes","createdAt","updatedAt","status","enteredBy","enteredByName","approvedBy","approvedByName","approvedAt","rejectionReason","periodType","periodKey","closedBy","closedByName","closedAt","totalReceipts","totalExpenses","netTotal","bookingCount"]) if (record[key] !== undefined) fields[key] = str(record[key]);
+  for (const key of ["type","name","kind","categoryId","personName","amount","date","notes","createdAt","updatedAt","status","enteredBy","enteredByName","approvedBy","approvedByName","approvedAt","reviewedBy","reviewedByName","reviewedAt","rejectionReason","periodType","periodKey","closedBy","closedByName","closedAt","totalReceipts","totalExpenses","netTotal","bookingCount"]) if (record[key] !== undefined) fields[key] = str(record[key]);
   return { fields };
 }
 async function listRecords(projectId, token) {
@@ -164,9 +165,10 @@ export async function onRequestPost({ request, env }) {
       const status = data.action === "approveDailyExpense" ? "approved" : "rejected";
       const rejectionReason = String(data.reason || "").trim();
       if (status === "rejected" && rejectionReason.length > 300) return jsonResponse({message:"سبب الرفض طويل جدًا."},400);
-      const patchFields = { status:str(status), approvedBy:str(DOCTOR_ADMIN_UID), approvedByName:str("الدكتور"),
-        approvedAt:str(now), updatedAt:str(now), rejectionReason:str(status === "rejected" ? (rejectionReason || "لم يُذكر سبب") : "") };
-      await fsRequest(projectId, token, "/" + COLLECTION + "/" + encodeURIComponent(id) + "?updateMask.fieldPaths=status&updateMask.fieldPaths=approvedBy&updateMask.fieldPaths=approvedByName&updateMask.fieldPaths=approvedAt&updateMask.fieldPaths=updatedAt&updateMask.fieldPaths=rejectionReason",
+      const patchFields = { status:str(status), approvedBy:str(status === "approved" ? DOCTOR_ADMIN_UID : ""), approvedByName:str(status === "approved" ? "الدكتور" : ""),
+        approvedAt:str(status === "approved" ? now : ""), reviewedBy:str(DOCTOR_ADMIN_UID), reviewedByName:str("الدكتور"), reviewedAt:str(now),
+        updatedAt:str(now), rejectionReason:str(status === "rejected" ? (rejectionReason || "لم يُذكر سبب") : "") };
+      await fsRequest(projectId, token, "/" + COLLECTION + "/" + encodeURIComponent(id) + "?updateMask.fieldPaths=status&updateMask.fieldPaths=approvedBy&updateMask.fieldPaths=approvedByName&updateMask.fieldPaths=approvedAt&updateMask.fieldPaths=reviewedBy&updateMask.fieldPaths=reviewedByName&updateMask.fieldPaths=reviewedAt&updateMask.fieldPaths=updatedAt&updateMask.fieldPaths=rejectionReason",
         {method:"PATCH",body:JSON.stringify({fields:patchFields})});
       return jsonResponse({id,status,approvedAt:status === "approved" ? now : "",rejectionReason:status === "rejected" ? (rejectionReason || "لم يُذكر سبب") : ""});
     }
@@ -198,7 +200,8 @@ export async function onRequestPost({ request, env }) {
       const now = new Date().toISOString();
       const settlement = {type:"settlement",periodType,periodKey,date:periodKey, status:"closed", closedBy:DOCTOR_ADMIN_UID, closedByName:"الدكتور",closedAt:now,
         totalReceipts:receipts.toFixed(2),totalExpenses:approvedExpenses.toFixed(2),netTotal:(receipts-approvedExpenses).toFixed(2),bookingCount:String(bookings.length),createdAt:now,updatedAt:now};
-      const result = await fsRequest(projectId, token, "/" + COLLECTION, {method:"POST",body:JSON.stringify(encode(settlement))});
+      const settlementId = "settlement-" + periodType + "-" + periodKey;
+      const result = await fsRequest(projectId, token, "/" + COLLECTION + "/" + encodeURIComponent(settlementId) + "?currentDocument.exists=false", {method:"PATCH",body:JSON.stringify(encode(settlement))});
       return jsonResponse({settlement:decode(result)},201);
     }
     if (data.action === "list") {
