@@ -652,3 +652,53 @@ a {
  .staff-expense-form button{grid-column:auto}
  .staff-accounts-date-label{flex-wrap:wrap}
 }
+
+
+/* إصلاح ترتيب لوحة الموظف على كل الشاشات */
+.staff-shell {
+  width: min(1440px, calc(100% - 40px));
+  min-width: 0;
+}
+.staff-welcome {
+  display: block;
+  text-align: right;
+}
+.staff-compact-welcome {
+  display: block;
+  width: 100%;
+  margin: 0 !important;
+  text-align: right;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.staff-tabs {
+  width: 100%;
+  min-width: 0;
+  margin-top: 10px;
+}
+.staff-tab {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .staff-shell {
+    width: calc(100% - 20px);
+  }
+  .staff-welcome {
+    margin-top: 18px;
+    padding: 14px;
+  }
+  .staff-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    padding: 7px;
+  }
+  .staff-tab {
+    width: 100%;
+    padding: 9px 6px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+}
