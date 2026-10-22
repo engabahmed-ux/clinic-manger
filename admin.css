@@ -667,3 +667,38 @@ button:disabled {
     flex: 1 1 100%;
   }
 }
+
+.patient-credentials-panel {
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: #f8fbf5;
+}
+
+.patient-credentials-panel h4 {
+  margin: 0 0 8px;
+}
+
+.patient-credentials-panel p {
+  line-height: 1.7;
+}
+
+.patient-credentials-panel dl {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.5fr) minmax(0, 1fr);
+  gap: 8px 12px;
+  overflow-wrap: anywhere;
+}
+
+.patient-credentials-panel dt {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.patient-credentials-panel dd {
+  margin: 0;
+  font-weight: 800;
+  user-select: text;
+}
