@@ -525,7 +525,7 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
   let paymentEnteredByUid = existing.paymentEnteredByUid || "";
   let paymentEnteredByName = existing.paymentEnteredByName || "";
   let paymentUpdatedAt = existing.paymentUpdatedAt || "";
-  if (actorAccountType === "staff" && changes.status === "completed" && existing.status !== "completed" && !(Number(existing.paidAmount) > 0)) {
+  if (actorAccountType === "staff" && changes.status === "completed" && !(Number(existing.paidAmount) > 0)) {
     const fee = Number(changes.servicePrice ?? existing.servicePrice) || 0;
     if (fee > 0) {
       paidAmount = fee.toFixed(2);
