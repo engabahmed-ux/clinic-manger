@@ -798,6 +798,7 @@ if (openBookingsButton) {
 
 if (refreshBookingsButton) refreshBookingsButton.addEventListener("click", loadBookings);
 if (addBookingToggleButton && bookingCreateCard) addBookingToggleButton.addEventListener("click", () => { bookingCreateCard.hidden = !bookingCreateCard.hidden; });
+createBookingForm?.querySelector(".service-quick-select")?.addEventListener("change",e=>{const input=createBookingForm.querySelector('[name="service"]');if(input&&e.target.value)input.value=e.target.value});
 if (bookingSearchInput) bookingSearchInput.addEventListener("input", renderPendingBookings);
 if (bookingRequestsToggle && bookingRequestsPanel) bookingRequestsToggle.addEventListener("click",()=>{const open=bookingRequestsPanel.hidden;bookingRequestsPanel.hidden=!open;bookingRequestsToggle.setAttribute("aria-expanded",String(open));bookingRequestsToggle.classList.toggle("is-open",open)});
 $("#cancelCreateBookingButton")?.addEventListener("click",()=>{createBookingForm?.reset();if(bookingCreateCard)bookingCreateCard.hidden=true;document.activeElement?.blur()});
