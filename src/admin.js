@@ -64,7 +64,6 @@ const openEmployeesButton = $("#openEmployeesButton");
 const backToDashboardButton = $("#backToDashboardButton");
 const employeeManagementSection = $("#employeeManagementSection");
 const openBookingsButton = $("#openBookingsButton");
-const backFromBookingsButton = $("#backFromBookingsButton");
 const bookingManagementSection = $("#bookingManagementSection");
 const bookingList = $("#bookingList");
 const bookingListMessage = $("#bookingListMessage");
@@ -746,11 +745,6 @@ if (openBookingsButton) {
   });
 }
 
-if (backFromBookingsButton) {
-  backFromBookingsButton.addEventListener("click", () => {
-    showBookingSection(false);
-  });
-}
 
 if (refreshBookingsButton) refreshBookingsButton.addEventListener("click", loadBookings);
 if (refreshDailyAppointmentsButton) refreshDailyAppointmentsButton.addEventListener("click", loadBookings);
