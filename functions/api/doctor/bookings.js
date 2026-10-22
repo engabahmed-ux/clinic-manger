@@ -387,6 +387,7 @@ function validateBooking(data, partial = false) {
   return null;
 }
 
+
 async function listBookings(projectId, accessToken) {
   const result = await firestoreRequest(
     projectId,
@@ -398,8 +399,8 @@ async function listBookings(projectId, accessToken) {
         structuredQuery: {
           from: [{ collectionId: BOOKINGS_COLLECTION }],
           limit: 300
-        })
-      }
+        }
+      })
     }
   );
 
@@ -410,6 +411,7 @@ async function listBookings(projectId, accessToken) {
       a.appointmentDate.localeCompare(b.appointmentDate)
     );
 }
+
 
 async function createBooking(projectId, accessToken, data) {
   const now = new Date().toISOString();
