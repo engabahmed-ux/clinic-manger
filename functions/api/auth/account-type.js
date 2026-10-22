@@ -13,7 +13,8 @@ const PERMISSION_KEYS = [
   "bookings",
   "patients",
   "medicalRecords",
-  "settings"
+  "settings",
+  "accounts"
 ];
 
 const PERMISSION_VALUES = ["none", "view", "edit"];
