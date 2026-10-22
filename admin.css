@@ -762,3 +762,11 @@ button:disabled {
  .accounts-entry-form{grid-template-columns:1fr}
  .accounts-entry-form button,.accounts-entry-form .message{grid-column:auto}
 }
+
+.doctor-daily-expenses{margin-top:22px;padding-top:16px;border-top:1px solid var(--color-border)}
+.doctor-daily-expense-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:14px;border:1px solid var(--color-border);border-radius:12px;background:#fff}
+.doctor-daily-expense-form label{display:grid;gap:5px;font-size:12px;font-weight:700}
+.doctor-daily-expense-form input{width:100%;min-width:0;min-height:40px;padding:8px;border:1px solid var(--color-border);border-radius:8px;font:inherit}
+.doctor-daily-expense-form button,.doctor-daily-expense-form .message{grid-column:1/-1}
+.doctor-daily-expense-row{display:flex;justify-content:space-between;gap:12px;padding:11px 12px;border-bottom:1px solid var(--color-border);font-size:13px}
+@media(max-width:600px){.doctor-daily-expense-form{grid-template-columns:1fr}.doctor-daily-expense-form button,.doctor-daily-expense-form .message{grid-column:auto}}
