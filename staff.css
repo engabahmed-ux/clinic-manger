@@ -712,3 +712,75 @@ a {
   .staff-monthly-expenses .staff-section-heading { align-items: stretch; }
   .staff-monthly-expenses .staff-accounts-date-label { width: 100%; }
 }
+
+/* أزرار تعديل الحجز والإشعارات ونافذة رقم الدور */
+.staff-welcome {
+  display: block !important;
+  width: 100%;
+  box-sizing: border-box;
+  margin-inline-start: auto;
+  direction: rtl;
+  text-align: right !important;
+}
+.staff-compact-welcome {
+  width: 100%;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: right !important;
+  font-size: clamp(15px, 3.8vw, 23px) !important;
+}
+.staff-edit-booking-button, .edit-booking-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  min-height: 38px;
+  border: 1px solid var(--staff-border);
+  border-radius: 10px;
+  background: var(--staff-surface);
+  color: var(--staff-dark);
+  font-size: 22px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.booking-notification-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #c62828;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+.booking-notification-badge[hidden] { display: none !important; }
+.queue-number-dialog {
+  width: min(360px, calc(100% - 32px));
+  border: 0;
+  border-radius: 20px;
+  padding: 0;
+  color: var(--staff-dark);
+  background: var(--staff-surface);
+  box-shadow: 0 24px 80px rgba(0,0,0,.24);
+}
+.queue-number-dialog::backdrop { background: rgba(16,20,25,.55); }
+.queue-number-dialog-content {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 26px 22px;
+  text-align: center;
+}
+.queue-number-dialog-content h2 { margin: 0; font-size: 20px; }
+.queue-number-dialog-content p { margin: 0; color: var(--staff-muted); }
+.queue-number-dialog-content strong { font-size: 56px; line-height: 1.2; }
+.queue-number-dialog-content button { width: 100%; min-height: 44px; }
+@media (max-width: 640px) {
+  .staff-compact-welcome { overflow: hidden; text-overflow: ellipsis; }
+  .staff-appointment-card .schedule-card-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+}
+
