@@ -66,9 +66,11 @@
       </div>
       <nav id="staffTabs" class="staff-tabs" aria-label="أقسام العمل"></nav>
       <section id="staffHomeSection" class="staff-section staff-tab-panel">
-        <div class="staff-section-heading"><h2>مواعيد اليوم</h2><button id="refreshDailyAppointments" class="staff-secondary" type="button">تحديث المواعيد</button></div>
+        <div class="staff-section-heading"><h2>جدول المواعيد</h2><button id="refreshDailyAppointments" class="staff-secondary" type="button">تحديث المواعيد</button></div>
+        <div class="staff-booking-filters"><label>اختيار يوم المواعيد<input id="staffHomeDateFilter" type="date"></label><label>بحث بالاسم أو الهاتف أو الخدمة<input id="staffHomeSearch" type="search" placeholder="ابحث في مواعيد اليوم المختار"></label></div>
         <p id="dailyAppointmentsMessage" class="staff-message" hidden></p>
         <div id="dailyAppointmentsList" class="staff-bookings-list" aria-live="polite"></div>
+        <section class="staff-archive-section"><div class="staff-section-heading"><h3>أرشيف الحجوزات</h3></div><div class="staff-booking-filters"><label>تصفية الأرشيف بتاريخ الموعد<input id="staffArchiveDateFilter" type="date"></label></div><div id="staffArchiveList" class="staff-bookings-list" aria-live="polite"></div></section>
       </section>
       <section id="staffBookingsSection" class="staff-section staff-tab-panel" hidden>
         <div class="staff-section-heading staff-bookings-heading"><h2>إدارة الحجوزات</h2><div class="staff-bookings-toolbar">
@@ -84,7 +86,7 @@
             <datalist id="clinicServiceOptions"><option value="كشف"><option value="استشارة"><option value="متابعة"><option value="سونار"><option value="إعادة كشف"><option value="خدمة أخرى"></datalist>
             <label class="staff-form-wide">ملاحظات<input name="notes" type="text" maxlength="2000"></label>
           </div><p id="staffCreateBookingMessage" class="staff-message" hidden></p>
-          <div class="staff-booking-actions"><button class="staff-primary" type="submit">إضافة الطلب</button><button id="cancelAddBooking" class="staff-secondary" type="button">إلغاء</button></div>
+          <div class="staff-booking-actions"><button class="staff-primary" type="submit">إضافة الحجز</button><button id="cancelAddBooking" class="staff-secondary" type="button">إلغاء</button></div>
         </form>
         <div class="staff-booking-filters"><label>بحث بالاسم أو الهاتف<input id="staffBookingSearch" type="search" placeholder="اسم المريضة أو رقم الهاتف"></label><label>تاريخ الموعد<input id="staffBookingDateFilter" type="date"></label></div>
         <p id="staffBookingsMessage" class="staff-message" hidden></p><div id="staffPendingBookingsList" class="staff-bookings-list" aria-live="polite"></div>
