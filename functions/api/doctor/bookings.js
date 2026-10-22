@@ -517,6 +517,7 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
   ) {
     throw new Error("هذا الحجز يحتوي على مبلغ سابق غير منسوب لموظف. يلزم أن يراجعه الدكتور قبل تعديل بياناته المالية.");
   }
+  let closedPeriodForUnpaidCompletion = false;
   if (changesFinancialFields) {
     const dates = new Set([
       String(existing.appointmentDate || "").slice(0,10),
@@ -526,6 +527,16 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     if (ownerUid) {
       for (const date of dates) {
         if (await isFinancialPeriodClosed(projectId, accessToken, date, ownerUid)) {
+          const isUnpaidStatusOnlyCompletion =
+            actorAccountType === "staff" &&
+            changes.status === "completed" &&
+            Object.keys(changes).every(key => key === "status") &&
+            !(Number(existing.paidAmount) > 0) &&
+            !existing.paymentEnteredByUid;
+          if (isUnpaidStatusOnlyCompletion) {
+            closedPeriodForUnpaidCompletion = true;
+            continue;
+          }
           throw new Error("لا يمكن تعديل التاريخ أو الحالة أو المبالغ لحجز مرتبط بفترة مالية تمت تصفيتها.");
         }
       }
@@ -547,7 +558,7 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
   let paymentEnteredByUid = existing.paymentEnteredByUid || "";
   let paymentEnteredByName = existing.paymentEnteredByName || "";
   let paymentUpdatedAt = existing.paymentUpdatedAt || "";
-  if (actorAccountType === "staff" && changes.status === "completed" && !(Number(existing.paidAmount) > 0)) {
+  if (actorAccountType === "staff" && changes.status === "completed" && !(Number(existing.paidAmount) > 0) && !closedPeriodForUnpaidCompletion) {
     const fee = Number(changes.servicePrice ?? existing.servicePrice) || 0;
     if (fee > 0) {
       paidAmount = fee.toFixed(2);
@@ -605,7 +616,9 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     }
   );
 
-  return decodeBooking(result);
+  const updatedBooking = decodeBooking(result);
+  updatedBooking.financialPeriodClosed = closedPeriodForUnpaidCompletion;
+  return updatedBooking;
 }
 
 async function cancelBooking(projectId, accessToken, data, actorUid = "", actorAccountType = "doctor") {
