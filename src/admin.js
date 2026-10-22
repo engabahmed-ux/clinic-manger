@@ -1085,7 +1085,6 @@ async function handleBookingCardAction(event, container) {
       const nextDate = String(booking.appointmentDate || "").slice(0, 10);
       if (container === dailyAppointmentsList && nextDate && nextDate !== previousDate) {
         if (doctorFilterMode) doctorFilterMode.value = "date";
-        if (doctorHomeDateFilter) doctorHomeDateFilter.value = nextDate;
         if (doctorHomeSearch) doctorHomeSearch.value = "";
       }
     } else return;
