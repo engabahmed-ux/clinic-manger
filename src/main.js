@@ -14,8 +14,6 @@ import {
 
 const config = APP_CONFIG;
 
-const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
-
 const firebaseApp =
   getApps().find((item) => item.name === "[DEFAULT]") ||
   initializeApp(FIREBASE_CONFIG);
@@ -419,8 +417,8 @@ function renderPatientPortal() {
       : config.patientPortal?.loginSubmitButton ??
         "تسجيل الدخول";
 
-    emailInput.disabled = busy;
-    passwordInput.disabled = busy;
+    if (emailInput) emailInput.disabled = busy;
+    if (passwordInput) passwordInput.disabled = busy;
   }
 
   function getAuthErrorMessage(error) {
@@ -447,13 +445,48 @@ function renderPatientPortal() {
     }
   }
 
+  async function identifyAccount(user) {
+    const idToken = await user.getIdToken();
+
+    const response = await fetch("/api/auth/account-type", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${idToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({})
+    });
+
+    let result;
+
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error("تعذر قراءة استجابة التحقق.");
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        result?.message || "تعذر التحقق من نوع الحساب."
+      );
+    }
+
+    if (
+      !["doctor", "staff", "patient"].includes(result?.accountType)
+    ) {
+      throw new Error("نوع الحساب الذي أعاده الخادم غير معروف.");
+    }
+
+    return result;
+  }
+
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     if (loginButton.disabled) return;
 
-    const email = emailInput.value.trim();
-    const password = passwordInput.value;
+    const email = emailInput?.value.trim() ?? "";
+    const password = passwordInput?.value ?? "";
 
     if (!email || !password) {
       showLoginMessage(
@@ -466,6 +499,8 @@ function renderPatientPortal() {
     showLoginMessage("", false);
     setLoginBusy(true);
 
+    let user;
+
     try {
       const credential = await signInWithEmailAndPassword(
         auth,
@@ -473,33 +508,62 @@ function renderPatientPortal() {
         password
       );
 
-      const user = credential.user;
-
+      user = credential.user;
       passwordInput.value = "";
 
-      if (user.uid === DOCTOR_ADMIN_UID) {
-        window.location.href = "./admin.html";
-        return;
-      }
-
-      showLoginMessage(
-        "تم التحقق من الحساب بنجاح. عرض المواعيد وبيانات المريضة لم يُفعّل بعد.",
-        false
-      );
-
-      emailInput.disabled = true;
-      passwordInput.disabled = true;
-      loginButton.hidden = true;
-      logoutButton.hidden = false;
     } catch (error) {
       console.error("Clinic login error:", error);
 
-      showLoginMessage(
-        getAuthErrorMessage(error)
-      );
-    } finally {
+      showLoginMessage(getAuthErrorMessage(error));
       setLoginBusy(false);
+      return;
     }
+
+    let account;
+
+    try {
+      account = await identifyAccount(user);
+    } catch (error) {
+      console.error("Account type verification failed:", error);
+
+      try {
+        await signOut(auth);
+      } catch (signOutError) {
+        console.error(
+          "Sign out after account verification failure:",
+          signOutError
+        );
+      }
+
+      showLoginMessage(
+        "تم تسجيل الدخول إلى Firebase، لكن تعذر التحقق الآمن من نوع الحساب. لم يتم فتح أي لوحة. حاول لاحقًا."
+      );
+
+      setLoginBusy(false);
+      return;
+    }
+
+    if (account.accountType === "doctor") {
+      window.location.href = "./admin.html";
+      return;
+    }
+
+    if (account.accountType === "staff") {
+      window.location.href = "./staff.html";
+      return;
+    }
+
+    showLoginMessage(
+      "تم تسجيل الدخول بنجاح. بوابة المريضة ستظل كما هي، وسيتم تفعيل عرض المواعيد والبيانات عند اكتمال ربطها الآمن.",
+      false
+    );
+
+    if (emailInput) emailInput.disabled = true;
+    if (passwordInput) passwordInput.disabled = true;
+
+    loginButton.hidden = true;
+    logoutButton.hidden = false;
+    setLoginBusy(false);
   });
 
   logoutButton.addEventListener("click", async () => {
@@ -508,11 +572,12 @@ function renderPatientPortal() {
     try {
       await signOut(auth);
 
-      emailInput.disabled = false;
-      passwordInput.disabled = false;
+      if (emailInput) emailInput.disabled = false;
+      if (passwordInput) passwordInput.disabled = false;
+
       loginButton.hidden = false;
 
-      passwordInput.value = "";
+      if (passwordInput) passwordInput.value = "";
 
       showLoginMessage(
         "تم تسجيل الخروج بنجاح.",
@@ -520,7 +585,7 @@ function renderPatientPortal() {
       );
 
       logoutButton.hidden = true;
-      emailInput.focus();
+      emailInput?.focus();
     } catch (error) {
       console.error("Clinic logout error:", error);
 
