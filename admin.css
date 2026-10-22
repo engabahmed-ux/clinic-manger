@@ -702,3 +702,18 @@ button:disabled {
   font-weight: 800;
   user-select: text;
 }
+
+/* تبويبات لوحة الدكتور وقائمة الطلبات */
+.dashboard-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:22px 0 4px;padding:8px;border:1px solid var(--color-border);border-radius:16px;background:#fcfbf8}
+.dashboard-tab{min-height:44px;padding:10px 16px;border:1px solid transparent;border-radius:11px;background:transparent;color:var(--color-dark);font-weight:800;cursor:pointer}
+.dashboard-tab[aria-selected="true"]{background:var(--color-secondary)}
+.booking-request-summary{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0;border:0;background:transparent;color:inherit;text-align:right;cursor:pointer}
+.booking-request-main{display:grid;gap:4px;min-width:0}.booking-request-main strong{font-size:15px}.booking-request-main small{color:var(--color-muted);font-size:12px}
+.booking-request-badge{flex:0 0 auto;padding:5px 9px;border-radius:8px;background:#fff4d5;color:#71591d;font-size:11px;font-weight:800}
+.booking-request-details{padding-top:14px}.booking-request-details[hidden]{display:none!important}
+.add-booking-toggle{margin-top:0;display:inline-flex;align-items:center;gap:7px}.add-booking-toggle span{font-size:22px;line-height:1}
+.booking-list-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(180px,1fr);gap:12px;margin:18px 0 8px}
+.booking-list-filters label{display:grid;gap:6px;color:var(--color-muted);font-size:12px;font-weight:700}
+.booking-list-filters input{width:100%;min-height:44px;padding:9px 12px;border:1px solid var(--color-border);border-radius:11px;background:#fff;color:var(--color-dark);font:inherit}
+.daily-appointment-card h4{margin:0 0 4px}.daily-appointment-card p{margin:0;color:var(--color-muted);font-size:13px}
+@media(max-width:600px){.dashboard-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-tab{padding-inline:8px}.booking-list-filters{grid-template-columns:1fr}.booking-request-summary{align-items:flex-start}.employee-list-actions{width:100%}.employee-list-actions button{flex:1 1 100%}}

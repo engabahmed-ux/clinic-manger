@@ -59,6 +59,7 @@ const loginError = $("#loginError");
 const logoutButton = $("#logoutButton");
 const doctorAccountLabel = $("#doctorAccountLabel");
 
+const openHomeTabButton = $("#openHomeTabButton");
 const openEmployeesButton = $("#openEmployeesButton");
 const backToDashboardButton = $("#backToDashboardButton");
 const employeeManagementSection = $("#employeeManagementSection");
@@ -68,6 +69,14 @@ const bookingManagementSection = $("#bookingManagementSection");
 const bookingList = $("#bookingList");
 const bookingListMessage = $("#bookingListMessage");
 const refreshBookingsButton = $("#refreshBookingsButton");
+const addBookingToggleButton = $("#addBookingToggleButton");
+const bookingCreateCard = $(".booking-create-card");
+const bookingSearchInput = $("#bookingSearchInput");
+const bookingDateFilter = $("#bookingDateFilter");
+const homeAppointmentsSection = $("#homeAppointmentsSection");
+const dailyAppointmentsList = $("#dailyAppointmentsList");
+const dailyAppointmentsMessage = $("#dailyAppointmentsMessage");
+const refreshDailyAppointmentsButton = $("#refreshDailyAppointmentsButton");
 const createBookingForm = $("#createBookingForm");
 const createBookingButton = $("#createBookingButton");
 const createBookingMessage = $("#createBookingMessage");
@@ -97,6 +106,7 @@ let isLoadingBookings = false;
 let isCreatingBooking = false;
 let isCreatingPatient = false;
 let verificationRequestNumber = 0;
+let allBookings = [];
 
 function showMessage(element, message, type = "error") {
   if (!element) return;
@@ -131,38 +141,31 @@ function showDashboard(user) {
   showEmployeeSection(false);
 }
 
-function showEmployeeSection(show) {
-  if (employeeManagementSection) {
-    employeeManagementSection.hidden = !show;
+function setActiveTab(button) {
+  for (const tab of document.querySelectorAll(".dashboard-tab")) {
+    tab.setAttribute("aria-selected", String(tab === button));
   }
-
+}
+function showHomeSection() {
+  if (homeAppointmentsSection) homeAppointmentsSection.hidden = false;
+  if (employeeManagementSection) employeeManagementSection.hidden = true;
   if (bookingManagementSection) bookingManagementSection.hidden = true;
   if (patientManagementSection) patientManagementSection.hidden = true;
-
-  const managementGrid = $(".management-grid");
-  const welcomeCard = $(".welcome-card");
-  const sectionHeading = $(".section-heading");
-
-  if (managementGrid) managementGrid.hidden = show;
-  if (welcomeCard) welcomeCard.hidden = show;
-  if (sectionHeading) sectionHeading.hidden = show;
+  setActiveTab(openHomeTabButton);
 }
-
+function showEmployeeSection(show) {
+  if (employeeManagementSection) employeeManagementSection.hidden = !show;
+  if (bookingManagementSection) bookingManagementSection.hidden = true;
+  if (patientManagementSection) patientManagementSection.hidden = true;
+  if (homeAppointmentsSection) homeAppointmentsSection.hidden = show;
+  if (show) setActiveTab(openEmployeesButton); else showHomeSection();
+}
 function showBookingSection(show) {
-  if (bookingManagementSection) {
-    bookingManagementSection.hidden = !show;
-  }
-
+  if (bookingManagementSection) bookingManagementSection.hidden = !show;
   if (employeeManagementSection) employeeManagementSection.hidden = true;
   if (patientManagementSection) patientManagementSection.hidden = true;
-
-  const managementGrid = $(".management-grid");
-  const welcomeCard = $(".welcome-card");
-  const sectionHeading = $(".section-heading");
-
-  if (managementGrid) managementGrid.hidden = show;
-  if (welcomeCard) welcomeCard.hidden = show;
-  if (sectionHeading) sectionHeading.hidden = show;
+  if (homeAppointmentsSection) homeAppointmentsSection.hidden = show;
+  if (show) setActiveTab(openBookingsButton); else showHomeSection();
 }
 
 function setLoginBusy(busy) {
@@ -308,12 +311,8 @@ function showPatientSection(show) {
   if (patientManagementSection) patientManagementSection.hidden = !show;
   if (employeeManagementSection) employeeManagementSection.hidden = true;
   if (bookingManagementSection) bookingManagementSection.hidden = true;
-  const managementGrid = $(".management-grid");
-  const welcomeCard = $(".welcome-card");
-  const sectionHeading = $(".section-heading");
-  if (managementGrid) managementGrid.hidden = show;
-  if (welcomeCard) welcomeCard.hidden = show;
-  if (sectionHeading) sectionHeading.hidden = show;
+  if (homeAppointmentsSection) homeAppointmentsSection.hidden = show;
+  if (show) setActiveTab(openPatientsButton); else showHomeSection();
 }
 
 async function patientApiRequest(action, data = {}) {
@@ -406,84 +405,54 @@ function renderBookingCard(booking) {
   const card = document.createElement("article");
   card.className = "employee-card booking-card";
   card.dataset.bookingId = booking.id;
-
-  const heading = document.createElement("div");
-  heading.className = "employee-card-header";
-  const identity = document.createElement("div");
-  const title = document.createElement("h5");
-  title.textContent = booking.patientName || "طلب حجز جديد";
-  const created = document.createElement("p");
-  created.className = "employee-email";
-  created.textContent = `رقم الطلب: ${booking.id}`;
-  identity.append(title, created);
-  heading.append(identity);
-
-  const fields = document.createElement("div");
-  fields.className = "booking-edit-grid";
-  fields.append(
-    createBookingInput("اسم المريضة", booking.patientName, "patientName"),
-    createBookingInput("رقم الهاتف", booking.patientPhone, "patientPhone", "tel"),
-    createBookingInput("التاريخ المطلوب", booking.appointmentDate, "appointmentDate", "date"),
-    createBookingInput("الخدمة", booking.service, "service"),
-    createBookingInput("الحالة", booking.status, "status", "select"),
-    createBookingInput("ملاحظات", booking.notes, "notes")
-  );
-
-  const actions = document.createElement("div");
-  actions.className = "booking-card-actions";
-  const save = document.createElement("button");
-  save.type = "button";
-  save.className = "primary-button";
-  save.dataset.action = "save-booking";
-  save.textContent = "حفظ التعديلات";
-
-  const cancel = document.createElement("button");
-  cancel.type = "button";
-  cancel.className = "secondary-button";
-  cancel.dataset.action = "cancel-booking";
-  cancel.textContent = "إلغاء الحجز";
-  cancel.disabled = booking.status === "cancelled";
-
-  actions.append(save, cancel);
-  card.append(heading, fields, actions);
-  return card;
+  const summary = document.createElement("button");
+  summary.type = "button"; summary.className = "booking-request-summary";
+  const main = document.createElement("span"); main.className = "booking-request-main";
+  const title = document.createElement("strong"); title.textContent = booking.patientName || "طلب حجز جديد";
+  const meta = document.createElement("small"); meta.textContent = `تاريخ الطلب: ${formatSubmittedAt(booking.createdAt)} · الموعد المطلوب: ${formatRequestDate(booking.appointmentDate)}`;
+  main.append(title,meta); const badge=document.createElement("span");badge.className="booking-request-badge";badge.textContent="طلب جديد";summary.append(main,badge);
+  const details=document.createElement("div");details.className="booking-request-details";details.hidden=true;
+  const fields=document.createElement("div");fields.className="booking-edit-grid";
+  fields.append(createBookingInput("اسم المريضة",booking.patientName,"patientName"),createBookingInput("رقم الهاتف",booking.patientPhone,"patientPhone","tel"),createBookingInput("الموعد",String(booking.appointmentDate||"").slice(0,10),"appointmentDate","date"),createBookingInput("الخدمة",booking.service,"service"),createBookingInput("ملاحظات",booking.notes,"notes"));
+  const actions=document.createElement("div");actions.className="booking-card-actions";
+  for(const [action,label,cls] of [["save-booking","حفظ التعديلات","secondary-button"],["confirm-booking","تأكيد الحجز","primary-button"],["cancel-booking","إلغاء الطلب","secondary-button"]]){const button=document.createElement("button");button.type="button";button.className=cls;button.dataset.action=action;button.textContent=label;actions.append(button)}
+  details.append(fields,actions);summary.addEventListener("click",()=>{details.hidden=!details.hidden});card.append(summary,details);return card;
 }
-
+function formatRequestDate(value){if(!value)return"التاريخ غير محدد";const date=new Date(`${String(value).slice(0,10)}T12:00:00`);return Number.isNaN(date.getTime())?value:new Intl.DateTimeFormat("ar-EG",{dateStyle:"medium"}).format(date)}
+function formatSubmittedAt(value){if(!value)return"وقت الطلب غير متاح";const date=new Date(value);return Number.isNaN(date.getTime())?"وقت الطلب غير متاح":new Intl.DateTimeFormat("ar-EG",{dateStyle:"medium",timeStyle:"short"}).format(date)}
+function renderDailyAppointments(){
+  dailyAppointmentsList.replaceChildren();
+  const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const rows=allBookings.filter(b=>b.status==="confirmed"&&String(b.appointmentDate||"").slice(0,10)===today);
+  if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد مواعيد مؤكدة اليوم.";dailyAppointmentsList.append(empty);return}
+  for(const b of rows){const card=document.createElement("article");card.className="employee-card daily-appointment-card";const h=document.createElement("h4");h.textContent=b.patientName||"مريضة";const p=document.createElement("p");p.textContent=[b.patientPhone,b.service].filter(Boolean).join(" · ");card.append(h,p);dailyAppointmentsList.append(card)}
+}
+function renderPendingBookings(){
+  bookingList.replaceChildren();const query=(bookingSearchInput?.value||"").trim().toLocaleLowerCase("ar"),date=bookingDateFilter?.value||"";
+  const rows=allBookings.filter(b=>b.status==="pending").filter(b=>(!query||`${b.patientName||""} ${b.patientPhone||""}`.toLocaleLowerCase("ar").includes(query))&&(!date||String(b.createdAt||"").slice(0,10)===date));
+  if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد طلبات حجز معلقة.";bookingList.append(empty);return}
+  rows.forEach(b=>bookingList.append(renderBookingCard(b)));
+}
 async function loadBookings() {
   if (isLoadingBookings || !bookingList) return;
   isLoadingBookings = true;
-  if (refreshBookingsButton) {
-    refreshBookingsButton.disabled = true;
-    refreshBookingsButton.textContent = "جارٍ التحديث...";
-  }
-  hideMessage(bookingListMessage);
-
+  if (refreshBookingsButton) { refreshBookingsButton.disabled = true; refreshBookingsButton.textContent = "جارٍ التحديث..."; }
+  if (refreshDailyAppointmentsButton) refreshDailyAppointmentsButton.disabled = true;
+  hideMessage(bookingListMessage); hideMessage(dailyAppointmentsMessage);
   try {
     const result = await bookingApiRequest("list");
-    bookingList.replaceChildren();
-    const bookings = Array.isArray(result.bookings) ? result.bookings : [];
-    if (!bookings.length) {
-      const empty = document.createElement("div");
-      empty.className = "empty-employees";
-      empty.textContent = "لا توجد طلبات حجز حتى الآن.";
-      bookingList.append(empty);
-    } else {
-      bookings.forEach((booking) => {
-        if (booking?.id) bookingList.append(renderBookingCard(booking));
-      });
-    }
+    allBookings = Array.isArray(result.bookings) ? result.bookings : [];
+    renderPendingBookings(); renderDailyAppointments();
   } catch (error) {
     console.error("تعذر تحميل الحجوزات:", error);
-    showMessage(bookingListMessage, error.message || "تعذر تحميل الحجوزات.");
+    showMessage(bookingListMessage,error.message||"تعذر تحميل الحجوزات.");
+    showMessage(dailyAppointmentsMessage,error.message||"تعذر تحميل المواعيد.");
   } finally {
     isLoadingBookings = false;
-    if (refreshBookingsButton) {
-      refreshBookingsButton.disabled = false;
-      refreshBookingsButton.textContent = "تحديث الحجوزات";
-    }
+    if (refreshBookingsButton) { refreshBookingsButton.disabled = false; refreshBookingsButton.textContent = "تحديث الطلبات"; }
+    if (refreshDailyAppointmentsButton) refreshDailyAppointmentsButton.disabled = false;
   }
 }
-
 async function employeeApiRequest(action, data = {}) {
   const user = auth.currentUser;
 
@@ -751,6 +720,7 @@ if (logoutButton) {
   });
 }
 
+if (openHomeTabButton) openHomeTabButton.addEventListener("click", showHomeSection);
 if (openEmployeesButton) {
   openEmployeesButton.addEventListener("click", async () => {
     showEmployeeSection(true);
@@ -781,9 +751,11 @@ if (backFromBookingsButton) {
   });
 }
 
-if (refreshBookingsButton) {
-  refreshBookingsButton.addEventListener("click", loadBookings);
-}
+if (refreshBookingsButton) refreshBookingsButton.addEventListener("click", loadBookings);
+if (refreshDailyAppointmentsButton) refreshDailyAppointmentsButton.addEventListener("click", loadBookings);
+if (addBookingToggleButton && bookingCreateCard) addBookingToggleButton.addEventListener("click", () => { bookingCreateCard.hidden = !bookingCreateCard.hidden; });
+if (bookingSearchInput) bookingSearchInput.addEventListener("input", renderPendingBookings);
+if (bookingDateFilter) bookingDateFilter.addEventListener("change", renderPendingBookings);
 
 function clearPatientCredentials() {
   if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
@@ -931,22 +903,22 @@ if (bookingList) {
       if (action === "cancel-booking") {
         if (!window.confirm("هل تريد إلغاء طلب الحجز؟")) return;
         await bookingApiRequest("cancel", { id });
-      } else if (action === "save-booking") {
-        const booking = { id };
-        for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "notes", "status"]) {
+      } else if (action === "confirm-booking") {
+        const booking = { id, status: "confirmed" };
+        for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "notes"]) {
           const input = card.querySelector(`[data-booking-field="${field}"]`);
           booking[field] = input?.value ?? "";
         }
         await bookingApiRequest("update", { booking });
-      } else {
-        return;
-      }
-
-      showMessage(
-        bookingListMessage,
-        action === "cancel-booking" ? "تم إلغاء الحجز." : "تم حفظ تعديلات الحجز.",
-        "success"
-      );
+      } else if (action === "save-booking") {
+        const booking = { id };
+        for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "notes"]) {
+          const input = card.querySelector(`[data-booking-field="${field}"]`);
+          booking[field] = input?.value ?? "";
+        }
+        await bookingApiRequest("update", { booking });
+      } else return;
+      showMessage(bookingListMessage,action==="cancel-booking"?"تم إلغاء طلب الحجز.":action==="confirm-booking"?"تم تأكيد الحجز ونقله إلى المواعيد.":"تم حفظ تعديلات الحجز.","success");
       await loadBookings();
     } catch (error) {
       console.error("تعذر تعديل الحجز:", error);

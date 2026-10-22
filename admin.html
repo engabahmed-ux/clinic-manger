@@ -77,62 +77,17 @@
         </button>
       </div>
 
-      <div class="welcome-card">
-        <span class="welcome-icon" aria-hidden="true">✓</span>
-        <div>
-          <h3>تم التحقق من حساب الدكتور</h3>
-          <p>
-            يمكنك إدارة الحجوزات وإنشاء حسابات المريضات وإدارة صلاحيات فريق العيادة.
-          </p>
-        </div>
-      </div>
-
-      <h3 class="section-heading">إدارة العيادة</h3>
-
-      <div class="management-grid">
-        <article class="management-card">
-          <span class="card-icon" aria-hidden="true">♙</span>
-          <h3>إدارة الموظفين</h3>
-          <p>إنشاء حسابات الموظفين وتحديد صلاحيات كل موظف.</p>
-          <button
-            id="openEmployeesButton"
-            class="card-action-button"
-            type="button"
-          >
-            فتح إدارة الموظفين
-          </button>
-        </article>
-
-        <article class="management-card">
-          <span class="card-icon" aria-hidden="true">▤</span>
-          <h3>صلاحيات الوصول</h3>
-          <p>
-            تحديد مستوى الوصول لكل قسم بصورة مستقلة، مع التحقق من الطلبات
-            على الخادم.
-          </p>
-          <span class="status-label">إدارة مركزية للصلاحيات</span>
-        </article>
-
-        <article class="management-card">
-          <span class="card-icon" aria-hidden="true">♙</span>
-          <h3>حسابات المريضات</h3>
-          <p>إنشاء حساب دخول للمريضة وعرض بياناته المؤقتة لتسليمها بشكل خاص.</p>
-          <button id="openPatientsButton" class="card-action-button" type="button">إنشاء حساب مريضة</button>
-        </article>
-
-        <article class="management-card">
-          <span class="card-icon" aria-hidden="true">▦</span>
-          <h3>إدارة الحجوزات</h3>
-          <p>عرض طلبات الحجز الواردة ومراجعتها وتحديث حالتها.</p>
-          <button
-            id="openBookingsButton"
-            class="card-action-button"
-            type="button"
-          >
-            فتح إدارة الحجوزات
-          </button>
-        </article>
-      </div>
+      <nav class="dashboard-tabs" aria-label="أقسام إدارة العيادة">
+        <button id="openHomeTabButton" class="dashboard-tab" type="button" aria-selected="true">الرئيسية</button>
+        <button id="openBookingsButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الحجوزات</button>
+        <button id="openPatientsButton" class="dashboard-tab" type="button" aria-selected="false">حسابات المريضات</button>
+        <button id="openEmployeesButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الموظفين</button>
+      </nav>
+      <section id="homeAppointmentsSection" class="employee-section home-appointments-section">
+        <div class="employee-section-heading"><div><h3>مواعيد اليوم</h3></div><button id="refreshDailyAppointmentsButton" class="secondary-button" type="button">تحديث المواعيد</button></div>
+        <p id="dailyAppointmentsMessage" class="message" role="status" hidden></p>
+        <div id="dailyAppointmentsList" class="employee-list" aria-live="polite"></div>
+      </section>
 
       <section id="patientManagementSection" class="employee-section" hidden>
         <div class="employee-section-heading">
@@ -176,18 +131,13 @@
 
       <section id="bookingManagementSection" class="employee-section" hidden>
         <div class="employee-section-heading">
-          <div>
-            <p class="eyebrow">طلبات المريضات</p>
-            <h3>إدارة الحجوزات</h3>
-            <p class="muted-text">راجعي الطلبات الواردة وحدثي حالة كل طلب. إرسال الطلب لا يؤكد الموعد تلقائيًا.</p>
-          </div>
+          <div><h3>إدارة الحجوزات</h3></div>
           <div class="employee-list-actions">
-            <button id="refreshBookingsButton" class="secondary-button" type="button">تحديث الحجوزات</button>
-            <button id="backFromBookingsButton" class="secondary-button" type="button">العودة للوحة</button>
+            <button id="addBookingToggleButton" class="primary-button add-booking-toggle" type="button"><span aria-hidden="true">＋</span> إضافة حجز جديد</button>
+            <button id="refreshBookingsButton" class="secondary-button" type="button">تحديث الطلبات</button>
           </div>
         </div>
-        <div class="employee-form-card booking-create-card">
-          <h4>إضافة حجز من العيادة</h4>
+        <div class="employee-form-card booking-create-card" hidden>
           <form id="createBookingForm" class="employee-form" novalidate>
             <label for="newBookingPatientName">اسم المريضة</label>
             <input id="newBookingPatientName" name="patientName" type="text" maxlength="120" required>
@@ -202,6 +152,10 @@
             <p id="createBookingMessage" class="message" role="status" hidden></p>
             <button id="createBookingButton" class="primary-button" type="submit">إضافة الحجز</button>
           </form>
+        </div>
+        <div class="booking-list-filters">
+          <label>بحث بالاسم أو الهاتف<input id="bookingSearchInput" type="search" placeholder="اسم المريضة أو رقم الهاتف"></label>
+          <label>تاريخ الطلب<input id="bookingDateFilter" type="date"></label>
         </div>
         <p id="bookingListMessage" class="message" role="status" hidden></p>
         <div id="bookingList" class="employee-list" aria-live="polite"></div>
