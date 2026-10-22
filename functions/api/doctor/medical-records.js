@@ -85,8 +85,16 @@ async function updateBookingPatient(projectId,token,doc,patientId){
 async function resolvePatient(projectId,token,data,access){
   let patient=data.patientId?await findPatient(projectId,token,String(data.patientId)):null;
   if(data.patientId&&!patient)throw new Error("ملف المريض المحدد لم يعد موجودًا. ابحث عنه مرة أخرى.");
-  const name=String(data.patientName||"").trim(),phone=String(data.patientPhone||"").trim();
+  let name=String(data.patientName||"").trim(),phone=String(data.patientPhone||"").trim();
   if(!patient){
+    // نتائج "ملف سابق" لا تملك patientId؛ استعد الاسم والهاتف من الحجز الأصلي إذا كانا ناقصين في النموذج.
+    const legacyBookingId=String(data.legacyBookingId||"");
+    if(validId(legacyBookingId)&&(name.length<2||phone.length<5)){
+      const legacyBooking=await firestore(projectId,token,"/"+BOOKINGS_COLLECTION+"/"+encodeURIComponent(legacyBookingId));
+      const legacyFields=legacyBooking?.fields||{};
+      if(name.length<2)name=read(legacyFields,"patientName").trim();
+      if(phone.length<5)phone=read(legacyFields,"patientPhone").trim();
+    }
     if(name.length<2||name.length>120||phone.length<5||phone.length>40)throw new Error("أدخل اسم المريض ورقم هاتف صحيحًا.");
     const docs=await collection(projectId,token,PATIENTS_COLLECTION);
     const found=docs.map(decode).find(p=>norm(p.displayName)===norm(name)&&normPhone(p.phone)===normPhone(phone));
