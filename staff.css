@@ -520,3 +520,45 @@ a {
     grid-template-columns: 1fr;
   }
 }
+
+.staff-booking-create-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dedbd5;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.staff-booking-create-form h4,
+.staff-booking-create-form p,
+.staff-booking-create-form button {
+  grid-column: 1 / -1;
+}
+
+.staff-booking-create-form h4 {
+  margin: 0;
+}
+
+.staff-booking-create-form label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.staff-booking-create-form input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #dedbd5;
+  border-radius: 9px;
+  font: inherit;
+}
+
+@media (max-width: 600px) {
+  .staff-booking-create-form {
+    grid-template-columns: 1fr;
+  }
+}
