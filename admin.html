@@ -114,15 +114,35 @@
           <span class="status-label">إدارة مركزية للصلاحيات</span>
         </article>
 
-        <article class="management-card upcoming-card">
+        <article class="management-card">
           <span class="card-icon" aria-hidden="true">▦</span>
-          <h3>الحجوزات والمرضى</h3>
-          <p>
-            ستتم معالجة هذا القسم في مرحلة لاحقة دون تغيير وظائفه الحالية.
-          </p>
-          <span class="status-label">مرحلة لاحقة</span>
+          <h3>إدارة الحجوزات</h3>
+          <p>عرض طلبات الحجز الواردة ومراجعتها وتحديث حالتها.</p>
+          <button
+            id="openBookingsButton"
+            class="card-action-button"
+            type="button"
+          >
+            فتح إدارة الحجوزات
+          </button>
         </article>
       </div>
+
+      <section id="bookingManagementSection" class="employee-section" hidden>
+        <div class="employee-section-heading">
+          <div>
+            <p class="eyebrow">طلبات المريضات</p>
+            <h3>إدارة الحجوزات</h3>
+            <p class="muted-text">راجعي الطلبات الواردة وحدثي حالة كل طلب. إرسال الطلب لا يؤكد الموعد تلقائيًا.</p>
+          </div>
+          <div class="employee-list-actions">
+            <button id="refreshBookingsButton" class="secondary-button" type="button">تحديث الحجوزات</button>
+            <button id="backFromBookingsButton" class="secondary-button" type="button">العودة للوحة</button>
+          </div>
+        </div>
+        <p id="bookingListMessage" class="message" role="status" hidden></p>
+        <div id="bookingList" class="employee-list" aria-live="polite"></div>
+      </section>
 
       <section id="employeeManagementSection" class="employee-section" hidden>
         <div class="employee-section-heading">
