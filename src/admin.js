@@ -139,6 +139,7 @@ function showDashboard(user) {
   }
 
   showEmployeeSection(false);
+  loadBookings();
 }
 
 function setActiveTab(button) {
