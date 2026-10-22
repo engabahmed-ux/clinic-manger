@@ -67,9 +67,7 @@
     <section id="dashboardSection" class="panel dashboard-panel" hidden>
       <div class="dashboard-top">
         <div>
-          <p class="eyebrow">مساحة العمل الخاصة</p>
-          <h2>أهلاً بك يا دكتور</h2>
-          <p id="doctorAccountLabel" class="muted-text"></p>
+          <h2 class="compact-welcome">أهلاً بك <span id="doctorAccountLabel">يا دكتور</span></h2>
         </div>
 
         <button id="logoutButton" class="secondary-button" type="button">
@@ -89,7 +87,7 @@
         <div class="employee-section-heading doctor-schedule-heading"><h3>جدول المواعيد <span id="doctorScheduleDateLabel" class="schedule-date-label"></span></h3><div class="doctor-home-actions"><button id="openDoctorScheduleFilter" class="schedule-filter-button" type="button" aria-label="فلترة جدول المواعيد" title="فلترة جدول المواعيد">☷</button><button id="homeAddBookingButton" class="primary-button home-add-booking-button" type="button">＋ إضافة حجز</button></div></div><input id="doctorHomeDateFilter" type="date" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1"><input id="doctorHomeSearch" type="search" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1">
         <div class="schedule-status-legend" id="doctorStatusLegend" aria-label="فلترة حسب حالة الحجز"><button type="button" data-status-filter="all" class="is-active">✓ الكل</button><button type="button" data-status-filter="waiting">✓ في الانتظار</button><button type="button" data-status-filter="completed">✓ تم الكشف</button><button type="button" data-status-filter="postponed">✓ مؤجل</button><button type="button" data-status-filter="no_show">✓ لم يأتِ</button><button type="button" data-status-filter="apologized">✓ اعتذر</button></div>
         <p id="dailyAppointmentsMessage" class="message" role="status" hidden></p>
-        <div id="dailyAppointmentsList" class="employee-list" aria-live="polite"></div><div class="schedule-bulk-actions"><span id="selectedAppointmentsCount">لم يتم تحديد حجوزات</span><button id="archiveSelectedAppointments" class="secondary-button" type="button" disabled>نقل المحدد إلى الأرشيف</button></div>
+        <div id="dailyAppointmentsList" class="employee-list" aria-live="polite"></div><div class="schedule-bulk-actions"><button id="archiveSelectedAppointments" class="secondary-button archive-day-button" type="button">أرشفة مواعيد اليوم</button></div>
         
       </section>
 
@@ -133,7 +131,7 @@
         </div>
       </section>
 
-      <section id="doctorAccountsSection" class="employee-section" hidden><div class="employee-section-heading"><h3>حسابات اليوم</h3><span id="accountsDateLabel" class="schedule-date-label"></span></div><p class="muted-text">تُحتسب قيمة الخدمة ضمن الإجمالي فقط عندما تكون حالة الحجز «تم الكشف».</p><div id="doctorAccountsContent" class="accounts-content"></div></section>
+      <section id="doctorAccountsSection" class="employee-section" hidden><div class="employee-section-heading"><h3>حسابات العيادة</h3></div><nav id="doctorAccountsSubtabs" class="accounts-subtabs" aria-label="أقسام الحسابات"></nav><div id="doctorAccountsSubcontent" class="accounts-subcontent"><section id="patientDailyAccountsPanel"><div class="employee-section-heading"><h4>حسابات المرضى اليومية <span id="accountsDateLabel" class="schedule-date-label"></span></h4></div><p class="muted-text">تُحتسب قيمة الخدمة ضمن الإجمالي فقط عندما تكون حالة الحجز «تم الكشف».</p><div id="doctorAccountsContent" class="accounts-content"></div></section><section id="salaryAccountsPanel" hidden><div class="employee-section-heading"><h4>مرتبات الموظفين</h4><button id="addSalaryEntryButton" class="primary-button" type="button">＋ تسجيل مرتب</button></div><form id="salaryEntryForm" class="accounts-entry-form" hidden><label>اسم الموظف<input name="personName" maxlength="120" required></label><label>قيمة المرتب (جنيه)<input name="amount" type="number" min="0.01" max="99999999" step="0.01" required></label><label>تاريخ الصرف<input name="date" type="date" required></label><label>ملاحظات<input name="notes" maxlength="1000"></label><button class="primary-button" type="submit">حفظ المرتب</button><p id="salaryEntryMessage" class="message" role="status" hidden></p></form><div id="salaryEntriesList" class="accounts-content"></div></section><section id="customAccountsPanel" hidden><div class="employee-section-heading"><h4 id="customAccountTitle"></h4><button id="addAccountEntryButton" class="primary-button" type="button">＋ إضافة حركة</button></div><form id="customAccountEntryForm" class="accounts-entry-form" hidden><label>البيان<input name="personName" maxlength="120" required></label><label>القيمة (جنيه)<input name="amount" type="number" min="0.01" max="99999999" step="0.01" required></label><label>التاريخ<input name="date" type="date" required></label><label>ملاحظات<input name="notes" maxlength="1000"></label><button class="primary-button" type="submit">حفظ الحركة</button><p id="customAccountEntryMessage" class="message" role="status" hidden></p></form><div id="customAccountEntriesList" class="accounts-content"></div></section></div><div class="accounts-category-create"><button id="addAccountsCategoryButton" class="secondary-button" type="button">＋ إضافة قسم حسابات</button><form id="accountsCategoryForm" class="accounts-entry-form" hidden><label>اسم القسم<input name="name" maxlength="80" required></label><label>نوع القسم<select name="kind" required><option value="income">دخل</option><option value="expense">مصروف</option></select></label><button class="primary-button" type="submit">إنشاء القسم</button><p id="accountsCategoryMessage" class="message" role="status" hidden></p></form></div></section>
       <section id="doctorArchiveSection" class="employee-section" hidden><div class="employee-section-heading"><h3>أرشيف الحجوزات</h3></div><div class="booking-list-filters"><label>بحث بالاسم أو الهاتف أو الخدمة<input id="doctorArchiveSearch" type="search" placeholder="ابحث في الأرشيف"></label><label>تصفية بتاريخ الموعد<input id="doctorArchiveDateFilter" type="date"></label></div><div id="doctorArchiveList" class="employee-list" aria-live="polite"></div></section>
 
       <section id="bookingManagementSection" class="employee-section" hidden>
@@ -327,7 +325,6 @@
     <dialog id="doctorScheduleFilterDialog" class="schedule-filter-dialog"><form method="dialog" id="doctorScheduleFilterForm"><div class="employee-section-heading"><h4>فلترة جدول المواعيد</h4><button class="schedule-filter-close" value="cancel" aria-label="إغلاق" type="submit">×</button></div><label>عايز تدور على إيه؟<select id="doctorFilterMode"><option value="date">مواعيد يوم معين</option><option value="search">الاسم أو الهاتف أو الخدمة</option></select></label><label id="doctorFilterDateLabel">تاريخ المواعيد<input id="doctorFilterDate" type="date"></label><label id="doctorFilterQueryLabel" hidden>كلمة البحث<input id="doctorFilterQuery" type="search" placeholder="اكتب الاسم أو الهاتف أو الخدمة"></label><div class="booking-card-actions"><button id="applyDoctorScheduleFilter" class="primary-button" type="button">عرض النتائج</button><button class="secondary-button" value="cancel" type="submit">إلغاء</button></div></form></dialog>
       <footer class="admin-footer">
       <a href="./index.html">العودة إلى الموقع العام</a>
-      <span>إدارة العيادة</span>
     </footer>
   </main>
 
