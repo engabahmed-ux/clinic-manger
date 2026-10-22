@@ -627,7 +627,7 @@ export async function onRequest(context) {
 
       case "archiveDay": {
         const date = typeof data.date === "string" ? data.date : "";
-        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00`))) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00`))) {
           return jsonResponse({ message: "تاريخ الأرشفة غير صحيح." }, 400);
         }
         const all = await listBookings(serviceAccount.project_id, accessToken);
