@@ -577,6 +577,7 @@ async function loadSettlementEmployees(){
     for(const employee of employees){const option=document.createElement("option");option.value=employee.uid;option.textContent=employee.displayName||employee.email||employee.uid;doctorSettlementEmployee.append(option)}
     if(employees.some(x=>x.uid===selected))doctorSettlementEmployee.value=selected;
     if(!employees.length)showMessage(doctorSettlementMessage,"أنشئ حساب موظف أولًا حتى تتمكن من تصفية عهدته.");
+    else await previewDoctorSettlement(settlementPreviewPeriodType);
   }catch(error){showMessage(doctorSettlementMessage,error.message||"تعذر تحميل الموظفين لتصفية العهدة.")}
 }
 async function loadDoctorSettlements(){
