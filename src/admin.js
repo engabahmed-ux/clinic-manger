@@ -538,6 +538,34 @@ async function loadDoctorDailyExpenses(day,paidTotal=0){
     await loadDoctorSettlements();
   } catch(error){showMessage(doctorDailyExpenseMessage,error.message||"تعذر تحميل مصروفات اليوم.")}
 }
+let settlementPreviewPeriodType = "day";
+async function previewDoctorSettlement(periodType = settlementPreviewPeriodType) {
+  settlementPreviewPeriodType = periodType;
+  const preview = $("#doctorSettlementPreview");
+  const employeeUid = doctorSettlementEmployee?.value || "";
+  const periodKey = periodType === "month" ? (doctorAccountsMonth?.value || "") : (doctorAccountsDate?.value || doctorHomeDateFilter?.value || "");
+  const settleButton = periodType === "month" ? finalizeMonthlySettlementButton : finalizeDailySettlementButton;
+  if (settleButton) settleButton.disabled = !employeeUid || !periodKey;
+  if (!preview) return;
+  if (!employeeUid || !periodKey) {
+    preview.textContent = "اختر الموظف والفترة لعرض قيمة العهدة المتوقعة.";
+    return;
+  }
+  preview.textContent = "جارٍ حساب عهدة الموظف...";
+  try {
+    const result = await accountsApiRequest("previewSettlement", { periodType, periodKey, employeeUid });
+    const receipts = doctorMoney(result.totalReceipts), expenses = doctorMoney(result.totalExpenses), net = doctorMoney(result.netTotal);
+    if (result.alreadySettled) {
+      preview.textContent = "تمت تصفية هذه الفترة بالفعل. الرصيد الحالي للعهدة: 0 ج.م. صافي التصفية السابقة: " + doctorMoney(result.settlement?.netTotal);
+      if (settleButton) settleButton.disabled = true;
+    } else {
+      preview.textContent = "العهدة المتوقعة للموظف: المقبوضات " + receipts + " − المصروفات المعتمدة " + expenses + " = صافي مستحق للعيادة " + net + (Number(result.netTotal) < 0 ? " (على العيادة للموظف)." : " (على الموظف للعيادة).") + (result.pendingExpenses ? " يوجد " + result.pendingExpenses + " مصروف معلق يجب اعتماده أو رفضه قبل التصفية." : "");
+      if (settleButton) settleButton.disabled = false;
+    }
+  } catch (error) {
+    preview.textContent = error.message || "تعذر حساب عهدة الموظف.";
+  }
+}
 async function loadSettlementEmployees(){
   if(!doctorSettlementEmployee)return;
   const selected=doctorSettlementEmployee.value;
