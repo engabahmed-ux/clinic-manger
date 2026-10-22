@@ -1,6 +1,7 @@
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const EXPECTED_PROJECT_ID = "clinics-manger";
 const STAFF_COLLECTION = "clinicStaff";
+const PATIENTS_COLLECTION = "clinicPatients";
 
 const FIREBASE_LOOKUP_URL =
   "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
@@ -302,6 +303,40 @@ async function getStaffRecord(uid, env) {
   };
 }
 
+async function getPatientRecord(uid, env) {
+  const serviceAccount = parseServiceAccount(env);
+  const accessToken = await createGoogleAccessToken(serviceAccount);
+  const url =
+    "https://firestore.googleapis.com/v1/projects/" +
+    `${encodeURIComponent(serviceAccount.project_id)}/databases/(default)/documents/` +
+    `${PATIENTS_COLLECTION}/${encodeURIComponent(uid)}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: { "Authorization": `Bearer ${accessToken}` }
+  });
+
+  if (response.status === 404) return { exists: false };
+  if (!response.ok) {
+    const details = await response.text();
+    console.error("Patient document lookup failed:", response.status, details.slice(0, 500));
+    throw new Error("Unable to verify patient record.");
+  }
+
+  const document = await response.json();
+  const fields = document.fields || {};
+  const storedUid = fields.uid?.stringValue || "";
+  const role = fields.role?.stringValue || "";
+  const active = fields.active?.booleanValue === true;
+
+  if (storedUid !== uid || role !== "patient") return { exists: false };
+  return {
+    exists: true,
+    active,
+    displayName: fields.displayName?.stringValue || ""
+  };
+}
+
 async function handlePost({ request, env }) {
   if (!env.FIREBASE_API_KEY) {
     return jsonResponse(
@@ -381,23 +416,32 @@ async function handlePost({ request, env }) {
   try {
     const staff = await getStaffRecord(uid, env);
 
-    if (!staff.exists) {
+    if (staff.exists) {
+      if (!staff.active) {
+        return jsonResponse(
+          { message: "حساب الموظف غير نشط. تواصل مع الدكتور." },
+          403
+        );
+      }
+
       return jsonResponse({
-        accountType: "patient"
+        accountType: "staff",
+        displayName: staff.displayName,
+        permissions: staff.permissions
       });
     }
 
-    if (!staff.active) {
+    const patient = await getPatientRecord(uid, env);
+    if (!patient.exists || !patient.active) {
       return jsonResponse(
-        { message: "حساب الموظف غير نشط. تواصل مع الدكتور." },
+        { message: "هذا الحساب غير مسجل كمريضة معتمدة في العيادة." },
         403
       );
     }
 
     return jsonResponse({
-      accountType: "staff",
-      displayName: staff.displayName,
-      permissions: staff.permissions
+      accountType: "patient",
+      displayName: patient.displayName
     });
   } catch (error) {
     console.error("Account type resolution failed:", error);
