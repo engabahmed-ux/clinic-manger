@@ -124,7 +124,7 @@ export async function onRequestPost({ request, env }) {
         .filter(x => verified.accountType === "doctor" || !x.enteredBy || x.enteredBy === verified.uid)
         .map(x => ({ id:x.id, description:x.personName, amount:x.amount, date:x.date, notes:x.notes, createdAt:x.createdAt,
           status:x.status || "approved", enteredBy:x.enteredBy, enteredByName:x.enteredByName,
-          approvedByName:x.approvedByName, approvedAt:x.approvedAt, rejectionReason:x.rejectionReason }));
+          approvedByName:x.approvedByName, approvedAt:x.approvedAt, reviewedByName:x.reviewedByName, reviewedAt:x.reviewedAt, rejectionReason:x.rejectionReason }));
       return jsonResponse({ expenses, date, accountType:verified.accountType, expenseMode:verified.expenseMode || "auto" });
     }
     if (data.action === "listMonthlyExpenses") {
@@ -134,7 +134,7 @@ export async function onRequestPost({ request, env }) {
       const expenses = records.filter(x=>x.type==="dailyExpense" && String(x.date||"").startsWith(month))
         .filter(x=>verified.accountType==="doctor" || !x.enteredBy || x.enteredBy===verified.uid)
         .sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))
-        .map(x=>({id:x.id,description:x.personName,amount:x.amount,date:x.date,notes:x.notes,status:x.status||"approved",enteredByName:x.enteredByName,approvedByName:x.approvedByName,rejectionReason:x.rejectionReason}));
+        .map(x=>({id:x.id,description:x.personName,amount:x.amount,date:x.date,notes:x.notes,status:x.status||"approved",enteredByName:x.enteredByName,approvedByName:x.approvedByName,reviewedByName:x.reviewedByName,reviewedAt:x.reviewedAt,rejectionReason:x.rejectionReason}));
       return jsonResponse({expenses,month});
     }
     if (data.action === "createDailyExpense") {
