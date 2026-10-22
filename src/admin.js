@@ -67,7 +67,6 @@ const openBookingsButton = $("#openBookingsButton");
 const bookingManagementSection = $("#bookingManagementSection");
 const bookingList = $("#bookingList");
 const bookingListMessage = $("#bookingListMessage");
-const refreshBookingsButton = $("#refreshBookingsButton");
 const addBookingToggleButton = $("#addBookingToggleButton");
 const bookingCreateCard = $(".booking-create-card");
 const bookingSearchInput = $("#bookingSearchInput");
@@ -88,7 +87,6 @@ const doctorArchiveSearch = $("#doctorArchiveSearch");
 const homeAddBookingButton = $("#homeAddBookingButton");
 const dailyAppointmentsList = $("#dailyAppointmentsList");
 const dailyAppointmentsMessage = $("#dailyAppointmentsMessage");
-const refreshDailyAppointmentsButton = $("#refreshDailyAppointmentsButton");
 const createBookingForm = $("#createBookingForm");
 const createBookingButton = $("#createBookingButton");
 const createBookingMessage = $("#createBookingMessage");
@@ -459,8 +457,6 @@ function renderPendingBookings(){bookingList.replaceChildren();const query=(book
 async function loadBookings() {
   if (isLoadingBookings || !bookingList) return;
   isLoadingBookings = true;
-  if (refreshBookingsButton) { refreshBookingsButton.disabled = true; refreshBookingsButton.textContent = "جارٍ التحديث..."; }
-  if (refreshDailyAppointmentsButton) refreshDailyAppointmentsButton.disabled = true;
   hideMessage(bookingListMessage); hideMessage(dailyAppointmentsMessage);
   try {
     const result = await bookingApiRequest("list");
@@ -472,8 +468,6 @@ async function loadBookings() {
     showMessage(dailyAppointmentsMessage,error.message||"تعذر تحميل المواعيد.");
   } finally {
     isLoadingBookings = false;
-    if (refreshBookingsButton) { refreshBookingsButton.disabled = false; refreshBookingsButton.textContent = "تحديث الطلبات"; }
-    if (refreshDailyAppointmentsButton) refreshDailyAppointmentsButton.disabled = false;
   }
 }
 async function employeeApiRequest(action, data = {}) {
