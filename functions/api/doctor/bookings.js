@@ -243,6 +243,7 @@ function decodeBooking(document) {
     paymentEnteredByUid: readString(fields, "paymentEnteredByUid"),
     paymentEnteredByName: readString(fields, "paymentEnteredByName"),
     paymentUpdatedAt: readString(fields, "paymentUpdatedAt"),
+    rescheduleHistory: readString(fields, "rescheduleHistory"),
     notes: readString(fields, "notes"),
     status: readString(fields, "status") || "pending",
     createdAt: readString(fields, "createdAt"),
@@ -263,6 +264,7 @@ function encodeBooking(data) {
     "paymentEnteredByUid",
     "paymentEnteredByName",
     "paymentUpdatedAt",
+    "rescheduleHistory",
     "notes",
     "status",
     "createdAt",
@@ -461,7 +463,7 @@ async function createBooking(projectId, accessToken, data) {
   return decodeBooking(result);
 }
 
-async function updateBooking(projectId, accessToken, data, actorUid = "", actorAccountType = "doctor") {
+async function updateBooking(projectId, accessToken, data, actorUid = "", actorAccountType = "doctor", actorDisplayName = "") {
   if (
     typeof data.id !== "string" ||
     !/^[A-Za-z0-9_-]{1,150}$/.test(data.id)
@@ -508,6 +510,31 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     }
   }
 
+  const now = new Date().toISOString();
+  let rescheduleHistory = [];
+  try {
+    const parsedHistory = JSON.parse(existing.rescheduleHistory || "[]");
+    if (Array.isArray(parsedHistory)) rescheduleHistory = parsedHistory.filter(item => item && typeof item.fromDate === "string" && typeof item.toDate === "string");
+  } catch {}
+  const oldDate = String(existing.appointmentDate || "").slice(0, 10);
+  const nextDate = String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0, 10);
+  if (changes.appointmentDate !== undefined && oldDate && nextDate && oldDate !== nextDate) {
+    rescheduleHistory.push({ fromDate: oldDate, toDate: nextDate, at: now });
+  }
+  let paidAmount = changes.paidAmount !== undefined ? String(changes.paidAmount).trim() : existing.paidAmount;
+  let paymentEnteredByUid = existing.paymentEnteredByUid || "";
+  let paymentEnteredByName = existing.paymentEnteredByName || "";
+  let paymentUpdatedAt = existing.paymentUpdatedAt || "";
+  if (actorAccountType === "staff" && changes.status === "completed" && existing.status !== "completed" && !(Number(existing.paidAmount) > 0)) {
+    const fee = Number(changes.servicePrice ?? existing.servicePrice) || 0;
+    if (fee > 0) {
+      paidAmount = fee.toFixed(2);
+      paymentEnteredByUid = actorUid;
+      paymentEnteredByName = actorDisplayName || "الموظف";
+      paymentUpdatedAt = now;
+    }
+  }
+
   const booking = {
     ...existing,
     ...changes,
@@ -517,9 +544,13 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
       changes.appointmentDate?.trim() ?? existing.appointmentDate,
     service: changes.service?.trim() ?? existing.service,
     servicePrice: changes.servicePrice !== undefined ? String(changes.servicePrice).trim() : existing.servicePrice,
-    paidAmount: changes.paidAmount !== undefined ? String(changes.paidAmount).trim() : existing.paidAmount,
+    paidAmount,
+    paymentEnteredByUid,
+    paymentEnteredByName,
+    paymentUpdatedAt,
+    rescheduleHistory: JSON.stringify(rescheduleHistory),
     notes: changes.notes?.trim() ?? existing.notes,
-    updatedAt: new Date().toISOString()
+    updatedAt: now
   };
 
   const query = new URLSearchParams();
@@ -531,6 +562,10 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     "service",
     "servicePrice",
     "paidAmount",
+    "paymentEnteredByUid",
+    "paymentEnteredByName",
+    "paymentUpdatedAt",
+    "rescheduleHistory",
     "notes",
     "status",
     "updatedAt"
@@ -735,7 +770,8 @@ export async function onRequest(context) {
           accessToken,
           data.booking || {},
           access.accountType === "staff" ? access.uid : "",
-          access.accountType
+          access.accountType,
+          access.displayName || ""
         );
 
         return jsonResponse({ booking });
