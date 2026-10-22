@@ -543,7 +543,7 @@ async function previewDoctorSettlement(periodType = settlementPreviewPeriodType)
   settlementPreviewPeriodType = periodType;
   const preview = $("#doctorSettlementPreview");
   const employeeUid = doctorSettlementEmployee?.value || "";
-  const periodKey = periodType === "month" ? (doctorAccountsMonth?.value || "") : (doctorAccountsDate?.value || doctorHomeDateFilter?.value || "");
+  const periodKey = periodType === "month" ? (doctorAccountsMonth?.value || (doctorAccountsDate?.value || doctorHomeDateFilter?.value || "").slice(0, 7)) : (doctorAccountsDate?.value || doctorHomeDateFilter?.value || "");
   const settleButton = periodType === "month" ? finalizeMonthlySettlementButton : finalizeDailySettlementButton;
   if (settleButton) settleButton.disabled = !employeeUid || !periodKey;
   if (!preview) return;
