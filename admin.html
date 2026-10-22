@@ -84,7 +84,7 @@
         <button id="openEmployeesButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الموظفين</button>
       </nav>
       <section id="homeAppointmentsSection" class="employee-section home-appointments-section">
-        <div class="employee-section-heading doctor-schedule-heading"><h3>جدول المواعيد <span id="doctorScheduleDateLabel" class="schedule-date-label"></span></h3><div class="doctor-home-actions"><button id="openDoctorScheduleFilter" class="schedule-filter-button" type="button" aria-label="فلترة جدول المواعيد" title="فلترة جدول المواعيد">☷</button><button id="homeAddBookingButton" class="primary-button home-add-booking-button" type="button">＋ إضافة حجز</button></div></div><input id="doctorHomeDateFilter" type="date" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1"><input id="doctorHomeSearch" type="search" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1">
+        <div class="employee-section-heading doctor-schedule-heading"><h3>جدول المواعيد <button id="doctorScheduleDateLabel" class="schedule-date-label" type="button" aria-label="اضغط لتغيير تاريخ المواعيد"></button></h3><div class="doctor-home-actions"><button id="openDoctorScheduleFilter" class="schedule-filter-button" type="button" aria-label="فلترة جدول المواعيد" title="فلترة جدول المواعيد">☷</button><button id="homeAddBookingButton" class="primary-button home-add-booking-button" type="button">＋ إضافة حجز</button></div></div><input id="doctorHomeDateFilter" type="date" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1"><input id="doctorHomeSearch" type="search" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1">
         <div class="schedule-status-legend" id="doctorStatusLegend" aria-label="فلترة حسب حالة الحجز"><button type="button" data-status-filter="all" class="is-active">✓ الكل</button><button type="button" data-status-filter="waiting">✓ في الانتظار</button><button type="button" data-status-filter="completed">✓ تم الكشف</button><button type="button" data-status-filter="postponed">✓ مؤجل</button><button type="button" data-status-filter="no_show">✓ لم يأتِ</button><button type="button" data-status-filter="apologized">✓ اعتذر</button></div>
         <p id="dailyAppointmentsMessage" class="message" role="status" hidden></p>
         <div id="dailyAppointmentsList" class="employee-list" aria-live="polite"></div><div class="schedule-bulk-actions"><button id="archiveSelectedAppointments" class="secondary-button archive-day-button" type="button">أرشفة مواعيد اليوم</button></div>
@@ -153,19 +153,18 @@
             <label for="newBookingService">نوع الحجز أو الخدمة</label>
             <input id="newBookingService" name="service" type="text" maxlength="120" list="clinicServiceOptions" placeholder="اختر خدمة أو اكتبها يدويًا">
             <label for="newBookingServicePrice">قيمة الكشف أو الاستشارة (جنيه)</label><input id="newBookingServicePrice" name="servicePrice" type="number" min="0" max="99999999" step="0.01" inputmode="decimal" placeholder="مثال: 300">
-            <datalist id="clinicServiceOptions"><option value="كشف"><option value="استشارة"><option value="متابعة"><option value="سونار"><option value="إعادة كشف"><option value="خدمة أخرى"></datalist>
+            <datalist id="clinicServiceOptions"><option value="كشف"></option><option value="استشارة"></option><option value="متابعة"></option><option value="سونار"></option><option value="إعادة كشف"></option><option value="خدمة أخرى"></option></datalist>
             <label for="newBookingNotes">ملاحظات</label>
             <textarea id="newBookingNotes" name="notes" maxlength="2000" rows="3"></textarea>
             <p id="createBookingMessage" class="message" role="status" hidden></p>
-            <button id="createBookingButton" class="primary-button" type="submit">إضافة الحجز</button>
+            <div class="booking-form-actions"><button id="createBookingButton" class="primary-button" type="submit">تأكيد الحجز</button><button id="cancelCreateBookingButton" class="secondary-button" type="button">إلغاء</button></div>
           </form>
         </div>
-        <div class="booking-list-filters">
-          <label>بحث بالاسم أو الهاتف<input id="bookingSearchInput" type="search" placeholder="اسم المريضة أو رقم الهاتف"></label>
-          <label>تاريخ الموعد<input id="bookingDateFilter" type="date"></label>
+        <button id="openBookingRequestsButton" class="booking-requests-toggle" type="button" aria-expanded="false">طلبات الحجوزات <span aria-hidden="true">⌄</span></button><div id="bookingRequestsPanel" hidden><div class="booking-list-filters">
+          <label>تصفية بتاريخ الموعد<input id="bookingDateFilter" type="date"></label>
         </div>
         <p id="bookingListMessage" class="message" role="status" hidden></p>
-        <div id="bookingList" class="employee-list" aria-live="polite"></div>
+        <div id="bookingList" class="employee-list" aria-live="polite"></div></div>
       </section>
 
       <section id="employeeManagementSection" class="employee-section" hidden>
