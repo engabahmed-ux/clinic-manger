@@ -463,6 +463,66 @@ function renderPermissions(permissions) {
     } else if (section.key === "bookings") {
       const controls = document.createElement("div");
       controls.className = "staff-bookings-controls";
+
+      if (permission === "edit") {
+        const createForm = document.createElement("form");
+        createForm.className = "staff-booking-create-form";
+        const createHeading = document.createElement("h4");
+        createHeading.textContent = "إضافة حجز من العيادة";
+        createForm.append(createHeading);
+        const bookingInputs = {};
+        for (const [key, labelText, type, required, maxLength] of [
+          ["patientName", "اسم المريضة", "text", true, 120],
+          ["patientPhone", "رقم الهاتف", "tel", true, 40],
+          ["appointmentDate", "التاريخ المطلوب", "date", true, 40],
+          ["service", "الخدمة", "text", false, 120],
+          ["notes", "ملاحظات", "text", false, 2000]
+        ]) {
+          const label = document.createElement("label");
+          label.textContent = labelText;
+          const input = document.createElement("input");
+          input.type = type;
+          input.required = required;
+          input.maxLength = maxLength;
+          bookingInputs[key] = input;
+          label.append(input);
+          createForm.append(label);
+        }
+        const createMessage = document.createElement("p");
+        createMessage.className = "staff-message";
+        createMessage.hidden = true;
+        const createButton = document.createElement("button");
+        createButton.type = "submit";
+        createButton.className = "staff-primary";
+        createButton.textContent = "إضافة الحجز";
+        createForm.append(createMessage, createButton);
+        createForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          if (createButton.disabled) return;
+          createButton.disabled = true;
+          createButton.textContent = "جارٍ الإضافة...";
+          createMessage.hidden = true;
+          try {
+            const booking = {};
+            for (const key of ["patientName", "patientPhone", "appointmentDate", "service", "notes"]) {
+              booking[key] = bookingInputs[key].value.trim();
+            }
+            await staffBookingsRequest("create", { booking });
+            createForm.reset();
+            createMessage.textContent = "تمت إضافة الحجز بحالة قيد المراجعة.";
+            createMessage.hidden = false;
+            await loadStaffBookings(list, permission, refresh, message);
+          } catch (error) {
+            createMessage.textContent = error.message || "تعذر إضافة الحجز.";
+            createMessage.hidden = false;
+          } finally {
+            createButton.disabled = false;
+            createButton.textContent = "إضافة الحجز";
+          }
+        });
+        controls.append(createForm);
+      }
+
       const refresh = document.createElement("button");
       refresh.type = "button";
       refresh.className = "staff-secondary";
