@@ -92,7 +92,7 @@ const homeAddBookingButton = $("#homeAddBookingButton");
 const dailyAppointmentsList = $("#dailyAppointmentsList");
 const dailyAppointmentsMessage = $("#dailyAppointmentsMessage");
 const doctorAccountsSection=$("#doctorAccountsSection"),openAccountsTabButton=$("#openAccountsTabButton"),doctorAccountsContent=$("#doctorAccountsContent"),accountsDateLabel=$("#accountsDateLabel"),doctorStatusLegend=$("#doctorStatusLegend"),archiveSelectedAppointments=$("#archiveSelectedAppointments");let activeStatusFilter="all";
-const accountsSubtabs=$("#doctorAccountsSubtabs"),patientDailyAccountsPanel=$("#patientDailyAccountsPanel"),salaryAccountsPanel=$("#salaryAccountsPanel"),customAccountsPanel=$("#customAccountsPanel"),salaryEntriesList=$("#salaryEntriesList"),customAccountEntriesList=$("#customAccountEntriesList"),salaryEntryForm=$("#salaryEntryForm"),customAccountEntryForm=$("#customAccountEntryForm"),accountsCategoryForm=$("#accountsCategoryForm"),doctorAccountsDate=$("#doctorAccountsDate"),doctorDailyExpenseForm=$("#doctorDailyExpenseForm"),doctorDailyExpensesList=$("#doctorDailyExpensesList"),doctorDailyExpenseMessage=$("#doctorDailyExpenseMessage"),doctorDailyNetTotal=$("#doctorDailyNetTotal"),doctorAccountsMonth=$("#doctorAccountsMonth"),finalizeDailySettlementButton=$("#finalizeDailySettlement"),finalizeMonthlySettlementButton=$("#finalizeMonthlySettlement"),doctorSettlementMessage=$("#doctorSettlementMessage"),doctorMonthlyExpensesList=$("#doctorMonthlyExpensesList"),doctorSettlementsList=$("#doctorSettlementsList");let doctorDailyExpenses=[],doctorAccountCategories=[],doctorAccountEntries=[],activeDoctorAccountSubtab="patients";
+const accountsSubtabs=$("#doctorAccountsSubtabs"),patientDailyAccountsPanel=$("#patientDailyAccountsPanel"),salaryAccountsPanel=$("#salaryAccountsPanel"),customAccountsPanel=$("#customAccountsPanel"),salaryEntriesList=$("#salaryEntriesList"),customAccountEntriesList=$("#customAccountEntriesList"),salaryEntryForm=$("#salaryEntryForm"),customAccountEntryForm=$("#customAccountEntryForm"),accountsCategoryForm=$("#accountsCategoryForm"),doctorAccountsDate=$("#doctorAccountsDate"),doctorDailyExpenseForm=$("#doctorDailyExpenseForm"),doctorDailyExpensesList=$("#doctorDailyExpensesList"),doctorDailyExpenseMessage=$("#doctorDailyExpenseMessage"),doctorDailyNetTotal=$("#doctorDailyNetTotal"),doctorAccountsMonth=$("#doctorAccountsMonth"),doctorSettlementEmployee=$("#doctorSettlementEmployee"),finalizeDailySettlementButton=$("#finalizeDailySettlement"),finalizeMonthlySettlementButton=$("#finalizeMonthlySettlement"),doctorSettlementMessage=$("#doctorSettlementMessage"),doctorMonthlyExpensesList=$("#doctorMonthlyExpensesList"),doctorSettlementsList=$("#doctorSettlementsList");let doctorDailyExpenses=[],doctorAccountCategories=[],doctorAccountEntries=[],activeDoctorAccountSubtab="patients";
 const createBookingForm = $("#createBookingForm");
 const createBookingButton = $("#createBookingButton");
 const createBookingMessage = $("#createBookingMessage");
@@ -525,6 +525,19 @@ async function loadDoctorDailyExpenses(day,paidTotal=0){
     await loadDoctorSettlements();
   } catch(error){showMessage(doctorDailyExpenseMessage,error.message||"تعذر تحميل مصروفات اليوم.")}
 }
+async function loadSettlementEmployees(){
+  if(!doctorSettlementEmployee)return;
+  const selected=doctorSettlementEmployee.value;
+  try{
+    const result=await employeeApiRequest("list");
+    const employees=(Array.isArray(result.employees)?result.employees:[]).filter(x=>x.uid);
+    doctorSettlementEmployee.replaceChildren();
+    const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent="اختر الموظف";doctorSettlementEmployee.append(placeholder);
+    for(const employee of employees){const option=document.createElement("option");option.value=employee.uid;option.textContent=employee.displayName||employee.email||employee.uid;doctorSettlementEmployee.append(option)}
+    if(employees.some(x=>x.uid===selected))doctorSettlementEmployee.value=selected;
+    if(!employees.length)showMessage(doctorSettlementMessage,"أنشئ حساب موظف أولًا حتى تتمكن من تصفية عهدته.");
+  }catch(error){showMessage(doctorSettlementMessage,error.message||"تعذر تحميل الموظفين لتصفية العهدة.")}
+}
 async function loadDoctorSettlements(){
   try{
     const result=await accountsApiRequest("listSettlements");
@@ -541,12 +554,12 @@ async function loadDoctorSettlements(){
       doctorSettlementsList.replaceChildren();
       const settlements=Array.isArray(result.settlements)?result.settlements:[];
       if(!settlements.length){const p=document.createElement("p");p.className="muted-text";p.textContent="لا توجد تصفيات سابقة.";doctorSettlementsList.append(p)}
-      for(const x of settlements){const row=document.createElement("div");row.className="doctor-daily-expense-row";const label=document.createElement("span");label.textContent=(x.periodType==="month"?"تصفية شهرية":"تصفية يومية")+" · "+x.periodKey+" · نفذها: "+(x.closedByName||"الدكتور")+" · "+(x.closedAt?formatSubmittedAt(x.closedAt):"وقت التصفية غير مسجل");const amount=document.createElement("strong");amount.textContent="المقبوضات "+doctorMoney(x.totalReceipts)+" / المصروفات "+doctorMoney(x.totalExpenses)+" / الصافي "+doctorMoney(x.netTotal);row.append(label,amount);doctorSettlementsList.append(row)}
+      for(const x of settlements){const row=document.createElement("div");row.className="doctor-daily-expense-row";const label=document.createElement("span");label.textContent=(x.periodType==="month"?"تصفية شهرية":"تصفية يومية")+" · "+x.periodKey+" · الموظف: "+(x.employeeName||"غير محدد")+" · نفذها: "+(x.closedByName||"الدكتور")+" · "+(x.closedAt?formatSubmittedAt(x.closedAt):"وقت التصفية غير مسجل");const amount=document.createElement("strong");amount.textContent="المقبوضات "+doctorMoney(x.totalReceipts)+" / المصروفات "+doctorMoney(x.totalExpenses)+" / الصافي "+doctorMoney(x.netTotal);row.append(label,amount);doctorSettlementsList.append(row)}
     }
   }catch(error){showMessage(doctorSettlementMessage,error.message||"تعذر تحميل سجل التصفيات.")}
 }
 async function archiveDoctorDay(){const day=doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());if((doctorFilterMode?.value||"date")!=="date"){showMessage(dailyAppointmentsMessage,"اختر عرض مواعيد يوم محدد قبل الأرشفة.");return}if(!window.confirm("هل تريد نقل جميع مواعيد يوم "+formatRequestDate(day)+" إلى الأرشيف؟ لن تظهر هذه المواعيد في جدول اليوم بعد الأرشفة."))return;archiveSelectedAppointments.disabled=true;try{const result=await bookingApiRequest("archiveDay",{date:day});await loadBookings();showMessage(dailyAppointmentsMessage,"تم نقل "+(result.archivedCount||0)+" حجز إلى الأرشيف.","success")}catch(e){showMessage(dailyAppointmentsMessage,e.message||"تعذر أرشفة مواعيد اليوم.")}finally{archiveSelectedAppointments.disabled=false;}}
-function showDoctorAccounts(){if(doctorAccountsSection)doctorAccountsSection.hidden=false;homeAppointmentsSection.hidden=true;doctorArchiveSection.hidden=true;bookingManagementSection.hidden=true;patientManagementSection.hidden=true;employeeManagementSection.hidden=true;setActiveTab(openAccountsTabButton);if(doctorAccountsDate)doctorAccountsDate.value=doctorHomeDateFilter?.value||doctorAccountsDate.value;renderDoctorAccounts();loadDoctorAccountRecords()}
+function showDoctorAccounts(){if(doctorAccountsSection)doctorAccountsSection.hidden=false;homeAppointmentsSection.hidden=true;doctorArchiveSection.hidden=true;bookingManagementSection.hidden=true;patientManagementSection.hidden=true;employeeManagementSection.hidden=true;setActiveTab(openAccountsTabButton);if(doctorAccountsDate)doctorAccountsDate.value=doctorHomeDateFilter?.value||doctorAccountsDate.value;renderDoctorAccounts();loadDoctorAccountRecords();loadSettlementEmployees()}
 function renderPendingBookings(){bookingList.replaceChildren();const query=(bookingSearchInput?.value||"").trim().toLocaleLowerCase("ar"),date=bookingDateFilter?.value||"";const rows=allBookings.filter(b=>b.status==="pending"&&(!date||String(b.appointmentDate||"").slice(0,10)===date)).filter(b=>(!query||`${b.patientName||""} ${b.patientPhone||""}`.toLocaleLowerCase("ar").includes(query)));if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد طلبات مراجعة مطابقة.";bookingList.append(empty);return}rows.forEach(b=>bookingList.append(renderBookingCard(b)))}
 async function loadBookings() {
   if (isLoadingBookings || !bookingList) return;
@@ -1210,20 +1223,24 @@ if (doctorHomeDateFilter) { doctorHomeDateFilter.value = new Intl.DateTimeFormat
 doctorHomeSearch?.addEventListener("input",renderDailyAppointments);doctorStatusLegend?.addEventListener("click",e=>{const b=e.target.closest("[data-status-filter]");if(!b)return;activeStatusFilter=b.dataset.statusFilter;for(const x of doctorStatusLegend.querySelectorAll("[data-status-filter]"))x.classList.toggle("is-active",x===b);renderDailyAppointments()});archiveSelectedAppointments?.addEventListener("click",archiveDoctorDay);openAccountsTabButton?.addEventListener("click",showDoctorAccounts);
 doctorAccountsMonth?.addEventListener("change",loadDoctorSettlements);
 finalizeDailySettlementButton?.addEventListener("click",async()=>{
-  const periodKey=doctorAccountsDate?.value||doctorHomeDateFilter?.value;
+  const periodKey=doctorAccountsDate?.value||doctorHomeDateFilter?.value,employeeUid=doctorSettlementEmployee?.value;
+  if(!employeeUid){showMessage(doctorSettlementMessage,"اختر الموظف أولًا.");return}
+  const employeeName=doctorSettlementEmployee.selectedOptions[0]?.textContent||"الموظف";
   if(!periodKey){showMessage(doctorSettlementMessage,"اختر تاريخ اليوم المراد تصفيته.");return}
-  if(!window.confirm("هل تريد تصفية عهدة يوم "+formatRequestDate(periodKey)+"؟ لن يمكن إضافة مصروفات إلى هذه الفترة بعد الإقفال."))return;
+  if(!window.confirm("هل تريد تصفية عهدة "+employeeName+" ليوم "+formatRequestDate(periodKey)+"؟ لن يمكن إضافة مصروفات أو تعديل مقبوضات هذه العهدة بعد الإقفال."))return;
   finalizeDailySettlementButton.disabled=true;
-  try{const result=await accountsApiRequest("finalizeSettlement",{periodType:"day",periodKey});showMessage(doctorSettlementMessage,"تمت تصفية اليوم. الصافي: "+doctorMoney(result.settlement?.netTotal),"success");await loadDoctorSettlements();renderDoctorAccounts()}
+  try{const result=await accountsApiRequest("finalizeSettlement",{periodType:"day",periodKey,employeeUid});showMessage(doctorSettlementMessage,"تمت تصفية عهدة "+employeeName+". الصافي: "+doctorMoney(result.settlement?.netTotal),"success");await loadDoctorSettlements();renderDoctorAccounts()}
   catch(error){showMessage(doctorSettlementMessage,error.message||"تعذر تصفية اليوم.")}
   finally{finalizeDailySettlementButton.disabled=false}
 });
 finalizeMonthlySettlementButton?.addEventListener("click",async()=>{
-  const periodKey=doctorAccountsMonth?.value;
+  const periodKey=doctorAccountsMonth?.value,employeeUid=doctorSettlementEmployee?.value;
+  if(!employeeUid){showMessage(doctorSettlementMessage,"اختر الموظف أولًا.");return}
+  const employeeName=doctorSettlementEmployee.selectedOptions[0]?.textContent||"الموظف";
   if(!periodKey){showMessage(doctorSettlementMessage,"اختر الشهر المراد تصفيته.");return}
-  if(!window.confirm("هل تريد تصفية عهدة شهر "+periodKey+"؟ لن يمكن إضافة مصروفات إلى هذه الفترة بعد الإقفال."))return;
+  if(!window.confirm("هل تريد تصفية عهدة "+employeeName+" لشهر "+periodKey+"؟ لن يمكن إضافة مصروفات أو تعديل مقبوضات هذه العهدة بعد الإقفال."))return;
   finalizeMonthlySettlementButton.disabled=true;
-  try{const result=await accountsApiRequest("finalizeSettlement",{periodType:"month",periodKey});showMessage(doctorSettlementMessage,"تمت تصفية الشهر. الصافي: "+doctorMoney(result.settlement?.netTotal),"success");await loadDoctorSettlements();renderDoctorAccounts()}
+  try{const result=await accountsApiRequest("finalizeSettlement",{periodType:"month",periodKey,employeeUid});showMessage(doctorSettlementMessage,"تمت تصفية عهدة "+employeeName+" للشهر. الصافي: "+doctorMoney(result.settlement?.netTotal),"success");await loadDoctorSettlements();renderDoctorAccounts()}
   catch(error){showMessage(doctorSettlementMessage,error.message||"تعذر تصفية الشهر.")}
   finally{finalizeMonthlySettlementButton.disabled=false}
 });
