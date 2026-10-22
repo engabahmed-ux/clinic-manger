@@ -9,7 +9,7 @@ const FIREBASE_LOOKUP_URL =
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 
-const STATUSES = ["pending", "confirmed", "completed", "cancelled"];
+const STATUSES = ["pending", "confirmed", "waiting", "completed", "postponed", "no_show", "apologized", "cancelled", "archived"];
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -235,9 +235,20 @@ function decodeBooking(document) {
   return {
     id,
     patientName: readString(fields, "patientName"),
+    patientId: readString(fields, "patientId"),
+    bloodPressure: readString(fields, "bloodPressure"),
+    weight: readString(fields, "weight"),
+    bloodSugar: readString(fields, "bloodSugar"),
+    preVisitNotes: readString(fields, "preVisitNotes"),
     patientPhone: readString(fields, "patientPhone"),
     appointmentDate: readString(fields, "appointmentDate"),
     service: readString(fields, "service"),
+    servicePrice: readString(fields, "servicePrice"),
+    paidAmount: readString(fields, "paidAmount"),
+    paymentEnteredByUid: readString(fields, "paymentEnteredByUid"),
+    paymentEnteredByName: readString(fields, "paymentEnteredByName"),
+    paymentUpdatedAt: readString(fields, "paymentUpdatedAt"),
+    rescheduleHistory: readString(fields, "rescheduleHistory"),
     notes: readString(fields, "notes"),
     status: readString(fields, "status") || "pending",
     createdAt: readString(fields, "createdAt"),
@@ -250,9 +261,20 @@ function encodeBooking(data) {
 
   for (const key of [
     "patientName",
+    "patientId",
     "patientPhone",
+    "bloodPressure",
+    "weight",
+    "bloodSugar",
+    "preVisitNotes",
     "appointmentDate",
     "service",
+    "servicePrice",
+    "paidAmount",
+    "paymentEnteredByUid",
+    "paymentEnteredByName",
+    "paymentUpdatedAt",
+    "rescheduleHistory",
     "notes",
     "status",
     "createdAt",
@@ -273,7 +295,10 @@ async function getAccountAccess(
     return {
       ok: true,
       accountType: "doctor",
-      permission: "edit"
+      permission: "edit",
+      accountsPermission: "edit",
+      uid: user.uid,
+      displayName: "الدكتور"
     };
   }
 
@@ -296,10 +321,9 @@ async function getAccountAccess(
   const fields = document?.fields || {};
   const active = fields.active?.booleanValue === true;
   const role = readString(fields, "role");
-  const permission = readString(
-    fields.permissions?.mapValue?.fields,
-    "bookings"
-  );
+  const permission = readString(fields.permissions?.mapValue?.fields, "bookings");
+  const accountsPermission = readString(fields.permissions?.mapValue?.fields, "accounts");
+  const displayName = readString(fields, "displayName");
 
   if (role !== "staff" || !active) {
     return {
@@ -309,19 +333,8 @@ async function getAccountAccess(
     };
   }
 
-  if (!["view", "edit"].includes(permission)) {
-    return {
-      ok: false,
-      status: 403,
-      message: "لم يمنحك الدكتور صلاحية الوصول إلى الحجوزات."
-    };
-  }
-
-  return {
-    ok: true,
-    accountType: "staff",
-    permission
-  };
+  if (!["view", "edit"].includes(permission) && !["view", "edit"].includes(accountsPermission)) return { ok:false, status:403, message:"لم يمنحك الدكتور صلاحية الوصول إلى هذا القسم." };
+  return { ok:true, accountType:"staff", permission, accountsPermission, uid:user.uid, displayName };
 }
 
 function validateBooking(data, partial = false) {
@@ -331,9 +344,15 @@ function validateBooking(data, partial = false) {
 
   const allowed = [
     "patientName",
+    "patientId",
     "patientPhone",
     "appointmentDate",
     "service",
+    "servicePrice",
+    "bloodPressure",
+    "weight",
+    "bloodSugar",
+    "preVisitNotes",
     "notes",
     "status"
   ];
@@ -376,6 +395,19 @@ function validateBooking(data, partial = false) {
     return "اسم الخدمة أطول من المسموح.";
   }
 
+  if (data.servicePrice !== undefined && data.servicePrice !== "" && (!/^\d{1,8}(\.\d{1,2})?$/.test(String(data.servicePrice)) || Number(data.servicePrice) < 0)) {
+    return "قيمة الخدمة يجب أن تكون رقمًا موجبًا أو صفرًا وبحد أقصى منزلتين عشريتين.";
+  }
+
+  if (data.paidAmount !== undefined && data.paidAmount !== "" && (!/^\d{1,8}(\.\d{1,2})?$/.test(String(data.paidAmount)) || Number(data.paidAmount) < 0)) return "قيمة المبلغ المدفوع غير صحيحة.";
+
+  for (const key of ["bloodPressure", "weight", "bloodSugar"]) {
+    if (data[key] !== undefined && String(data[key]).length > 40) return "إحدى القياسات أطول من المسموح.";
+  }
+  if (data.preVisitNotes && data.preVisitNotes.length > 1000) return "ملاحظات ما قبل الكشف أطول من المسموح.";
+  if (data.patientId && !/^[A-Za-z0-9_-]{1,150}$/.test(data.patientId)) return "رقم ملف المريض غير صحيح.";
+  if (data.weight !== undefined && data.weight !== "" && (!/^\d{1,3}(\.\d{1,2})?$/.test(String(data.weight)) || Number(data.weight) < 0 || Number(data.weight) > 500)) return "قيمة الوزن غير صحيحة.";
+
   if (data.notes && data.notes.length > 2000) {
     return "الملاحظات أطول من المسموح.";
   }
@@ -397,8 +429,7 @@ async function listBookings(projectId, accessToken) {
       method: "POST",
       body: JSON.stringify({
         structuredQuery: {
-          from: [{ collectionId: BOOKINGS_COLLECTION }],
-          limit: 300
+          from: [{ collectionId: BOOKINGS_COLLECTION }]
         }
       })
     }
@@ -407,11 +438,24 @@ async function listBookings(projectId, accessToken) {
   return (Array.isArray(result) ? result : [])
     .filter((item) => item.document)
     .map((item) => decodeBooking(item.document))
-    .sort((a, b) =>
-      a.appointmentDate.localeCompare(b.appointmentDate)
-    );
+    .sort((a, b) => (Date.parse(a.createdAt || "") || 0) - (Date.parse(b.createdAt || "") || 0));
 }
 
+
+async function isFinancialPeriodClosed(projectId, accessToken, dateValue, employeeUid = "") {
+  const date = String(dateValue || "").slice(0,10);
+  if (!employeeUid || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const result = await firestoreRequest(projectId, accessToken, ":runQuery", {
+    method:"POST",
+    body:JSON.stringify({structuredQuery:{from:[{collectionId:"clinicAccountRecords"}]}})
+  });
+  return (Array.isArray(result)?result:[]).some(item => {
+    const fields = item.document?.fields || {};
+    if (readString(fields,"type") !== "settlement" || readString(fields,"employeeUid") !== employeeUid) return false;
+    const type = readString(fields,"periodType"), key = readString(fields,"periodKey");
+    return (type === "day" && key === date) || (type === "month" && key === date.slice(0,7));
+  });
+}
 
 async function createBooking(projectId, accessToken, data) {
   const now = new Date().toISOString();
@@ -423,7 +467,7 @@ async function createBooking(projectId, accessToken, data) {
     appointmentDate: data.appointmentDate.trim(),
     service: (data.service || "").trim(),
     notes: (data.notes || "").trim(),
-    status: "pending",
+    status: "waiting",
     createdAt: now,
     updatedAt: now
   };
@@ -441,7 +485,7 @@ async function createBooking(projectId, accessToken, data) {
   return decodeBooking(result);
 }
 
-async function updateBooking(projectId, accessToken, data) {
+async function updateBooking(projectId, accessToken, data, actorUid = "", actorAccountType = "doctor", actorDisplayName = "") {
   if (
     typeof data.id !== "string" ||
     !/^[A-Za-z0-9_-]{1,150}$/.test(data.id)
@@ -463,6 +507,55 @@ async function updateBooking(projectId, accessToken, data) {
   );
 
   const existing = decodeBooking(current);
+  const financialFields = ["appointmentDate","servicePrice","paidAmount","status"];
+  const changesFinancialFields = financialFields.some(key => changes[key] !== undefined);
+  if (
+    actorAccountType === "staff" &&
+    changesFinancialFields &&
+    !existing.paymentEnteredByUid &&
+    Number(existing.paidAmount) > 0
+  ) {
+    throw new Error("هذا الحجز يحتوي على مبلغ سابق غير منسوب لموظف. يلزم أن يراجعه الدكتور قبل تعديل بياناته المالية.");
+  }
+  if (changesFinancialFields) {
+    const dates = new Set([
+      String(existing.appointmentDate || "").slice(0,10),
+      String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0,10)
+    ].filter(Boolean));
+    const ownerUid = existing.paymentEnteredByUid || (actorAccountType === "staff" && changes.status === "completed" ? actorUid : "");
+    if (ownerUid) {
+      for (const date of dates) {
+        if (await isFinancialPeriodClosed(projectId, accessToken, date, ownerUid)) {
+          throw new Error("لا يمكن تعديل التاريخ أو الحالة أو المبالغ لحجز مرتبط بفترة مالية تمت تصفيتها.");
+        }
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
+  let rescheduleHistory = [];
+  try {
+    const parsedHistory = JSON.parse(existing.rescheduleHistory || "[]");
+    if (Array.isArray(parsedHistory)) rescheduleHistory = parsedHistory.filter(item => item && typeof item.fromDate === "string" && typeof item.toDate === "string");
+  } catch {}
+  const oldDate = String(existing.appointmentDate || "").slice(0, 10);
+  const nextDate = String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0, 10);
+  if (changes.appointmentDate !== undefined && oldDate && nextDate && oldDate !== nextDate) {
+    rescheduleHistory.push({ fromDate: oldDate, toDate: nextDate, at: now });
+  }
+  let paidAmount = changes.paidAmount !== undefined ? String(changes.paidAmount).trim() : existing.paidAmount;
+  let paymentEnteredByUid = existing.paymentEnteredByUid || "";
+  let paymentEnteredByName = existing.paymentEnteredByName || "";
+  let paymentUpdatedAt = existing.paymentUpdatedAt || "";
+  if (actorAccountType === "staff" && changes.status === "completed" && !(Number(existing.paidAmount) > 0)) {
+    const fee = Number(changes.servicePrice ?? existing.servicePrice) || 0;
+    if (fee > 0) {
+      paidAmount = fee.toFixed(2);
+      paymentEnteredByUid = actorUid;
+      paymentEnteredByName = actorDisplayName || "الموظف";
+      paymentUpdatedAt = now;
+    }
+  }
 
   const booking = {
     ...existing,
@@ -472,8 +565,14 @@ async function updateBooking(projectId, accessToken, data) {
     appointmentDate:
       changes.appointmentDate?.trim() ?? existing.appointmentDate,
     service: changes.service?.trim() ?? existing.service,
+    servicePrice: changes.servicePrice !== undefined ? String(changes.servicePrice).trim() : existing.servicePrice,
+    paidAmount,
+    paymentEnteredByUid,
+    paymentEnteredByName,
+    paymentUpdatedAt,
+    rescheduleHistory: JSON.stringify(rescheduleHistory),
     notes: changes.notes?.trim() ?? existing.notes,
-    updatedAt: new Date().toISOString()
+    updatedAt: now
   };
 
   const query = new URLSearchParams();
@@ -483,6 +582,12 @@ async function updateBooking(projectId, accessToken, data) {
     "patientPhone",
     "appointmentDate",
     "service",
+    "servicePrice",
+    "paidAmount",
+    "paymentEnteredByUid",
+    "paymentEnteredByName",
+    "paymentUpdatedAt",
+    "rescheduleHistory",
     "notes",
     "status",
     "updatedAt"
@@ -503,7 +608,7 @@ async function updateBooking(projectId, accessToken, data) {
   return decodeBooking(result);
 }
 
-async function cancelBooking(projectId, accessToken, data) {
+async function cancelBooking(projectId, accessToken, data, actorUid = "", actorAccountType = "doctor") {
   if (
     typeof data.id !== "string" ||
     !/^[A-Za-z0-9_-]{1,150}$/.test(data.id)
@@ -514,7 +619,7 @@ async function cancelBooking(projectId, accessToken, data) {
   return updateBooking(projectId, accessToken, {
     id: data.id,
     status: "cancelled"
-  });
+  }, actorUid, actorAccountType);
 }
 
 export async function onRequest(context) {
@@ -597,15 +702,39 @@ export async function onRequest(context) {
 
   const action = data?.action;
 
-  if (action !== "list" && access.permission !== "edit") {
-    return jsonResponse(
-      { message: "صلاحية العرض فقط؛ لا يمكنك تعديل الحجوزات." },
-      403
-    );
-  }
+  if (action === "list" && !["view","edit"].includes(access.permission)) return jsonResponse({ message:"لم تمنح صلاحية عرض الحجوزات." },403);
+  if (action === "listDailyAccounts" && !["view","edit"].includes(access.accountsPermission)) return jsonResponse({ message:"لم تمنح صلاحية عرض حسابات اليوم." },403);
+  if (action === "updatePaidAmount" && access.accountsPermission !== "edit") return jsonResponse({ message:"لا تملك صلاحية تعديل المدفوعات." },403);
+  if (!["list","listDailyAccounts","updatePaidAmount"].includes(action) && access.permission !== "edit") return jsonResponse({ message:"صلاحية العرض فقط؛ لا يمكنك تعديل الحجوزات." },403);
 
   try {
     switch (action) {
+      case "listDailyAccounts": {
+        const date = typeof data.date === "string" ? data.date : "";
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
+        const bookings = await listBookings(serviceAccount.project_id, accessToken);
+        const daily = bookings.filter(b => String(b.appointmentDate || "").slice(0,10) === date && (b.status !== "pending" || Number(b.paidAmount) > 0)).map(b => { const otherOwner = access.accountType === "staff" && !!b.paymentEnteredByUid && b.paymentEnteredByUid !== access.uid; return { id:b.id, patientName:b.patientName, appointmentDate:b.appointmentDate, service:b.service, servicePrice:b.servicePrice, paidAmount:otherOwner ? "0" : (b.paidAmount || "0"), status:b.status, paymentEnteredByUid:b.paymentEnteredByUid, paymentEnteredByName:b.paymentEnteredByName, paymentReadOnly:otherOwner, paymentAttributedToCurrentUser:access.accountType === "doctor" || b.paymentEnteredByUid === access.uid, paymentUnassigned:!b.paymentEnteredByUid && Number(b.paidAmount)>0 }; });
+        return jsonResponse({ bookings:daily, date });
+      }
+      case "updatePaidAmount": {
+        const bookingId = String(data.id || ""), paidAmount = String(data.paidAmount ?? "");
+        if (!/^[A-Za-z0-9_-]{1,150}$/.test(bookingId) || !/^\d{1,8}(\.\d{1,2})?$/.test(paidAmount) || Number(paidAmount) < 0) return jsonResponse({ message:"أدخل مبلغًا مدفوعًا صحيحًا." },400);
+        const currentDoc = await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(bookingId)}`);
+        const current = decodeBooking(currentDoc);
+        if (access.accountType === "staff" && current.paymentEnteredByUid && current.paymentEnteredByUid !== access.uid) return jsonResponse({message:"لا يمكنك تعديل مبلغ سجله موظف آخر."},403);
+        if (await isFinancialPeriodClosed(serviceAccount.project_id, accessToken, current.appointmentDate, current.paymentEnteredByUid || access.uid)) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف؛ لا يمكن تعديل المبلغ بعد الإقفال."},409);
+        const now = new Date().toISOString();
+        const patch = {fields:{
+          paidAmount:stringField(paidAmount),
+          paymentEnteredByUid:stringField(access.uid),
+          paymentEnteredByName:stringField(access.displayName || (access.accountType === "doctor" ? "الدكتور" : "الموظف")),
+          paymentUpdatedAt:stringField(now),
+          updatedAt:stringField(now)
+        }};
+        const updated = await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(bookingId)}?updateMask.fieldPaths=paidAmount&updateMask.fieldPaths=paymentEnteredByUid&updateMask.fieldPaths=paymentEnteredByName&updateMask.fieldPaths=paymentUpdatedAt&updateMask.fieldPaths=updatedAt`, {method:"PATCH",body:JSON.stringify(patch)});
+        const booking = decodeBooking(updated);
+        return jsonResponse({ booking:{ id:booking.id, paidAmount:booking.paidAmount, paymentEnteredByUid:booking.paymentEnteredByUid, paymentEnteredByName:booking.paymentEnteredByName } });
+      }
       case "list": {
         const bookings = await listBookings(
           serviceAccount.project_id,
@@ -617,6 +746,27 @@ export async function onRequest(context) {
           accountType: access.accountType,
           permission: access.permission
         });
+      }
+
+      case "archiveDay": {
+        const date = typeof data.date === "string" ? data.date : "";
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00`))) {
+          return jsonResponse({ message: "تاريخ الأرشفة غير صحيح." }, 400);
+        }
+        const all = await listBookings(serviceAccount.project_id, accessToken);
+        const targets = all.filter((booking) => booking.appointmentDate.slice(0, 10) === date && !["pending", "archived", "cancelled"].includes(booking.status));
+        let archivedCount = 0;
+        for (const booking of targets) {
+          await updateBooking(
+            serviceAccount.project_id,
+            accessToken,
+            { id: booking.id, status: "archived" },
+            access.accountType === "staff" ? access.uid : "",
+            access.accountType
+          );
+          archivedCount += 1;
+        }
+        return jsonResponse({ archivedCount, date });
       }
 
       case "create": {
@@ -634,10 +784,16 @@ export async function onRequest(context) {
       }
 
       case "update": {
+        if (access.accountType === "staff" && data.booking?.paidAmount !== undefined) {
+          return jsonResponse({ message: "تعديل المبلغ المقبوض يتم من قسم حسابات اليوم فقط حتى يُنسب الاستلام إلى الحساب الصحيح." }, 403);
+        }
         const booking = await updateBooking(
           serviceAccount.project_id,
           accessToken,
-          data.booking || {}
+          data.booking || {},
+          access.accountType === "staff" ? access.uid : "",
+          access.accountType,
+          access.displayName || ""
         );
 
         return jsonResponse({ booking });
@@ -647,7 +803,9 @@ export async function onRequest(context) {
         const booking = await cancelBooking(
           serviceAccount.project_id,
           accessToken,
-          { id: data.id }
+          { id: data.id },
+          access.accountType === "staff" ? access.uid : "",
+          access.accountType
         );
 
         return jsonResponse({ booking });

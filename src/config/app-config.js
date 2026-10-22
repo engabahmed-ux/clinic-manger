@@ -135,10 +135,12 @@ doctorImage: "./doctor.jpg",
     patientPhoneLabel: "رقم الهاتف",
     patientPhonePlaceholder: "01xxxxxxxxx",
     appointmentDateLabel: "التاريخ المفضل",
+    serviceLabel: "الخدمة المطلوبة",
+    servicePlaceholder: "اختاري الخدمة (اختياري)",
     submitButton: "إرسال طلب الحجز",
     disclaimer:
       "إرسال الطلب لا يعني تأكيد الموعد. يجب تأكيده من العيادة.",
-    successMessage: "تم تجهيز طلبك في هذه الواجهة التجريبية.",
+    successMessage: "تم استلام طلب الحجز، وسيتم التواصل معك لتأكيد الموعد.",
     errorMessage: "يرجى التأكد من إدخال البيانات المطلوبة.",
     allowGuestBooking: true,
     requireDoctorApproval: true
@@ -153,15 +155,15 @@ doctorImage: "./doctor.jpg",
       "بعد إنشاء حسابك وتفعيله من العيادة، يمكنك تسجيل الدخول لمتابعة مواعيدك.",
     loginButton: "الدخول إلى بوابة المريض",
     loginTitle: "تسجيل دخول المريضة",
-    emailLabel: "البريد الإلكتروني",
-    emailPlaceholder: "name@example.com",
+    emailLabel: "اسم المستخدم أو البريد الإلكتروني",
+    emailPlaceholder: "اسم المستخدم أو name@example.com",
     passwordLabel: "كلمة المرور",
     passwordPlaceholder: "أدخلي كلمة المرور",
     loginSubmitButton: "تسجيل الدخول",
     forgotPasswordText: "نسيتِ كلمة المرور؟",
     logoutButton: "تسجيل الخروج",
     demoMessage:
-      "بوابة المريض في هذه النسخة واجهة فقط، ولم يتم ربط تسجيل الدخول بـ Firebase بعد."
+      "سجّلي الدخول باسم المستخدم أو البريد الإلكتروني وكلمة المرور التي استلمتيها من العيادة لمتابعة مواعيدك."
   },
 
   contact: {

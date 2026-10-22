@@ -13,13 +13,7 @@
 <body>
   <main class="staff-shell">
     <header class="staff-header">
-      <a class="staff-brand" href="./index.html">
-        <span class="staff-brand-mark" aria-hidden="true">ط</span>
-        <span>
-          <strong>إدارة العيادة</strong>
-          <small>مساحة عمل الموظف</small>
-        </span>
-      </a>
+      
 
       <button
         id="staffLogoutButton"
@@ -58,48 +52,53 @@
 
     <section id="staffDashboard" hidden>
       <div class="staff-welcome">
-        <div>
-          <p class="staff-eyebrow">مساحة العمل الخاصة</p>
-          <h1>أهلًا بك <span id="staffDisplayName">في لوحة الموظف</span></h1>
-          <p>
-            الأقسام التالية مبنية على الصلاحيات التي حددها الدكتور لحسابك.
-          </p>
-        </div>
-
-        <span class="staff-role">موظف العيادة</span>
+        <h1 class="staff-compact-welcome">أهلًا بك يا <span id="staffDisplayName">...</span></h1>
       </div>
-
-      <div class="staff-notice" role="status">
-        <strong>ملاحظة</strong>
-        <p>
-          هذه المرحلة تعرض الصلاحيات فقط. عمليات عرض وتعديل بيانات المرضى
-          والحجوزات لن تتاح حتى اكتمال ربطها بخدمات آمنة على الخادم.
-        </p>
-      </div>
-
-      <section class="staff-section">
-        <div class="staff-section-heading">
-          <h2>الأقسام المسموح بها</h2>
-          <p>الأقسام التي لا تملك صلاحية الوصول إليها لن تظهر هنا.</p>
-        </div>
-
-        <div id="staffPermissionsGrid" class="staff-permissions-grid"></div>
-
-        <p id="staffNoPermissions" class="staff-empty" hidden>
-          لم يمنحك الدكتور صلاحية الوصول إلى أي قسم حتى الآن.
-          تواصل معه إذا كنت تحتاج إلى صلاحية إضافية.
-        </p>
+      <nav id="staffTabs" class="staff-tabs" aria-label="أقسام العمل"></nav>
+      <section id="staffHomeSection" class="staff-section staff-tab-panel">
+        <div class="staff-section-heading staff-schedule-heading"><h2>جدول المواعيد <button id="staffScheduleDateLabel" class="staff-schedule-date" type="button" aria-label="اضغط لتغيير تاريخ المواعيد"></button><button id="staffOpenFilter" class="staff-filter-button" type="button" aria-label="فلترة جدول المواعيد" title="فلترة جدول المواعيد">☷</button></h2><div class="staff-home-actions"><button id="staffHomeAddBooking" class="staff-primary staff-compact-add" type="button">＋ إضافة حجز</button></div></div><input id="staffHomeDateFilter" type="date" class="staff-hidden-filter" aria-hidden="true" tabindex="-1"><input id="staffHomeSearch" type="search" class="staff-hidden-filter" aria-hidden="true" tabindex="-1">
+        <div class="schedule-status-legend staff-status-legend" id="staffStatusLegend" aria-label="فلترة حسب حالة الحجز"><button type="button" data-status-filter="all" class="is-active">✓ الكل</button><button type="button" data-status-filter="waiting">✓ في الانتظار</button><button type="button" data-status-filter="completed">✓ تم الكشف</button><button type="button" data-status-filter="postponed">✓ مؤجل</button><button type="button" data-status-filter="no_show">✓ لم يأتِ</button><button type="button" data-status-filter="apologized">✓ اعتذر</button></div>
+        <p id="dailyAppointmentsMessage" class="staff-message" hidden></p>
+        <div id="dailyAppointmentsList" class="staff-bookings-list" aria-live="polite"></div><div class="schedule-bulk-actions staff-bulk-actions"><button id="staffArchiveSelectedAppointments" class="staff-secondary archive-day-button" type="button">أرشفة مواعيد اليوم</button></div>
+        
       </section>
-
-      <p id="staffDashboardMessage" class="staff-message" hidden></p>
+      
+      <section id="staffArchiveSection" class="staff-section staff-tab-panel" hidden><div class="staff-section-heading"><h2>أرشيف الحجوزات</h2></div><div class="staff-booking-filters"><label>بحث بالاسم أو الهاتف أو الخدمة<input id="staffArchiveSearch" type="search" placeholder="ابحث في الأرشيف"></label><label>تصفية بتاريخ الموعد<input id="staffArchiveDateFilter" type="date"></label></div><div id="staffArchiveList" class="staff-bookings-list" aria-live="polite"></div></section>
+      <section id="staffBookingsSection" class="staff-section staff-tab-panel" hidden>
+        <div class="staff-section-heading staff-bookings-heading"><h2>إدارة الحجوزات</h2><div class="staff-bookings-toolbar">
+          <button id="addBookingToggle" class="staff-primary staff-add-button" type="button" hidden><span aria-hidden="true">＋</span> إضافة حجز جديد</button>
+          
+        </div></div>
+        <form id="staffCreateBookingForm" class="staff-booking-create-form" hidden>
+          <h3>إضافة حجز جديد</h3><div class="staff-form-grid">
+            <label>اسم المريضة<input id="staffNewBookingPatientName" name="patientName" type="text" maxlength="120" autocomplete="off" required></label><input id="staffNewBookingPatientId" type="hidden" name="patientId"><input id="staffNewBookingLegacyBookingId" type="hidden" name="legacyBookingId"><div id="staffNewBookingPatientSuggestions" class="patient-suggestions" hidden></div>
+            <label>رقم الهاتف<input name="patientPhone" type="tel" maxlength="40" required></label>
+            <label>الموعد المطلوب<input name="appointmentDate" type="date" required></label>
+            <label>نوع الحجز أو الخدمة<input name="service" type="text" maxlength="120" placeholder="اكتب الخدمة يدويًا"><select class="service-quick-select" aria-label="اختيار خدمة جاهزة"><option value="">أو اختر خدمة جاهزة</option><option value="كشف">كشف</option><option value="استشارة">استشارة</option><option value="متابعة">متابعة</option><option value="سونار">سونار</option><option value="إعادة كشف">إعادة كشف</option><option value="خدمة أخرى">خدمة أخرى</option></select></label>
+            <label>قيمة الكشف أو الاستشارة (جنيه)<input name="servicePrice" type="number" min="0" max="99999999" step="0.01" inputmode="decimal" placeholder="مثال: 300"></label><label>ضغط الدم (اختياري)<input name="bloodPressure" maxlength="40" placeholder="مثال: 120/80"></label><label>الوزن بالكيلو (اختياري)<input name="weight" type="number" min="0" max="500" step="0.1"></label><label>قياس السكر (اختياري)<input name="bloodSugar" maxlength="40" placeholder="القيمة والوحدة"></label><label class="staff-form-wide">ملاحظات الموظف قبل الكشف<textarea name="preVisitNotes" maxlength="1000" rows="2"></textarea></label>
+            
+            <label class="staff-form-wide">ملاحظات<input name="notes" type="text" maxlength="2000"></label>
+          </div><p id="staffCreateBookingMessage" class="staff-message" hidden></p>
+          <div class="staff-booking-actions"><button class="staff-primary" type="submit">إضافة الحجز</button><button id="cancelAddBooking" class="staff-secondary" type="button">إلغاء</button></div>
+        </form>
+        <button id="staffOpenBookingRequests" class="staff-request-toggle" type="button" aria-expanded="false">طلبات الحجوزات <span id="staffPendingBookingBadge" class="booking-notification-badge" aria-live="polite" hidden></span><span aria-hidden="true">⌄</span></button><div id="staffBookingRequestsPanel" hidden><div class="staff-booking-filters"><label>تصفية بتاريخ الموعد<input id="staffBookingDateFilter" type="date"></label></div>
+        <p id="staffBookingsMessage" class="staff-message" hidden></p><div id="staffPendingBookingsList" class="staff-bookings-list" aria-live="polite"></div></div>
+    
+          <section id="staffBookingDetail" class="staff-booking-detail" hidden><div class="staff-section-heading"><h3>تفاصيل طلب الحجز</h3><button id="closeStaffBookingDetail" class="staff-secondary" type="button">العودة للطلبات</button></div><div id="staffBookingDetailContent"></div></section>
+      </section>
+      <section id="staffPatientsSection" class="staff-section staff-tab-panel" hidden><div class="staff-section-heading"><h2>حسابات المريضات</h2></div><div id="staffPatientTools"></div><p id="staffPatientMessage" class="staff-message" hidden></p></section>
+      <section id="staffAccountsSection" class="staff-section staff-tab-panel" hidden><div class="staff-section-heading"><h2>حسابات اليوم</h2><label class="staff-accounts-date-label">التاريخ<input id="staffAccountsDate" type="date"></label></div><p id="staffAccountsMessage" class="staff-message" hidden></p><div class="staff-accounts-summary"><div><span>إجمالي المقبوضات</span><strong id="staffAccountsPaidTotal">0 ج.م</strong></div><div><span>إجمالي المصروفات</span><strong id="staffAccountsExpenseTotal">0 ج.م</strong></div><div><span>صافي اليوم</span><strong id="staffAccountsNetTotal">0 ج.م</strong></div></div><h3>حجوزات المرضى والمدفوعات</h3><div id="staffAccountsBookings" class="staff-accounts-bookings"></div><section id="staffExpenseEntrySection" class="staff-expense-section" hidden><h3>إضافة مصروف</h3><form id="staffExpenseForm" class="staff-expense-form"><label>المبلغ (جنيه)<input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label><label>اتصرف في إيه؟<input name="description" type="text" maxlength="160" required></label><label>ملاحظات (اختياري)<input name="notes" type="text" maxlength="500"></label><button class="staff-primary" type="submit">تسجيل المصروف</button></form></section><h3>مصروفات اليوم</h3><div id="staffExpensesList" class="staff-expenses-list"></div><section class="staff-monthly-expenses"><div class="staff-section-heading"><h3>مصروفات الشهر</h3><label class="staff-accounts-date-label">الشهر<input id="staffAccountsMonth" type="month"></label></div><div id="staffMonthlyExpensesList" class="staff-expenses-list"></div></section></section><section id="staffRecordsSection" class="staff-section staff-tab-panel" hidden><div class="staff-section-heading"><h2>السجلات الطبية</h2></div><label class="medical-search-label" for="staffMedicalPatientSearch">ابحث بالاسم أو رقم الملف أو الهاتف</label><input id="staffMedicalPatientSearch" type="search" autocomplete="off" placeholder="اكتب اسم المريض أو رقم هاتفه"><div id="staffMedicalPatientResults" class="medical-patient-results" aria-live="polite"></div><section id="staffMedicalPatientProfile" class="medical-patient-profile" hidden><div id="staffMedicalPatientSummary"></div><h3>سجل الزيارات السابقة</h3><div id="staffMedicalVisitHistory" class="medical-visit-history"></div><form id="staffMedicalVisitForm" class="medical-visit-form" novalidate><h3>تسجيل أو تحديث تفاصيل الكشف</h3><label>الحجز المرتبط بالكشف<select id="staffMedicalVisitBooking" required><option value="">اختر حجزًا للمريض</option></select></label><label>تاريخ الكشف<input id="staffMedicalVisitDate" type="date" required></label><div class="medical-vitals-grid"><label>ضغط الدم<input id="staffMedicalVisitBloodPressure" maxlength="40" placeholder="مثال: 120/80"></label><label>الوزن (كجم)<input id="staffMedicalVisitWeight" type="number" min="0" max="500" step="0.1"></label><label>قياس السكر<input id="staffMedicalVisitBloodSugar" maxlength="40" placeholder="القيمة والوحدة"></label></div><label>ملاحظات الموظف قبل الكشف<textarea id="staffMedicalVisitPreNotes" rows="2" maxlength="1000"></textarea></label><label>التشخيص<input id="staffMedicalVisitDiagnosis" maxlength="1000"></label><label>ملاحظات الدكتور أثناء الكشف<textarea id="staffMedicalVisitClinicalNotes" rows="3" maxlength="4000"></textarea></label><label>العلاج والتوصيات<textarea id="staffMedicalVisitTreatment" rows="3" maxlength="4000"></textarea></label><label>موعد المتابعة أو تعليماتها<input id="staffMedicalVisitFollowUp" maxlength="1000"></label><p id="staffMedicalVisitMessage" class="staff-message" role="status" hidden></p><button class="staff-primary" type="submit">حفظ الكشف في السجل الطبي</button></form></section></section>
+      <section id="staffSettingsSection" class="staff-section staff-tab-panel" hidden><div class="staff-section-heading"><h2>إعدادات العيادة</h2></div><p class="staff-empty">لا توجد أدوات متاحة لهذا القسم حاليًا.</p></section>
+      <p id="staffNoPermissions" class="staff-empty" hidden>لا توجد أقسام متاحة لحسابك.</p><p id="staffDashboardMessage" class="staff-message" hidden></p>
     </section>
 
-    <footer class="staff-footer">
+    <dialog id="staffScheduleFilterDialog" class="staff-filter-dialog"><form method="dialog" id="staffScheduleFilterForm"><div class="staff-section-heading"><h3>فلترة جدول المواعيد</h3><button class="staff-filter-close" value="cancel" aria-label="إغلاق" type="submit">×</button></div><label>عايز تدور على إيه؟<select id="staffFilterMode"><option value="date">مواعيد يوم معين</option><option value="search">الاسم أو الهاتف أو الخدمة</option></select></label><label id="staffFilterDateLabel">تاريخ المواعيد<input id="staffFilterDate" type="date"></label><label id="staffFilterQueryLabel" hidden>كلمة البحث<input id="staffFilterQuery" type="search" placeholder="اكتب الاسم أو الهاتف أو الخدمة"></label><div class="staff-booking-actions"><button id="staffFilterApply" class="staff-primary" type="button">عرض النتائج</button><button class="staff-secondary" value="cancel" type="submit">إلغاء</button></div></form></dialog>
+      <footer class="staff-footer">
       <a href="./index.html">العودة إلى الموقع العام</a>
-      <span>إدارة العيادة</span>
     </footer>
   </main>
 
   <script type="module" src="./src/staff.js"></script>
+  <dialog id="staffQueueDialog" class="queue-number-dialog" aria-labelledby="staffQueueDialogTitle"><div class="queue-number-dialog-content"><h2 id="staffQueueDialogTitle">تمت إضافة الحجز</h2><p>رقم الدور</p><strong id="staffQueueNumber">—</strong><button id="staffQueueDialogDone" class="staff-primary" type="button">تم</button></div></dialog>
 </body>
 </html>

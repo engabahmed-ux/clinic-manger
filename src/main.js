@@ -311,8 +311,28 @@ function renderBooking() {
       config.booking?.patientPhonePlaceholder ?? "";
   }
 
+  const serviceSelect = $("#bookingService");
+
+  if (serviceSelect) {
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent =
+      config.booking?.servicePlaceholder ?? "اختاري الخدمة (اختياري)";
+
+    serviceSelect.replaceChildren(placeholder);
+
+    for (const service of config.services?.items ?? []) {
+      if (service.enabled === false) continue;
+
+      const option = document.createElement("option");
+      option.value = String(service.title ?? "").trim();
+      option.textContent = String(service.title ?? "").trim();
+      if (option.value) serviceSelect.append(option);
+    }
+  }
+
   if (form) {
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
       const message = $("#bookingMessage");
@@ -342,10 +362,68 @@ function renderBooking() {
         return;
       }
 
-      message.textContent =
-        "هذه واجهة تجريبية فقط. لم يتم إرسال أو حفظ طلب الحجز. يجب ربط النموذج بخدمة آمنة قبل استخدامه فعليًا.";
+      const submitButton = form.querySelector('button[type="submit"]');
+      const service = String(formData.get("service") ?? "").trim();
+      const notes = String(formData.get("notes") ?? "").trim();
 
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.setAttribute("aria-busy", "true");
+      }
+
+      message.textContent = "جارٍ إرسال طلب الحجز...";
       message.className = "form-message";
+
+      try {
+        const response = await fetch("/api/public/bookings", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({
+            patientName: name,
+            patientPhone,
+            appointmentDate: date,
+            service,
+            notes
+          }),
+          cache: "no-store"
+        });
+
+        let result = {};
+        try {
+          result = await response.json();
+        } catch {
+          result = {};
+        }
+
+        if (!response.ok || result.success !== true) {
+          throw new Error(
+            result.message ||
+            "تعذر إرسال طلب الحجز. حاولي مرة أخرى لاحقًا."
+          );
+        }
+
+        message.textContent =
+          result.message ||
+          config.booking?.successMessage ||
+          "تم استلام طلب الحجز، وسيتم التواصل معك لتأكيد الموعد.";
+        message.className = "form-message";
+        form.reset();
+        setupDateInput();
+      } catch (error) {
+        console.error("تعذر إرسال طلب الحجز:", error);
+        message.textContent =
+          error.message ||
+          "تعذر الاتصال بخدمة الحجز. تحققي من الإنترنت وحاولي مرة أخرى.";
+        message.className = "form-message error";
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.removeAttribute("aria-busy");
+        }
+      }
     });
   }
 }
@@ -369,6 +447,10 @@ function renderPatientPortal() {
   const loginButton = loginForm?.querySelector(
     'button[type="submit"]'
   );
+  const patientAppointmentsPanel = $("#patientAppointmentsPanel");
+  const patientAppointmentsList = $("#patientAppointmentsList");
+  const patientAppointmentsMessage = $("#patientAppointmentsMessage");
+  const refreshPatientAppointmentsButton = $("#refreshPatientAppointmentsButton");
 
   if (emailInput) {
     emailInput.placeholder =
@@ -480,17 +562,101 @@ function renderPatientPortal() {
     return result;
   }
 
+  function renderPatientAppointments(appointments) {
+    if (!patientAppointmentsList) return;
+    patientAppointmentsList.replaceChildren();
+
+    if (!Array.isArray(appointments) || appointments.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "form-message";
+      empty.textContent = "لا توجد مواعيد مرتبطة بحسابك حتى الآن.";
+      patientAppointmentsList.append(empty);
+      return;
+    }
+
+    const labels = {
+      pending: "قيد المراجعة",
+      confirmed: "تم تأكيد الموعد",
+      completed: "مكتمل",
+      cancelled: "ملغي"
+    };
+
+    for (const appointment of appointments) {
+      const card = document.createElement("article");
+      card.className = "patient-appointment-card";
+      const date = document.createElement("h4");
+      date.textContent = appointment.appointmentDate || "تاريخ الموعد غير محدد";
+      const service = document.createElement("p");
+      service.textContent = appointment.service || "الخدمة: لم تُحدد";
+      const status = document.createElement("span");
+      status.className = "patient-appointment-status";
+      status.textContent = labels[appointment.status] || "قيد المراجعة";
+      card.append(date, service, status);
+      patientAppointmentsList.append(card);
+    }
+  }
+
+  async function loadPatientAppointments(user) {
+    if (refreshPatientAppointmentsButton) {
+      refreshPatientAppointmentsButton.disabled = true;
+      refreshPatientAppointmentsButton.textContent = "جارٍ التحديث...";
+    }
+    if (patientAppointmentsMessage) {
+      patientAppointmentsMessage.textContent = "";
+      patientAppointmentsMessage.className = "form-message";
+    }
+
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/patient/portal", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+          "Accept": "application/json"
+        },
+        cache: "no-store"
+      });
+      let result = {};
+      try { result = await response.json(); } catch {}
+
+      if (!response.ok) {
+        throw new Error(result.message || "تعذر تحميل مواعيدك.");
+      }
+
+      renderPatientAppointments(result.appointments || []);
+      if (patientAppointmentsMessage && result.message) {
+        patientAppointmentsMessage.textContent = result.message;
+      }
+    } catch (error) {
+      console.error("Patient appointments load failed:", error);
+      if (patientAppointmentsMessage) {
+        patientAppointmentsMessage.textContent =
+          error.message || "تعذر تحميل مواعيدك. حاولي مرة أخرى.";
+        patientAppointmentsMessage.className = "form-message error";
+      }
+    } finally {
+      if (refreshPatientAppointmentsButton) {
+        refreshPatientAppointmentsButton.disabled = false;
+        refreshPatientAppointmentsButton.textContent = "تحديث المواعيد";
+      }
+    }
+  }
+
+  refreshPatientAppointmentsButton?.addEventListener("click", () => {
+    if (auth.currentUser) loadPatientAppointments(auth.currentUser);
+  });
+
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     if (loginButton.disabled) return;
 
-    const email = emailInput?.value.trim() ?? "";
+    const identifier = emailInput?.value.trim() ?? "";
     const password = passwordInput?.value ?? "";
 
-    if (!email || !password) {
+    if (!identifier || !password) {
       showLoginMessage(
-        "أدخل البريد الإلكتروني وكلمة المرور."
+        "أدخل اسم المستخدم أو البريد الإلكتروني وكلمة المرور."
       );
 
       return;
@@ -502,9 +668,34 @@ function renderPatientPortal() {
     let user;
 
     try {
+      let loginEmail = identifier;
+
+      if (!identifier.includes("@")) {
+        const resolveResponse = await fetch("/api/auth/resolve-login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+          },
+          body: JSON.stringify({ username: identifier, password }),
+          cache: "no-store"
+        });
+
+        let resolveResult = {};
+        try {
+          resolveResult = await resolveResponse.json();
+        } catch {}
+
+        if (!resolveResponse.ok || resolveResult.success !== true || !resolveResult.email) {
+          throw new Error(resolveResult.message || "اسم المستخدم أو كلمة المرور غير صحيحة.");
+        }
+
+        loginEmail = resolveResult.email;
+      }
+
       const credential = await signInWithEmailAndPassword(
         auth,
-        email,
+        loginEmail,
         password
       );
 
@@ -553,17 +744,13 @@ function renderPatientPortal() {
       return;
     }
 
-    showLoginMessage(
-      "تم تسجيل الدخول بنجاح. بوابة المريضة ستظل كما هي، وسيتم تفعيل عرض المواعيد والبيانات عند اكتمال ربطها الآمن.",
-      false
-    );
+    showLoginMessage("تم تسجيل الدخول بنجاح.", false);
 
-    if (emailInput) emailInput.disabled = true;
-    if (passwordInput) passwordInput.disabled = true;
-
-    loginButton.hidden = true;
+    if (loginForm) loginForm.hidden = true;
+    if (patientAppointmentsPanel) patientAppointmentsPanel.hidden = false;
     logoutButton.hidden = false;
     setLoginBusy(false);
+    await loadPatientAppointments(user);
   });
 
   logoutButton.addEventListener("click", async () => {
@@ -572,6 +759,8 @@ function renderPatientPortal() {
     try {
       await signOut(auth);
 
+      if (loginForm) loginForm.hidden = false;
+      if (patientAppointmentsPanel) patientAppointmentsPanel.hidden = true;
       if (emailInput) emailInput.disabled = false;
       if (passwordInput) passwordInput.disabled = false;
 
