@@ -607,14 +607,14 @@ export async function onRequest(context) {
     switch (action) {
       case "listDailyAccounts": {
         const date = typeof data.date === "string" ? data.date : "";
-        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
         const bookings = await listBookings(serviceAccount.project_id, accessToken);
         const daily = bookings.filter(b => String(b.appointmentDate || "").slice(0,10) === date && !["pending","archived","cancelled"].includes(b.status)).map(b => ({ id:b.id, patientName:b.patientName, appointmentDate:b.appointmentDate, service:b.service, servicePrice:b.servicePrice, paidAmount:b.paidAmount || "0", status:b.status }));
         return jsonResponse({ bookings:daily, date });
       }
       case "updatePaidAmount": {
         const bookingId = String(data.id || ""), paidAmount = String(data.paidAmount ?? "");
-        if (!/^[A-Za-z0-9_-]{1,150}$/.test(bookingId) || !/^\\d{1,8}(\\.\\d{1,2})?$/.test(paidAmount) || Number(paidAmount) < 0) return jsonResponse({ message:"أدخل مبلغًا مدفوعًا صحيحًا." },400);
+        if (!/^[A-Za-z0-9_-]{1,150}$/.test(bookingId) || !/^\d{1,8}(\\.\d{1,2})?$/.test(paidAmount) || Number(paidAmount) < 0) return jsonResponse({ message:"أدخل مبلغًا مدفوعًا صحيحًا." },400);
         const booking = await updateBooking(serviceAccount.project_id, accessToken, { id:bookingId, paidAmount });
         return jsonResponse({ booking:{ id:booking.id, paidAmount:booking.paidAmount } });
       }
