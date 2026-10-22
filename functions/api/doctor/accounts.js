@@ -49,10 +49,16 @@ async function verifyDoctor(request, env) {
   if (!response.ok) return { error: "جلسة الدخول غير صالحة.", status: 401 };
   const result = await response.json(), user = result.users?.[0];
   if (!user?.localId) return { error: "تعذر التحقق من الحساب.", status: 401 };
-  if (user.localId !== DOCTOR_ADMIN_UID) return { error: "قسم الحسابات متاح للدكتور فقط.", status: 403 };
   const account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
   if (account.project_id !== EXPECTED_PROJECT_ID || !account.client_email || !account.private_key) return { error: "إعدادات الحسابات غير صحيحة.", status: 503 };
-  return { account, token: await accessToken(account) };
+  const token = await accessToken(account);
+  if (user.localId === DOCTOR_ADMIN_UID) return { account, token, accountType:"doctor", permission:"edit" };
+  let staffDoc;
+  try { staffDoc = await fsRequest(account.project_id, token, "/clinicStaff/" + encodeURIComponent(user.localId)); }
+  catch { return { error:"الحساب غير مصرح له بحسابات اليوم.", status:403 }; }
+  const fields = staffDoc?.fields || {}, permission = fields.permissions?.mapValue?.fields?.accounts?.stringValue || "none";
+  if (fields.active?.booleanValue !== true || fields.role?.stringValue !== "staff" || !["view","edit"].includes(permission)) return { error:"لم يمنحك الدكتور صلاحية الوصول إلى حسابات اليوم.", status:403 };
+  return { account, token, accountType:"staff", permission };
 }
 function fsUrl(projectId, path = "") {
   return "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(projectId) + "/databases/(default)/documents" + path;
@@ -100,7 +106,23 @@ export async function onRequestPost({ request, env }) {
   catch (error) { console.error("Accounts authorization error:", error); return jsonResponse({ message: "تعذر التحقق من صلاحية الدكتور." }, 503); }
   if (verified.error) return jsonResponse({ message: verified.error }, verified.status);
   const projectId = verified.account.project_id, token = verified.token;
+  if (["list","createCategory","createEntry"].includes(data.action) && verified.accountType !== "doctor") return jsonResponse({ message:"هذه الوظيفة متاحة للدكتور فقط." },403);
+  if (data.action === "createDailyExpense" && verified.permission !== "edit") return jsonResponse({ message:"لا تملك صلاحية تسجيل المصروفات." },403);
   try {
+    if (data.action === "listDailyExpenses") {
+      const date = String(data.date || "");
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
+      const records = await listRecords(projectId, token);
+      const expenses = records.filter(x => x.type === "dailyExpense" && x.date === date).map(x => ({ id:x.id, description:x.personName, amount:x.amount, date:x.date, notes:x.notes, createdAt:x.createdAt }));
+      return jsonResponse({ expenses, date });
+    }
+    if (data.action === "createDailyExpense") {
+      const entry = data.entry || {}, description = String(entry.description || "").trim(), date = String(entry.date || ""), notes = String(entry.notes || "").trim(), amount = String(entry.amount ?? "");
+      if (!cleanString(description,160) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00")) || !/^\\d{1,8}(\\.\\d{1,2})?$/.test(amount) || Number(amount) <= 0 || notes.length > 500) return jsonResponse({ message:"راجع وصف المصروف والمبلغ والتاريخ." },400);
+      const now = new Date().toISOString();
+      const result = await fsRequest(projectId, token, "/" + COLLECTION, { method:"POST", body:JSON.stringify(encode({ type:"dailyExpense", personName:description, amount, date, notes, createdAt:now, updatedAt:now })) });
+      return jsonResponse({ expense:decode(result) },201);
+    }
     if (data.action === "list") {
       const records = await listRecords(projectId, token);
       return jsonResponse({ categories: records.filter(x => x.type === "category"), entries: records.filter(x => x.type === "entry") });
