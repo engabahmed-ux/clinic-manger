@@ -565,7 +565,7 @@ a {
 
 /* تبويبات عملية للموظف */
 .staff-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px;padding:8px;border:1px solid var(--staff-border);border-radius:16px;background:#fff}
-.staff-tab{min-height:44px;padding:10px 16px;border:1px solid transparent;border-radius:11px;background:transparent;color:var(--staff-text);font-weight:700}
+.staff-tab{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:10px 16px;border:1px solid transparent;border-radius:11px;background:transparent;color:var(--staff-text);font-weight:700}.staff-tab .booking-notification-badge:not([hidden]){flex:0 0 auto;margin-inline-start:2px;display:inline-flex!important;visibility:visible!important}
 .staff-tab[aria-selected="true"]{background:var(--staff-green);color:var(--staff-dark)}
 .staff-section-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
 .staff-section-heading h2,.staff-section-heading h3{margin:0}
