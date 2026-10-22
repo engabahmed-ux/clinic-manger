@@ -585,3 +585,6 @@ a {
 .staff-appointment-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;padding:15px 17px;border:1px solid var(--staff-border);border-radius:14px;background:#fff}
 .staff-appointment-card h3{margin:0;font-size:15px}.staff-appointment-card p{margin:4px 0 0;color:var(--staff-muted);font-size:12px}.staff-appointment-time{padding:6px 10px;border-radius:9px;background:#e8f0e2;color:#36552d;font-size:12px;font-weight:800}
 @media(max-width:640px){.staff-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.staff-tab{padding-inline:8px}.staff-booking-filters,.staff-form-grid,.staff-booking-detail .staff-booking-edit{grid-template-columns:1fr}.staff-form-wide{grid-column:auto}.staff-bookings-toolbar,.staff-bookings-toolbar button,.staff-booking-actions button{width:100%}.staff-request-card{align-items:flex-start}}
+
+/* حالات المواعيد والأرشيف */
+.staff-status-select{width:100%;min-height:42px;padding:8px 10px;border:1px solid var(--color-border);border-radius:10px;background:#fff;color:var(--color-dark);font:inherit;font-weight:700}.staff-archive-section{margin-top:28px;padding-top:20px;border-top:1px solid var(--color-border)}
