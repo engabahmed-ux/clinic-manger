@@ -1,5 +1,6 @@
 
 import { FIREBASE_CONFIG } from "./config/firebase-config.js";
+import { APP_CONFIG } from "./config/app-config.js";
 
 import {
   initializeApp,
@@ -149,7 +150,7 @@ function showDashboard(user) {
   const brandPanel = $(".brand-panel"); if (brandPanel) brandPanel.hidden = true;
 
   if (doctorAccountLabel) {
-    doctorAccountLabel.textContent = user.displayName || (user.email ? user.email.split("@")[0] : "يا دكتور");
+    doctorAccountLabel.textContent = user.displayName || APP_CONFIG.clinic.doctorName || (user.email ? user.email.split("@")[0] : "الدكتور");
   }
 
   showEmployeeSection(false);
