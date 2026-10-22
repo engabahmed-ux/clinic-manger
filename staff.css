@@ -628,3 +628,5 @@ a {
  .staff-status-select{width:100%!important;max-width:100%}
  .staff-bulk-actions .archive-day-button{max-width:none}
 }
+.staff-form-grid .service-quick-select,.staff-booking-create-form .service-quick-select{width:100%;min-width:0;min-height:40px;padding:8px 10px;border:1px solid var(--staff-border);border-radius:10px;background:#fff;color:var(--staff-text);font:inherit;font-size:13px}
+#staffArchiveSection,#staffArchiveList{width:100%;max-width:100%;min-width:0}
