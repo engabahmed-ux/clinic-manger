@@ -742,7 +742,7 @@ function renderEmployeeCard(employee) {
   saveButton.type = "button";
   saveButton.className = "primary-button save-permissions-button";
   saveButton.dataset.action = "save-permissions";
-  saveButton.textContent = "حفظ الصلاحيات";
+  saveButton.textContent = "حفظ الصلاحيات والإعدادات";
 
   card.append(header, permissionsContainer, saveButton);
 
@@ -1192,7 +1192,7 @@ if (employeeList) {
       );
     } finally {
       button.disabled = false;
-      button.textContent = "حفظ الصلاحيات";
+      button.textContent = "حفظ الصلاحيات والإعدادات";
     }
   });
 }
