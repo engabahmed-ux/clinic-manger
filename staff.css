@@ -599,3 +599,32 @@ a {
 
 /* واجهة موظف مختصرة وأرشفة اليوم */
 .staff-header{min-height:54px;justify-content:flex-start;border:0}.staff-header .staff-logout{margin-inline-start:auto;min-height:34px;padding:6px 11px;font-size:12px}.staff-welcome{margin-top:8px;padding:8px 0;border:0;border-radius:0;background:transparent;justify-content:flex-start;min-height:0}.staff-welcome>div{margin-inline-end:auto}.staff-compact-welcome{margin:0!important;font-size:15px!important;font-weight:700!important}.staff-bulk-actions{justify-content:flex-start!important;padding:10px 0!important;border:0!important}.archive-day-button{width:100%;max-width:260px;color:#8f3333!important;background:#fff5f5!important;border-color:#e8c4c4!important}@media(max-width:640px){.staff-compact-welcome{font-size:14px!important}.staff-header{min-height:48px}}
+
+/* تحسينات عرض الموبايل */
+.staff-welcome{width:100%;min-width:0;justify-content:flex-start;direction:rtl}
+.staff-welcome>div{width:100%;margin-inline:0;text-align:right}
+.staff-compact-welcome{display:block;width:100%;text-align:right;white-space:normal;overflow-wrap:anywhere}
+.staff-tabs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;min-width:0;gap:7px;padding:7px}
+.staff-tab{min-width:0;width:100%;padding:9px 6px;font-size:13px;line-height:1.45;overflow-wrap:anywhere}
+.staff-section,.staff-tab-panel,.staff-bookings-list,.staff-appointment-card{min-width:0;max-width:100%}
+.staff-appointment-card{width:100%}
+.staff-request-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:58px;margin-top:16px;padding:14px 16px;border:1px solid var(--staff-border);border-radius:14px;background:#fff;color:var(--staff-dark);font:inherit;font-weight:800;text-align:right}
+.staff-request-toggle span{font-size:20px;transition:transform .2s ease}
+.staff-request-toggle.is-open span{transform:rotate(180deg)}
+.staff-schedule-date{display:inline-flex;align-items:center;margin-inline-start:8px;padding:3px 8px;border:0;border-radius:8px;background:#f0eee8;color:#68675f;font:inherit;font-size:12px;font-weight:700;vertical-align:middle;cursor:pointer}
+@media(max-width:640px){
+ .staff-shell{width:calc(100% - 20px)}
+ .staff-welcome{padding:8px 0!important;margin-top:8px!important}
+ .staff-compact-welcome{font-size:14px!important;line-height:1.5!important}
+ .staff-tabs{grid-template-columns:repeat(2,minmax(0,1fr))!important;margin-top:14px}
+ .staff-section{margin-top:22px}
+ .staff-section-heading{align-items:flex-start}
+ .staff-bookings-list{width:100%}
+ .staff-form-grid{grid-template-columns:1fr}
+ .staff-booking-create-form input,.staff-booking-create-form select,.staff-booking-create-form textarea,.staff-booking-filters input,.staff-booking-edit input,.staff-booking-edit select,.staff-patient-form input,.staff-filter-dialog input,.staff-filter-dialog select{font-size:16px!important}
+ .staff-booking-create-form{grid-template-columns:minmax(0,1fr);width:100%;padding:12px}
+ .staff-form-grid>*{min-width:0}
+ .staff-appointment-card .schedule-card-controls{width:100%}
+ .staff-status-select{width:100%!important;max-width:100%}
+ .staff-bulk-actions .archive-day-button{max-width:none}
+}
