@@ -551,7 +551,7 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
   return decodeBooking(result);
 }
 
-async function cancelBooking(projectId, accessToken, data, actorUid = "") {
+async function cancelBooking(projectId, accessToken, data, actorUid = "", actorAccountType = "doctor") {
   if (
     typeof data.id !== "string" ||
     !/^[A-Za-z0-9_-]{1,150}$/.test(data.id)
@@ -704,7 +704,8 @@ export async function onRequest(context) {
             serviceAccount.project_id,
             accessToken,
             { id: booking.id, status: "archived" },
-            access.accountType === "staff" ? access.uid : ""
+            access.accountType === "staff" ? access.uid : "",
+            access.accountType
           );
           archivedCount += 1;
         }
@@ -745,7 +746,8 @@ export async function onRequest(context) {
           serviceAccount.project_id,
           accessToken,
           { id: data.id },
-          access.accountType === "staff" ? access.uid : ""
+          access.accountType === "staff" ? access.uid : "",
+          access.accountType
         );
 
         return jsonResponse({ booking });
