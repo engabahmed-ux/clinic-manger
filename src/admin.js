@@ -1079,6 +1079,8 @@ async function handleBookingCardAction(event, container) {
       }
     } else return;
 
+    if (action === "archive-booking") showDoctorArchive();
+    await loadBookings();
     showMessage(
       container === dailyAppointmentsList ? dailyAppointmentsMessage : bookingListMessage,
       action === "cancel-booking" ? "تم إلغاء طلب الحجز."
@@ -1087,8 +1089,6 @@ async function handleBookingCardAction(event, container) {
         : "تم حفظ تعديلات الحجز.",
       "success"
     );
-    if (action === "archive-booking") showDoctorArchive();
-    await loadBookings();
   } catch (error) {
     console.error("تعذر تعديل الحجز:", error);
     showMessage(
