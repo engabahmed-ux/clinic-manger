@@ -461,7 +461,7 @@ async function createBooking(projectId, accessToken, data) {
   return decodeBooking(result);
 }
 
-async function updateBooking(projectId, accessToken, data) {
+async function updateBooking(projectId, accessToken, data, actorUid = "") {
   if (
     typeof data.id !== "string" ||
     !/^[A-Za-z0-9_-]{1,150}$/.test(data.id)
@@ -485,8 +485,21 @@ async function updateBooking(projectId, accessToken, data) {
   const existing = decodeBooking(current);
   const financialFields = ["appointmentDate","servicePrice","paidAmount","status"];
   if (financialFields.some(key => changes[key] !== undefined)) {
-    const dates = new Set([String(existing.appointmentDate || "").slice(0,10), String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0,10)].filter(Boolean));
-    for (const date of dates) if (await isFinancialPeriodClosed(projectId, accessToken, date, existing.paymentEnteredByUid)) throw new Error("لا يمكن تعديل التاريخ أو الحالة أو المبالغ لحجز داخل عهدة موظف تمت تصفيتها ماليًا.");
+    const dates = new Set([
+      String(existing.appointmentDate || "").slice(0,10),
+      String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0,10)
+    ].filter(Boolean));
+    const owners = new Set([
+      existing.paymentEnteredByUid || "",
+      actorUid || ""
+    ].filter(Boolean));
+    for (const date of dates) {
+      for (const ownerUid of owners) {
+        if (await isFinancialPeriodClosed(projectId, accessToken, date, ownerUid)) {
+          throw new Error("لا يمكن تعديل التاريخ أو الحالة أو المبالغ لحجز مرتبط بفترة مالية تمت تصفيتها.");
+        }
+      }
+    }
   }
 
   const booking = {
@@ -532,7 +545,7 @@ async function updateBooking(projectId, accessToken, data) {
   return decodeBooking(result);
 }
 
-async function cancelBooking(projectId, accessToken, data) {
+async function cancelBooking(projectId, accessToken, data, actorUid = "") {
   if (
     typeof data.id !== "string" ||
     !/^[A-Za-z0-9_-]{1,150}$/.test(data.id)
@@ -543,7 +556,7 @@ async function cancelBooking(projectId, accessToken, data) {
   return updateBooking(projectId, accessToken, {
     id: data.id,
     status: "cancelled"
-  });
+  }, actorUid);
 }
 
 export async function onRequest(context) {
@@ -705,7 +718,8 @@ export async function onRequest(context) {
         const booking = await updateBooking(
           serviceAccount.project_id,
           accessToken,
-          data.booking || {}
+          data.booking || {},
+          access.accountType === "staff" ? access.uid : ""
         );
 
         return jsonResponse({ booking });
@@ -715,7 +729,8 @@ export async function onRequest(context) {
         const booking = await cancelBooking(
           serviceAccount.project_id,
           accessToken,
-          { id: data.id }
+          { id: data.id },
+          access.accountType === "staff" ? access.uid : ""
         );
 
         return jsonResponse({ booking });
