@@ -931,3 +931,65 @@ a {
   .staff-request-status { align-self: flex-start; }
   .staff-request-edit { inset-inline-end: 8px; width: 34px; height: 34px; }
 }
+
+
+/* تثبيت نهائي لبنية الترحيب وتبويبات الموظف */
+#staffDashboard > .staff-welcome {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 8px 0 10px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  direction: rtl !important;
+  text-align: right !important;
+  gap: 0 !important;
+}
+#staffDashboard > .staff-welcome > h1.staff-compact-welcome {
+  display: block !important;
+  flex: 0 1 auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  color: var(--staff-dark) !important;
+  font-size: clamp(16px, 2.2vw, 22px) !important;
+  font-weight: 700 !important;
+  line-height: 1.5 !important;
+  text-align: right !important;
+  direction: rtl !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+}
+#staffDashboard > #staffTabs {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 0 18px !important;
+  padding-top: 0 !important;
+  direction: rtl !important;
+}
+@media (max-width: 640px) {
+  #staffDashboard > .staff-welcome {
+    margin: 6px 0 8px !important;
+  }
+  #staffDashboard > .staff-welcome > h1.staff-compact-welcome {
+    font-size: 14px !important;
+    line-height: 1.55 !important;
+  }
+  #staffDashboard > #staffTabs {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    margin-bottom: 14px !important;
+  }
+}
