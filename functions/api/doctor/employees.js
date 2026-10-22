@@ -7,7 +7,8 @@ const ALLOWED_PERMISSION_KEYS = [
   "bookings",
   "patients",
   "medicalRecords",
-  "settings"
+  "settings",
+  "accounts"
 ];
 
 const ALLOWED_PERMISSION_VALUES = [
