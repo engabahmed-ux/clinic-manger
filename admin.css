@@ -762,3 +762,5 @@ button:disabled {
 }
 .service-quick-field{display:grid;gap:7px;min-width:0}
 .service-quick-field input,.service-quick-select{width:100%;min-width:0;min-height:42px;padding:9px 11px;border:1px solid var(--color-border);border-radius:10px;background:#fff;color:var(--color-dark);font:inherit}
+
+@media(max-width:600px){.dashboard-tabs .dashboard-tab:last-child:nth-child(odd){grid-column:1/-1}}
