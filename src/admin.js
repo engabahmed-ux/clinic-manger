@@ -1034,53 +1034,78 @@ if (copyPatientCredentialsButton) {
   });
 }
 
+async function handleBookingCardAction(event, container) {
+  const button = event.target.closest('button[data-action]');
+  if (!button || !container.contains(button)) return;
+
+  const card = button.closest("[data-booking-id]");
+  const id = card?.dataset.bookingId;
+  if (!id) return;
+
+  const action = button.dataset.action;
+  const busyText = button.textContent;
+  const previousDate = String(allBookings.find(item => item.id === id)?.appointmentDate || "").slice(0, 10);
+  button.disabled = true;
+  button.textContent = action === "cancel-booking" ? "جارٍ الإلغاء..." : "جارٍ الحفظ...";
+  hideMessage(bookingListMessage);
+  hideMessage(dailyAppointmentsMessage);
+
+  try {
+    if (action === "cancel-booking") {
+      if (!window.confirm("هل تريد إلغاء طلب الحجز؟")) return;
+      await bookingApiRequest("cancel", { id });
+    } else if (action === "confirm-booking") {
+      const booking = { id, status: "waiting" };
+      for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "servicePrice", "notes", "status"]) {
+        const input = card.querySelector(`[data-booking-field="${field}"]`);
+        if (input) booking[field] = input.value;
+      }
+      booking.status = "waiting";
+      await bookingApiRequest("update", { booking });
+    } else if (action === "archive-booking") {
+      await bookingApiRequest("update", { booking: { id, status: "archived" } });
+    } else if (action === "save-booking") {
+      const booking = { id };
+      for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "servicePrice", "notes", "status"]) {
+        const input = card.querySelector(`[data-booking-field="${field}"]`);
+        if (input) booking[field] = input.value;
+      }
+      await bookingApiRequest("update", { booking });
+      const nextDate = String(booking.appointmentDate || "").slice(0, 10);
+      if (container === dailyAppointmentsList && nextDate && nextDate !== previousDate) {
+        if (doctorFilterMode) doctorFilterMode.value = "date";
+        if (doctorHomeDateFilter) doctorHomeDateFilter.value = nextDate;
+        if (doctorHomeSearch) doctorHomeSearch.value = "";
+      }
+    } else return;
+
+    showMessage(
+      container === dailyAppointmentsList ? dailyAppointmentsMessage : bookingListMessage,
+      action === "cancel-booking" ? "تم إلغاء طلب الحجز."
+        : action === "confirm-booking" ? "تم تأكيد الحجز ونقله إلى المواعيد."
+        : action === "archive-booking" ? "تم نقل الطلب إلى الأرشيف."
+        : "تم حفظ تعديلات الحجز.",
+      "success"
+    );
+    if (action === "archive-booking") showDoctorArchive();
+    await loadBookings();
+  } catch (error) {
+    console.error("تعذر تعديل الحجز:", error);
+    showMessage(
+      container === dailyAppointmentsList ? dailyAppointmentsMessage : bookingListMessage,
+      error.message || "تعذر تعديل الحجز."
+    );
+  } finally {
+    button.disabled = false;
+    button.textContent = busyText;
+  }
+}
+
 if (bookingList) {
-  bookingList.addEventListener("click", async (event) => {
-    const button = event.target.closest('button[data-action]');
-    if (!button || !bookingList.contains(button)) return;
-
-    const card = button.closest("[data-booking-id]");
-    const id = card?.dataset.bookingId;
-    if (!id) return;
-
-    const action = button.dataset.action;
-    const busyText = button.textContent;
-    button.disabled = true;
-    button.textContent = action === "cancel-booking" ? "جارٍ الإلغاء..." : "جارٍ الحفظ...";
-    hideMessage(bookingListMessage);
-
-    try {
-      if (action === "cancel-booking") {
-        if (!window.confirm("هل تريد إلغاء طلب الحجز؟")) return;
-        await bookingApiRequest("cancel", { id });
-      } else if (action === "confirm-booking") {
-        const booking = { id, status: "waiting" };
-        for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "notes", "status"]) {
-          const input = card.querySelector(`[data-booking-field="${field}"]`);
-          booking[field] = input?.value ?? "";
-        }
-        booking.status = "waiting";
-        await bookingApiRequest("update", { booking });
-      } else if (action === "archive-booking") {
-        await bookingApiRequest("update", { booking: { id, status: "archived" } });
-      } else if (action === "save-booking") {
-        const booking = { id };
-        for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "notes", "status"]) {
-          const input = card.querySelector(`[data-booking-field="${field}"]`);
-          booking[field] = input?.value ?? "";
-        }
-        await bookingApiRequest("update", { booking });
-      } else return;
-      showMessage(bookingListMessage,action==="cancel-booking"?"تم إلغاء طلب الحجز.":action==="confirm-booking"?"تم تأكيد الحجز ونقله إلى المواعيد.":action==="archive-booking"?"تم نقل الطلب إلى الأرشيف.":"تم حفظ تعديلات الحجز.","success");if(action==="archive-booking")showDoctorArchive();
-      await loadBookings();
-    } catch (error) {
-      console.error("تعذر تعديل الحجز:", error);
-      showMessage(bookingListMessage, error.message || "تعذر تعديل الحجز.");
-    } finally {
-      button.disabled = false;
-      button.textContent = busyText;
-    }
-  });
+  bookingList.addEventListener("click", event => handleBookingCardAction(event, bookingList));
+}
+if (dailyAppointmentsList) {
+  dailyAppointmentsList.addEventListener("click", event => handleBookingCardAction(event, dailyAppointmentsList));
 }
 
 if (createEmployeeForm) {
