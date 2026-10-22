@@ -410,7 +410,23 @@ async function listBookings(projectId, accessToken) {
 }
 
 
+async function isFinancialPeriodClosed(projectId, accessToken, dateValue) {
+  const date = String(dateValue || "").slice(0,10);
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return false;
+  const result = await firestoreRequest(projectId, accessToken, ":runQuery", {
+    method:"POST",
+    body:JSON.stringify({structuredQuery:{from:[{collectionId:"clinicAccountRecords"}]}})
+  });
+  return (Array.isArray(result)?result:[]).some(item => {
+    const fields = item.document?.fields || {};
+    if (readString(fields,"type") !== "settlement") return false;
+    const type = readString(fields,"periodType"), key = readString(fields,"periodKey");
+    return (type === "day" && key === date) || (type === "month" && key === date.slice(0,7));
+  });
+}
+
 async function createBooking(projectId, accessToken, data) {
+  if (await isFinancialPeriodClosed(projectId, accessToken, data.appointmentDate)) throw new Error("لا يمكن إضافة حجز إلى فترة تمت تصفيتها ماليًا.");
   const now = new Date().toISOString();
 
   const booking = {
@@ -460,6 +476,11 @@ async function updateBooking(projectId, accessToken, data) {
   );
 
   const existing = decodeBooking(current);
+  const financialFields = ["appointmentDate","servicePrice","paidAmount","status"];
+  if (financialFields.some(key => changes[key] !== undefined)) {
+    const dates = new Set([String(existing.appointmentDate || "").slice(0,10), String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0,10)].filter(Boolean));
+    for (const date of dates) if (await isFinancialPeriodClosed(projectId, accessToken, date)) throw new Error("لا يمكن تعديل التاريخ أو الحالة أو المبالغ لحجز داخل فترة تمت تصفيتها ماليًا.");
+  }
 
   const booking = {
     ...existing,
