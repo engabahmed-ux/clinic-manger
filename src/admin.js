@@ -560,7 +560,7 @@ async function previewDoctorSettlement(periodType = settlementPreviewPeriodType)
       preview.textContent = "تمت تصفية هذه الفترة بالفعل. الرصيد الحالي للعهدة: 0 ج.م. صافي التصفية السابقة: " + doctorMoney(result.settlement?.netTotal);
       if (settleButton) settleButton.disabled = true;
     } else {
-      preview.textContent = "العهدة المتوقعة للموظف: المقبوضات " + receipts + " − المصروفات المعتمدة " + expenses + " = صافي مستحق للعيادة " + net + (Number(result.netTotal) < 0 ? " (على العيادة للموظف)." : " (على الموظف للعيادة).") + (result.pendingExpenses ? " يوجد " + result.pendingExpenses + " مصروف معلق يجب اعتماده أو رفضه قبل التصفية." : "");
+      preview.textContent = "العهدة المتوقعة للموظف: المقبوضات " + receipts + " − المصروفات المعتمدة " + expenses + " = صافي العهدة " + net + (Number(result.netTotal) < 0 ? " (مستحق للموظف من العيادة)." : " (مستحق للعيادة من الموظف).") + (result.previouslySettledDays ? " تم استبعاد " + result.previouslySettledDays + " يوم تمت تصفيته مسبقًا." : "") + (result.pendingExpenses ? " يوجد " + result.pendingExpenses + " مصروف معلق يجب اعتماده أو رفضه قبل التصفية." : "");
       if (settleButton) settleButton.disabled = Number(result.pendingExpenses) > 0;
     }
   } catch (error) {
