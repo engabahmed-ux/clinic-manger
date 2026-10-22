@@ -311,6 +311,26 @@ function renderBooking() {
       config.booking?.patientPhonePlaceholder ?? "";
   }
 
+  const serviceSelect = $("#bookingService");
+
+  if (serviceSelect) {
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent =
+      config.booking?.servicePlaceholder ?? "اختاري الخدمة (اختياري)";
+
+    serviceSelect.replaceChildren(placeholder);
+
+    for (const service of config.services?.items ?? []) {
+      if (service.enabled === false) continue;
+
+      const option = document.createElement("option");
+      option.value = String(service.title ?? "").trim();
+      option.textContent = String(service.title ?? "").trim();
+      if (option.value) serviceSelect.append(option);
+    }
+  }
+
   if (form) {
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
