@@ -461,7 +461,7 @@ async function createBooking(projectId, accessToken, data) {
   return decodeBooking(result);
 }
 
-async function updateBooking(projectId, accessToken, data, actorUid = "") {
+async function updateBooking(projectId, accessToken, data, actorUid = "", actorAccountType = "doctor") {
   if (
     typeof data.id !== "string" ||
     !/^[A-Za-z0-9_-]{1,150}$/.test(data.id)
@@ -484,17 +484,23 @@ async function updateBooking(projectId, accessToken, data, actorUid = "") {
 
   const existing = decodeBooking(current);
   const financialFields = ["appointmentDate","servicePrice","paidAmount","status"];
-  if (financialFields.some(key => changes[key] !== undefined)) {
+  const changesFinancialFields = financialFields.some(key => changes[key] !== undefined);
+  if (
+    actorAccountType === "staff" &&
+    changesFinancialFields &&
+    !existing.paymentEnteredByUid &&
+    Number(existing.paidAmount) > 0
+  ) {
+    throw new Error("هذا الحجز يحتوي على مبلغ سابق غير منسوب لموظف. يلزم أن يراجعه الدكتور قبل تعديل بياناته المالية.");
+  }
+  if (changesFinancialFields) {
     const dates = new Set([
       String(existing.appointmentDate || "").slice(0,10),
       String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0,10)
     ].filter(Boolean));
-    const owners = new Set([
-      existing.paymentEnteredByUid || "",
-      actorUid || ""
-    ].filter(Boolean));
-    for (const date of dates) {
-      for (const ownerUid of owners) {
+    const ownerUid = existing.paymentEnteredByUid || "";
+    if (ownerUid) {
+      for (const date of dates) {
         if (await isFinancialPeriodClosed(projectId, accessToken, date, ownerUid)) {
           throw new Error("لا يمكن تعديل التاريخ أو الحالة أو المبالغ لحجز مرتبط بفترة مالية تمت تصفيتها.");
         }
@@ -556,7 +562,7 @@ async function cancelBooking(projectId, accessToken, data, actorUid = "") {
   return updateBooking(projectId, accessToken, {
     id: data.id,
     status: "cancelled"
-  }, actorUid);
+  }, actorUid, actorAccountType);
 }
 
 export async function onRequest(context) {
@@ -720,11 +726,15 @@ export async function onRequest(context) {
       }
 
       case "update": {
+        if (access.accountType === "staff" && data.booking?.paidAmount !== undefined) {
+          return jsonResponse({ message: "تعديل المبلغ المقبوض يتم من قسم حسابات اليوم فقط حتى يُنسب الاستلام إلى الحساب الصحيح." }, 403);
+        }
         const booking = await updateBooking(
           serviceAccount.project_id,
           accessToken,
           data.booking || {},
-          access.accountType === "staff" ? access.uid : ""
+          access.accountType === "staff" ? access.uid : "",
+          access.accountType
         );
 
         return jsonResponse({ booking });
