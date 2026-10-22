@@ -69,10 +69,10 @@
         <div class="staff-section-heading staff-schedule-heading"><h2>جدول المواعيد <span id="staffScheduleDateLabel" class="staff-schedule-date"></span></h2><div class="staff-home-actions"><button id="staffOpenFilter" class="staff-filter-button" type="button" aria-label="فلترة جدول المواعيد" title="فلترة جدول المواعيد">☷</button><button id="staffHomeAddBooking" class="staff-primary staff-compact-add" type="button">＋ إضافة حجز</button></div></div><input id="staffHomeDateFilter" type="date" class="staff-hidden-filter" aria-hidden="true" tabindex="-1"><input id="staffHomeSearch" type="search" class="staff-hidden-filter" aria-hidden="true" tabindex="-1">
         <div class="schedule-status-legend staff-status-legend" id="staffStatusLegend" aria-label="فلترة حسب حالة الحجز"><button type="button" data-status-filter="all" class="is-active">✓ الكل</button><button type="button" data-status-filter="waiting">✓ في الانتظار</button><button type="button" data-status-filter="completed">✓ تم الكشف</button><button type="button" data-status-filter="postponed">✓ مؤجل</button><button type="button" data-status-filter="no_show">✓ لم يأتِ</button><button type="button" data-status-filter="apologized">✓ اعتذر</button></div>
         <p id="dailyAppointmentsMessage" class="staff-message" hidden></p>
-        <div id="dailyAppointmentsList" class="staff-bookings-list" aria-live="polite"></div><div class="schedule-bulk-actions staff-bulk-actions"><span id="staffSelectedAppointmentsCount">لم يتم تحديد حجوزات</span><button id="staffArchiveSelectedAppointments" class="staff-secondary" type="button" disabled>نقل المحدد إلى الأرشيف</button></div>
+        <div id="dailyAppointmentsList" class="staff-bookings-list" aria-live="polite"></div><div class="schedule-bulk-actions staff-bulk-actions"><button id="staffArchiveSelectedAppointments" class="staff-secondary archive-day-button" type="button">أرشفة مواعيد اليوم</button></div>
         
       </section>
-      <section id="staffAccountsSection" class="staff-section staff-tab-panel" hidden><div class="staff-section-heading"><h2>حسابات اليوم</h2><span id="staffAccountsDateLabel" class="staff-schedule-date"></span></div><p class="staff-muted">تُحتسب قيمة الخدمة ضمن الإجمالي فقط عندما تكون حالة الحجز «تم الكشف».</p><div id="staffAccountsContent" class="accounts-content"></div></section>
+      
       <section id="staffArchiveSection" class="staff-section staff-tab-panel" hidden><div class="staff-section-heading"><h2>أرشيف الحجوزات</h2></div><div class="staff-booking-filters"><label>بحث بالاسم أو الهاتف أو الخدمة<input id="staffArchiveSearch" type="search" placeholder="ابحث في الأرشيف"></label><label>تصفية بتاريخ الموعد<input id="staffArchiveDateFilter" type="date"></label></div><div id="staffArchiveList" class="staff-bookings-list" aria-live="polite"></div></section>
       <section id="staffBookingsSection" class="staff-section staff-tab-panel" hidden>
         <div class="staff-section-heading staff-bookings-heading"><h2>إدارة الحجوزات</h2><div class="staff-bookings-toolbar">
@@ -104,7 +104,6 @@
     <dialog id="staffScheduleFilterDialog" class="staff-filter-dialog"><form method="dialog" id="staffScheduleFilterForm"><div class="staff-section-heading"><h3>فلترة جدول المواعيد</h3><button class="staff-filter-close" value="cancel" aria-label="إغلاق" type="submit">×</button></div><label>عايز تدور على إيه؟<select id="staffFilterMode"><option value="date">مواعيد يوم معين</option><option value="search">الاسم أو الهاتف أو الخدمة</option></select></label><label id="staffFilterDateLabel">تاريخ المواعيد<input id="staffFilterDate" type="date"></label><label id="staffFilterQueryLabel" hidden>كلمة البحث<input id="staffFilterQuery" type="search" placeholder="اكتب الاسم أو الهاتف أو الخدمة"></label><div class="staff-booking-actions"><button id="staffFilterApply" class="staff-primary" type="button">عرض النتائج</button><button class="staff-secondary" value="cancel" type="submit">إلغاء</button></div></form></dialog>
       <footer class="staff-footer">
       <a href="./index.html">العودة إلى الموقع العام</a>
-      <span>إدارة العيادة</span>
     </footer>
   </main>
 
