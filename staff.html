@@ -71,7 +71,7 @@
         </div></div>
         <form id="staffCreateBookingForm" class="staff-booking-create-form" hidden>
           <h3>إضافة حجز جديد</h3><div class="staff-form-grid">
-            <label>اسم المريضة<input id="staffNewBookingPatientName" name="patientName" type="text" maxlength="120" autocomplete="off" required></label><input id="staffNewBookingPatientId" type="hidden" name="patientId"><div id="staffNewBookingPatientSuggestions" class="patient-suggestions" hidden></div>
+            <label>اسم المريضة<input id="staffNewBookingPatientName" name="patientName" type="text" maxlength="120" autocomplete="off" required></label><input id="staffNewBookingPatientId" type="hidden" name="patientId"><input id="staffNewBookingLegacyBookingId" type="hidden" name="legacyBookingId"><div id="staffNewBookingPatientSuggestions" class="patient-suggestions" hidden></div>
             <label>رقم الهاتف<input name="patientPhone" type="tel" maxlength="40" required></label>
             <label>الموعد المطلوب<input name="appointmentDate" type="date" required></label>
             <label>نوع الحجز أو الخدمة<input name="service" type="text" maxlength="120" placeholder="اكتب الخدمة يدويًا"><select class="service-quick-select" aria-label="اختيار خدمة جاهزة"><option value="">أو اختر خدمة جاهزة</option><option value="كشف">كشف</option><option value="استشارة">استشارة</option><option value="متابعة">متابعة</option><option value="سونار">سونار</option><option value="إعادة كشف">إعادة كشف</option><option value="خدمة أخرى">خدمة أخرى</option></select></label>
