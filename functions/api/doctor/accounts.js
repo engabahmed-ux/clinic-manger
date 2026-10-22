@@ -142,7 +142,7 @@ export async function onRequestPost({ request, env }) {
       if (!cleanString(description,160) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00")) || !/^\d{1,8}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || notes.length > 500) return jsonResponse({ message:"راجع وصف المصروف والمبلغ والتاريخ." },400);
       const now = new Date().toISOString();
       const records = await listRecords(projectId, token);
-      if (verified.accountType === "staff" && records.some(x => x.type === "settlement" && x.employeeUid === verified.uid && ((x.periodType === "day" && x.periodKey === date) || (x.periodType === "month" && x.periodKey === date.slice(0,7)))) {
+      if (verified.accountType === "staff" && records.some(x => x.type === "settlement" && x.employeeUid === verified.uid && ((x.periodType === "day" && x.periodKey === date) || (x.periodType === "month" && x.periodKey === date.slice(0,7))))) {
         return jsonResponse({ message:"هذه الفترة تمت تصفيتها بالفعل. لا يمكن إضافة مصروف إليها بعد الإقفال." },409);
       }
       const isDoctor = verified.accountType === "doctor";
