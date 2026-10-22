@@ -92,7 +92,7 @@ const homeAddBookingButton = $("#homeAddBookingButton");
 const dailyAppointmentsList = $("#dailyAppointmentsList");
 const dailyAppointmentsMessage = $("#dailyAppointmentsMessage");
 const doctorAccountsSection=$("#doctorAccountsSection"),openAccountsTabButton=$("#openAccountsTabButton"),doctorAccountsContent=$("#doctorAccountsContent"),accountsDateLabel=$("#accountsDateLabel"),doctorStatusLegend=$("#doctorStatusLegend"),archiveSelectedAppointments=$("#archiveSelectedAppointments");let activeStatusFilter="all";
-const accountsSubtabs=$("#doctorAccountsSubtabs"),patientDailyAccountsPanel=$("#patientDailyAccountsPanel"),salaryAccountsPanel=$("#salaryAccountsPanel"),customAccountsPanel=$("#customAccountsPanel"),salaryEntriesList=$("#salaryEntriesList"),customAccountEntriesList=$("#customAccountEntriesList"),salaryEntryForm=$("#salaryEntryForm"),customAccountEntryForm=$("#customAccountEntryForm"),accountsCategoryForm=$("#accountsCategoryForm"),doctorAccountsDate=$("#doctorAccountsDate"),doctorDailyExpenseForm=$("#doctorDailyExpenseForm"),doctorDailyExpensesList=$("#doctorDailyExpensesList"),doctorDailyExpenseMessage=$("#doctorDailyExpenseMessage"),doctorDailyNetTotal=$("#doctorDailyNetTotal");let doctorDailyExpenses=[],doctorAccountCategories=[],doctorAccountEntries=[],activeDoctorAccountSubtab="patients";
+const accountsSubtabs=$("#doctorAccountsSubtabs"),patientDailyAccountsPanel=$("#patientDailyAccountsPanel"),salaryAccountsPanel=$("#salaryAccountsPanel"),customAccountsPanel=$("#customAccountsPanel"),salaryEntriesList=$("#salaryEntriesList"),customAccountEntriesList=$("#customAccountEntriesList"),salaryEntryForm=$("#salaryEntryForm"),customAccountEntryForm=$("#customAccountEntryForm"),accountsCategoryForm=$("#accountsCategoryForm"),doctorAccountsDate=$("#doctorAccountsDate"),doctorDailyExpenseForm=$("#doctorDailyExpenseForm"),doctorDailyExpensesList=$("#doctorDailyExpensesList"),doctorDailyExpenseMessage=$("#doctorDailyExpenseMessage"),doctorDailyNetTotal=$("#doctorDailyNetTotal"),doctorAccountsMonth=$("#doctorAccountsMonth"),finalizeDailySettlementButton=$("#finalizeDailySettlement"),finalizeMonthlySettlementButton=$("#finalizeMonthlySettlement"),doctorSettlementMessage=$("#doctorSettlementMessage"),doctorMonthlyExpensesList=$("#doctorMonthlyExpensesList"),doctorSettlementsList=$("#doctorSettlementsList");let doctorDailyExpenses=[],doctorAccountCategories=[],doctorAccountEntries=[],activeDoctorAccountSubtab="patients";
 const createBookingForm = $("#createBookingForm");
 const createBookingButton = $("#createBookingButton");
 const createBookingMessage = $("#createBookingMessage");
@@ -111,6 +111,7 @@ const copyPatientCredentialsButton = $("#copyPatientCredentialsButton");
 const createEmployeeForm = $("#createEmployeeForm");
 const createEmployeeButton = $("#createEmployeeButton");
 const createEmployeeMessage = $("#createEmployeeMessage");
+const employeeExpenseModeInput = $("#employeeExpenseMode");
 const employeeList = $("#employeeList");
 const employeeListMessage = $("#employeeListMessage");
 const refreshEmployeesButton = $("#refreshEmployeesButton");
@@ -485,7 +486,65 @@ function renderDailyAppointments(){dailyAppointmentsList.replaceChildren();const
 function renderDoctorArchive(){if(!doctorArchiveList)return;doctorArchiveList.replaceChildren();const day=doctorArchiveDateFilter?.value||"",query=(doctorArchiveSearch?.value||"").trim().toLocaleLowerCase("ar");const rows=allBookings.filter(b=>ARCHIVE_STATUSES.has(b.status)).filter(b=>(!day||String(b.appointmentDate||"").slice(0,10)===day)&&(!query||`${b.patientName||""} ${b.patientPhone||""} ${b.service||""}`.toLocaleLowerCase("ar").includes(query))).sort((a,b)=>(Date.parse(b.updatedAt||b.createdAt||"")||0)-(Date.parse(a.updatedAt||a.createdAt||"")||0));if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد حجوزات أو طلبات مؤرشفة حسب الفلتر الحالي.";doctorArchiveList.append(empty);return}for(const booking of rows)doctorArchiveList.append(renderScheduleCard(booking,true))}
 function doctorMoney(v){return new Intl.NumberFormat("ar-EG",{style:"currency",currency:"EGP",maximumFractionDigits:2}).format(Number(v)||0)}
 function renderDoctorAccounts(){if(!doctorAccountsContent)return;const day=doctorAccountsDate?.value||doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());if(doctorAccountsDate&&!doctorAccountsDate.value)doctorAccountsDate.value=day;if(accountsDateLabel)accountsDateLabel.textContent=formatRequestDate(day);const rows=allBookings.filter(b=>String(b.appointmentDate||"").slice(0,10)===day&&!["pending","archived","cancelled"].includes(b.status)).sort((a,b)=>queueNumberFor(a)-queueNumberFor(b));doctorAccountsContent.replaceChildren();let total=0;const table=document.createElement("table");table.className="accounts-table";const head=document.createElement("thead");head.innerHTML="<tr><th>المريضة</th><th>الخدمة</th><th>سعر الخدمة</th><th>المدفوع</th><th>الحالة</th></tr>";table.append(head);const body=document.createElement("tbody");for(const b of rows){const tr=document.createElement("tr"),price=Number(b.servicePrice)||0,paid=Number(b.paidAmount)||0;total+=paid;const vals=[b.patientName||"—",b.service||"غير محددة",doctorMoney(price),doctorMoney(paid),bookingStatusLabel(b.status)];for(let i=0;i<vals.length;i++){const td=document.createElement("td");td.textContent=vals[i];if(i===4)td.className=b.status==="completed"?"accounts-status-completed":"accounts-status-other";tr.append(td)}body.append(tr)}if(!rows.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=5;td.textContent="لا توجد حجوزات في هذا اليوم.";tr.append(td);body.append(tr)}table.append(body);const box=document.createElement("div");box.className="accounts-total";const label=document.createElement("span");label.textContent="إجمالي المقبوضات لهذا اليوم";const amount=document.createElement("strong");amount.textContent=doctorMoney(total);box.append(label,amount);doctorAccountsContent.append(table,box);loadDoctorDailyExpenses(day,total)}
-async function loadDoctorDailyExpenses(day,paidTotal=0){try{const result=await accountsApiRequest("listDailyExpenses",{date:day});doctorDailyExpenses=Array.isArray(result.expenses)?result.expenses:[];const expenseTotal=doctorDailyExpenses.reduce((sum,x)=>sum+(Number(x.amount)||0),0);if(doctorDailyExpensesList){doctorDailyExpensesList.replaceChildren();if(!doctorDailyExpenses.length){const p=document.createElement("p");p.className="muted-text";p.textContent="لا توجد مصروفات مسجلة لهذا اليوم.";doctorDailyExpensesList.append(p)}for(const item of doctorDailyExpenses){const row=document.createElement("div");row.className="doctor-daily-expense-row";const description=document.createElement("span");description.textContent=item.description+(item.notes?" · "+item.notes:"");const amount=document.createElement("strong");amount.textContent="− "+doctorMoney(Number(item.amount)||0);row.append(description,amount);doctorDailyExpensesList.append(row)}}if(doctorDailyNetTotal)doctorDailyNetTotal.textContent=doctorMoney(paidTotal-expenseTotal)}catch(error){showMessage(doctorDailyExpenseMessage,error.message||"تعذر تحميل مصروفات اليوم.")}}
+async function loadDoctorDailyExpenses(day,paidTotal=0){
+  try {
+    const result=await accountsApiRequest("listDailyExpenses",{date:day});
+    doctorDailyExpenses=Array.isArray(result.expenses)?result.expenses:[];
+    const approvedTotal=doctorDailyExpenses.filter(x=>(x.status||"approved")==="approved").reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+    if(doctorDailyExpensesList){
+      doctorDailyExpensesList.replaceChildren();
+      if(!doctorDailyExpenses.length){const p=document.createElement("p");p.className="muted-text";p.textContent="لا توجد مصروفات مسجلة لهذا اليوم.";doctorDailyExpensesList.append(p)}
+      for(const item of doctorDailyExpenses){
+        const row=document.createElement("div");row.className="doctor-daily-expense-row";
+        const details=document.createElement("div");
+        const description=document.createElement("strong");description.textContent=item.description+(item.notes?" · "+item.notes:"");
+        const meta=document.createElement("p");meta.className="muted-text";meta.textContent="سجله: "+(item.enteredByName||"غير محدد")+" · "+({pending:"بانتظار اعتماد الدكتور",approved:"معتمد ومحتسب",rejected:"مرفوض وغير محتسب"}[item.status||"approved"]||"غير محدد");
+        details.append(description,meta);
+        const amount=document.createElement("strong");amount.textContent=(item.status==="rejected"?"": "− ")+doctorMoney(Number(item.amount)||0);
+        row.append(details,amount);
+        if(item.status==="pending"){
+          const actions=document.createElement("div");actions.className="booking-card-actions";
+          for(const [action,label,cls] of [["approveDailyExpense","اعتماد وخصم","primary-button"],["rejectDailyExpense","رفض","secondary-button"]]){
+            const button=document.createElement("button");button.type="button";button.className=cls;button.textContent=label;
+            button.addEventListener("click",async()=>{
+              let reason="";
+              if(action==="rejectDailyExpense"){reason=window.prompt("سبب رفض المصروف (اختياري):","")||"";if(reason.length>300){showMessage(doctorSettlementMessage,"سبب الرفض يجب ألا يتجاوز 300 حرف.");return}}
+              button.disabled=true;
+              try{await accountsApiRequest(action,{id:item.id,reason});showMessage(doctorSettlementMessage,action==="approveDailyExpense"?"تم اعتماد المصروف واحتسابه.":"تم رفض المصروف ولن يُخصم.","success");await renderDoctorAccounts();await loadDoctorSettlements()}
+              catch(error){showMessage(doctorSettlementMessage,error.message||"تعذر معالجة المصروف.")}
+              finally{button.disabled=false}
+            });
+            actions.append(button);
+          }
+          row.append(actions);
+        }
+        doctorDailyExpensesList.append(row);
+      }
+    }
+    if(doctorDailyNetTotal)doctorDailyNetTotal.textContent=doctorMoney(paidTotal-approvedTotal);
+    await loadDoctorSettlements();
+  } catch(error){showMessage(doctorDailyExpenseMessage,error.message||"تعذر تحميل مصروفات اليوم.")}
+}
+async function loadDoctorSettlements(){
+  try{
+    const result=await accountsApiRequest("listSettlements");
+    const expenses=Array.isArray(result.expenses)?result.expenses:[];
+    const month=doctorAccountsMonth?.value||((doctorAccountsDate?.value||"").slice(0,7));
+    if(doctorAccountsMonth&&!doctorAccountsMonth.value)doctorAccountsMonth.value=month;
+    if(doctorMonthlyExpensesList){
+      doctorMonthlyExpensesList.replaceChildren();
+      const rows=expenses.filter(x=>String(x.date||"").startsWith(month)).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+      if(!rows.length){const p=document.createElement("p");p.className="muted-text";p.textContent="لا توجد مصروفات مسجلة لهذا الشهر.";doctorMonthlyExpensesList.append(p)}
+      for(const x of rows){const row=document.createElement("div");row.className="doctor-daily-expense-row";const label=document.createElement("span");label.textContent=x.date+" · "+x.personName+" · "+({pending:"معلق",approved:"معتمد",rejected:"مرفوض"}[x.status||"approved"]||"غير محدد")+" · "+(x.enteredByName||"");const amount=document.createElement("strong");amount.textContent=doctorMoney(x.amount);row.append(label,amount);doctorMonthlyExpensesList.append(row)}
+    }
+    if(doctorSettlementsList){
+      doctorSettlementsList.replaceChildren();
+      const settlements=Array.isArray(result.settlements)?result.settlements:[];
+      if(!settlements.length){const p=document.createElement("p");p.className="muted-text";p.textContent="لا توجد تصفيات سابقة.";doctorSettlementsList.append(p)}
+      for(const x of settlements){const row=document.createElement("div");row.className="doctor-daily-expense-row";const label=document.createElement("span");label.textContent=(x.periodType==="month"?"تصفية شهرية":"تصفية يومية")+" · "+x.periodKey+" · نفذها: "+(x.closedByName||"الدكتور");const amount=document.createElement("strong");amount.textContent="المقبوضات "+doctorMoney(x.totalReceipts)+" / المصروفات "+doctorMoney(x.totalExpenses)+" / الصافي "+doctorMoney(x.netTotal);row.append(label,amount);doctorSettlementsList.append(row)}
+    }
+  }catch(error){showMessage(doctorSettlementMessage,error.message||"تعذر تحميل سجل التصفيات.")}
+}
 async function archiveDoctorDay(){const day=doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());if((doctorFilterMode?.value||"date")!=="date"){showMessage(dailyAppointmentsMessage,"اختر عرض مواعيد يوم محدد قبل الأرشفة.");return}if(!window.confirm("هل تريد نقل جميع مواعيد يوم "+formatRequestDate(day)+" إلى الأرشيف؟ لن تظهر هذه المواعيد في جدول اليوم بعد الأرشفة."))return;archiveSelectedAppointments.disabled=true;try{const result=await bookingApiRequest("archiveDay",{date:day});await loadBookings();showMessage(dailyAppointmentsMessage,"تم نقل "+(result.archivedCount||0)+" حجز إلى الأرشيف.","success")}catch(e){showMessage(dailyAppointmentsMessage,e.message||"تعذر أرشفة مواعيد اليوم.")}finally{archiveSelectedAppointments.disabled=false;}}
 function showDoctorAccounts(){if(doctorAccountsSection)doctorAccountsSection.hidden=false;homeAppointmentsSection.hidden=true;doctorArchiveSection.hidden=true;bookingManagementSection.hidden=true;patientManagementSection.hidden=true;employeeManagementSection.hidden=true;setActiveTab(openAccountsTabButton);if(doctorAccountsDate)doctorAccountsDate.value=doctorHomeDateFilter?.value||doctorAccountsDate.value;renderDoctorAccounts();loadDoctorAccountRecords()}
 function renderPendingBookings(){bookingList.replaceChildren();const query=(bookingSearchInput?.value||"").trim().toLocaleLowerCase("ar"),date=bookingDateFilter?.value||"";const rows=allBookings.filter(b=>b.status==="pending"&&(!date||String(b.appointmentDate||"").slice(0,10)===date)).filter(b=>(!query||`${b.patientName||""} ${b.patientPhone||""}`.toLocaleLowerCase("ar").includes(query)));if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد طلبات مراجعة مطابقة.";bookingList.append(empty);return}rows.forEach(b=>bookingList.append(renderBookingCard(b)))}
@@ -648,6 +707,23 @@ function renderEmployeeCard(employee) {
     row.append(label, select);
     permissionsContainer.appendChild(row);
   }
+
+  const expenseModeRow = document.createElement("div");
+  expenseModeRow.className = "employee-permission-row";
+  const expenseModeLabel = document.createElement("label");
+  expenseModeLabel.textContent = "طريقة خصم المصروفات";
+  const expenseModeSelect = document.createElement("select");
+  expenseModeSelect.className = "expense-mode-select";
+  expenseModeSelect.setAttribute("aria-label", "طريقة خصم مصروفات " + (employee.displayName || "الموظف"));
+  for (const [value, labelText] of [["auto", "خصم تلقائي بعد التسجيل"], ["approval", "اعتماد الدكتور قبل الخصم"]]) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = labelText;
+    option.selected = (employee.expenseMode === "approval" ? "approval" : "auto") === value;
+    expenseModeSelect.append(option);
+  }
+  expenseModeRow.append(expenseModeLabel, expenseModeSelect);
+  permissionsContainer.appendChild(expenseModeRow);
 
   const saveButton = document.createElement("button");
   saveButton.type = "button";
@@ -1022,7 +1098,8 @@ if (createEmployeeForm) {
         displayName,
         email,
         password,
-        permissions
+        permissions,
+        expenseMode: employeeExpenseModeInput?.value === "approval" ? "approval" : "auto"
       });
 
       createEmployeeForm.reset();
@@ -1084,12 +1161,13 @@ if (employeeList) {
     try {
       await employeeApiRequest("updatePermissions", {
         uid,
-        permissions
+        permissions,
+        expenseMode: card.querySelector(".expense-mode-select")?.value === "approval" ? "approval" : "auto"
       });
 
       showMessage(
         employeeListMessage,
-        "تم حفظ صلاحيات الموظف.",
+        "تم حفظ صلاحيات الموظف وإعدادات المصروفات.",
         "success"
       );
     } catch (error) {
