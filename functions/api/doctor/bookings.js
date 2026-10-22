@@ -406,7 +406,7 @@ function validateBooking(data, partial = false) {
   }
   if (data.preVisitNotes && data.preVisitNotes.length > 1000) return "ملاحظات ما قبل الكشف أطول من المسموح.";
   if (data.patientId && !/^[A-Za-z0-9_-]{1,150}$/.test(data.patientId)) return "رقم ملف المريض غير صحيح.";
-  if (data.weight !== undefined && data.weight !== "" && (!/^\d{1,3}(\.\d{1,2})?$/.test(String(data.weight)) || Number(data.weight) < 0 || Number(data.weight) > 500)) return "قيمة الوزن غير صحيحة.");
+  if (data.weight !== undefined && data.weight !== "" && (!/^\d{1,3}(\.\d{1,2})?$/.test(String(data.weight)) || Number(data.weight) < 0 || Number(data.weight) > 500)) return "قيمة الوزن غير صحيحة.";
 
   if (data.notes && data.notes.length > 2000) {
     return "الملاحظات أطول من المسموح.";
