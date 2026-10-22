@@ -784,3 +784,61 @@ a {
   .staff-appointment-card .schedule-card-controls { display: flex; flex-wrap: wrap; gap: 8px; }
 }
 
+/* تثبيت تحية الموظف أعلى اليمين مع فصل واضح عن تبويبات اللوحة */
+#staffDashboard > .staff-welcome {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: flex-start !important;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0 0 8px !important;
+  padding: 0 !important;
+  direction: rtl;
+  text-align: right !important;
+}
+#staffDashboard > .staff-welcome > .staff-compact-welcome {
+  display: block;
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0 !important;
+  padding: 0;
+  direction: rtl;
+  text-align: right !important;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5 !important;
+}
+#staffDashboard > #staffTabs {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  margin-top: 0;
+}
+#staffDashboard > #staffTabs .staff-tab {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#staffDashboard .staff-edit-booking-button {
+  flex: 0 0 38px;
+}
+#staffDashboard .booking-notification-badge {
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+@media (max-width: 640px) {
+  #staffDashboard > .staff-welcome { width: 100%; }
+  #staffDashboard > .staff-welcome > .staff-compact-welcome {
+    width: 100%;
+    font-size: 14px !important;
+    text-align: right !important;
+  }
+  #staffDashboard > #staffTabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    margin-top: 0;
+  }
+}
