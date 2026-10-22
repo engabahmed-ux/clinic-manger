@@ -240,6 +240,9 @@ function decodeBooking(document) {
     service: readString(fields, "service"),
     servicePrice: readString(fields, "servicePrice"),
     paidAmount: readString(fields, "paidAmount"),
+    paymentEnteredByUid: readString(fields, "paymentEnteredByUid"),
+    paymentEnteredByName: readString(fields, "paymentEnteredByName"),
+    paymentUpdatedAt: readString(fields, "paymentUpdatedAt"),
     notes: readString(fields, "notes"),
     status: readString(fields, "status") || "pending",
     createdAt: readString(fields, "createdAt"),
@@ -257,6 +260,9 @@ function encodeBooking(data) {
     "service",
     "servicePrice",
     "paidAmount",
+    "paymentEnteredByUid",
+    "paymentEnteredByName",
+    "paymentUpdatedAt",
     "notes",
     "status",
     "createdAt",
@@ -278,7 +284,9 @@ async function getAccountAccess(
       ok: true,
       accountType: "doctor",
       permission: "edit",
-      accountsPermission: "edit"
+      accountsPermission: "edit",
+      uid: user.uid,
+      displayName: "الدكتور"
     };
   }
 
@@ -303,6 +311,7 @@ async function getAccountAccess(
   const role = readString(fields, "role");
   const permission = readString(fields.permissions?.mapValue?.fields, "bookings");
   const accountsPermission = readString(fields.permissions?.mapValue?.fields, "accounts");
+  const displayName = readString(fields, "displayName");
 
   if (role !== "staff" || !active) {
     return {
@@ -313,7 +322,7 @@ async function getAccountAccess(
   }
 
   if (!["view", "edit"].includes(permission) && !["view", "edit"].includes(accountsPermission)) return { ok:false, status:403, message:"لم يمنحك الدكتور صلاحية الوصول إلى هذا القسم." };
-  return { ok:true, accountType:"staff", permission, accountsPermission };
+  return { ok:true, accountType:"staff", permission, accountsPermission, uid:user.uid, displayName };
 }
 
 function validateBooking(data, partial = false) {
@@ -410,23 +419,22 @@ async function listBookings(projectId, accessToken) {
 }
 
 
-async function isFinancialPeriodClosed(projectId, accessToken, dateValue) {
+async function isFinancialPeriodClosed(projectId, accessToken, dateValue, employeeUid = "") {
   const date = String(dateValue || "").slice(0,10);
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return false;
+  if (!employeeUid || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const result = await firestoreRequest(projectId, accessToken, ":runQuery", {
     method:"POST",
     body:JSON.stringify({structuredQuery:{from:[{collectionId:"clinicAccountRecords"}]}})
   });
   return (Array.isArray(result)?result:[]).some(item => {
     const fields = item.document?.fields || {};
-    if (readString(fields,"type") !== "settlement") return false;
+    if (readString(fields,"type") !== "settlement" || readString(fields,"employeeUid") !== employeeUid) return false;
     const type = readString(fields,"periodType"), key = readString(fields,"periodKey");
     return (type === "day" && key === date) || (type === "month" && key === date.slice(0,7));
   });
 }
 
 async function createBooking(projectId, accessToken, data) {
-  if (await isFinancialPeriodClosed(projectId, accessToken, data.appointmentDate)) throw new Error("لا يمكن إضافة حجز إلى فترة تمت تصفيتها ماليًا.");
   const now = new Date().toISOString();
 
   const booking = {
@@ -479,7 +487,7 @@ async function updateBooking(projectId, accessToken, data) {
   const financialFields = ["appointmentDate","servicePrice","paidAmount","status"];
   if (financialFields.some(key => changes[key] !== undefined)) {
     const dates = new Set([String(existing.appointmentDate || "").slice(0,10), String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0,10)].filter(Boolean));
-    for (const date of dates) if (await isFinancialPeriodClosed(projectId, accessToken, date)) throw new Error("لا يمكن تعديل التاريخ أو الحالة أو المبالغ لحجز داخل فترة تمت تصفيتها ماليًا.");
+    for (const date of dates) if (await isFinancialPeriodClosed(projectId, accessToken, date, existing.paymentEnteredByUid)) throw new Error("لا يمكن تعديل التاريخ أو الحالة أو المبالغ لحجز داخل عهدة موظف تمت تصفيتها ماليًا.");
   }
 
   const booking = {
@@ -630,14 +638,27 @@ export async function onRequest(context) {
         const date = typeof data.date === "string" ? data.date : "";
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
         const bookings = await listBookings(serviceAccount.project_id, accessToken);
-        const daily = bookings.filter(b => String(b.appointmentDate || "").slice(0,10) === date && (b.status !== "pending" || Number(b.paidAmount) > 0)).map(b => ({ id:b.id, patientName:b.patientName, appointmentDate:b.appointmentDate, service:b.service, servicePrice:b.servicePrice, paidAmount:b.paidAmount || "0", status:b.status }));
+        const daily = bookings.filter(b => String(b.appointmentDate || "").slice(0,10) === date && (b.status !== "pending" || Number(b.paidAmount) > 0)).map(b => { const otherOwner = access.accountType === "staff" && !!b.paymentEnteredByUid && b.paymentEnteredByUid !== access.uid; return { id:b.id, patientName:b.patientName, appointmentDate:b.appointmentDate, service:b.service, servicePrice:b.servicePrice, paidAmount:otherOwner ? "0" : (b.paidAmount || "0"), status:b.status, paymentEnteredByUid:b.paymentEnteredByUid, paymentEnteredByName:b.paymentEnteredByName, paymentReadOnly:otherOwner, paymentAttributedToCurrentUser:access.accountType === "doctor" || b.paymentEnteredByUid === access.uid, paymentUnassigned:!b.paymentEnteredByUid && Number(b.paidAmount)>0 }; });
         return jsonResponse({ bookings:daily, date });
       }
       case "updatePaidAmount": {
         const bookingId = String(data.id || ""), paidAmount = String(data.paidAmount ?? "");
         if (!/^[A-Za-z0-9_-]{1,150}$/.test(bookingId) || !/^\d{1,8}(\.\d{1,2})?$/.test(paidAmount) || Number(paidAmount) < 0) return jsonResponse({ message:"أدخل مبلغًا مدفوعًا صحيحًا." },400);
-        const booking = await updateBooking(serviceAccount.project_id, accessToken, { id:bookingId, paidAmount });
-        return jsonResponse({ booking:{ id:booking.id, paidAmount:booking.paidAmount } });
+        const currentDoc = await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(bookingId)}`);
+        const current = decodeBooking(currentDoc);
+        if (access.accountType === "staff" && current.paymentEnteredByUid && current.paymentEnteredByUid !== access.uid) return jsonResponse({message:"لا يمكنك تعديل مبلغ سجله موظف آخر."},403);
+        if (await isFinancialPeriodClosed(serviceAccount.project_id, accessToken, current.appointmentDate, current.paymentEnteredByUid || access.uid)) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف؛ لا يمكن تعديل المبلغ بعد الإقفال."},409);
+        const now = new Date().toISOString();
+        const patch = {fields:{
+          paidAmount:stringField(paidAmount),
+          paymentEnteredByUid:stringField(access.uid),
+          paymentEnteredByName:stringField(access.displayName || (access.accountType === "doctor" ? "الدكتور" : "الموظف")),
+          paymentUpdatedAt:stringField(now),
+          updatedAt:stringField(now)
+        }};
+        const updated = await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(bookingId)}?updateMask.fieldPaths=paidAmount&updateMask.fieldPaths=paymentEnteredByUid&updateMask.fieldPaths=paymentEnteredByName&updateMask.fieldPaths=paymentUpdatedAt&updateMask.fieldPaths=updatedAt`, {method:"PATCH",body:JSON.stringify(patch)});
+        const booking = decodeBooking(updated);
+        return jsonResponse({ booking:{ id:booking.id, paidAmount:booking.paidAmount, paymentEnteredByUid:booking.paymentEnteredByUid, paymentEnteredByName:booking.paymentEnteredByName } });
       }
       case "list": {
         const bookings = await listBookings(
