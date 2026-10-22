@@ -79,7 +79,7 @@
         <button id="openHomeTabButton" class="dashboard-tab" type="button" aria-selected="true">الرئيسية</button>
         <button id="openArchiveTabButton" class="dashboard-tab" type="button" aria-selected="false">أرشيف الحجوزات</button>
         <button id="openAccountsTabButton" class="dashboard-tab" type="button" aria-selected="false">حسابات</button>
-        <button id="openBookingsButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الحجوزات</button>
+        <button id="openBookingsButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الحجوزات <span id="pendingBookingBadge" class="booking-notification-badge" aria-live="polite" hidden></span></button>
         <button id="openPatientsButton" class="dashboard-tab" type="button" aria-selected="false">حسابات المريضات</button>
         <button id="openEmployeesButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الموظفين</button>
       </nav>
@@ -167,7 +167,9 @@
         <div id="bookingList" class="employee-list" aria-live="polite"></div></div>
       </section>
 
-      <section id="employeeManagementSection" class="employee-section" hidden>
+<dialog id="doctorQueueDialog" class="queue-number-dialog" aria-labelledby="doctorQueueDialogTitle"><div class="queue-number-dialog-content"><h2 id="doctorQueueDialogTitle">تمت إضافة الحجز</h2><p>رقم الدور</p><strong id="doctorQueueNumber">—</strong><button id="doctorQueueDialogDone" class="primary-button" type="button">تم</button></div></dialog>
+
+            <section id="employeeManagementSection" class="employee-section" hidden>
         <div class="employee-section-heading">
           <div>
             <p class="eyebrow">فريق العيادة</p>
