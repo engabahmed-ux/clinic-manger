@@ -238,7 +238,7 @@
           <form id="patientLoginForm">
             <div class="form-field">
               <label for="patientEmail" data-portal="emailLabel"></label>
-              <input id="patientEmail" name="email" type="email" autocomplete="username" required>
+              <input id="patientEmail" name="email" type="text" autocomplete="username" required>
             </div>
 
             <div class="form-field">
@@ -249,6 +249,15 @@
             <button class="button button-dark form-submit" type="submit" data-portal="loginSubmitButton"></button>
             <p class="form-message" id="loginMessage" role="status" aria-live="polite"></p>
           </form>
+
+          <div id="patientAppointmentsPanel" class="patient-appointments-panel" hidden>
+            <div class="patient-appointments-heading">
+              <h3>مواعيدي</h3>
+              <button id="refreshPatientAppointmentsButton" class="button button-dark" type="button">تحديث المواعيد</button>
+            </div>
+            <p id="patientAppointmentsMessage" class="form-message" role="status" aria-live="polite"></p>
+            <div id="patientAppointmentsList" class="patient-appointments-list"></div>
+          </div>
         </div>
       </div>
     </section>
