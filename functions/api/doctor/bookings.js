@@ -614,7 +614,7 @@ export async function onRequest(context) {
       }
       case "updatePaidAmount": {
         const bookingId = String(data.id || ""), paidAmount = String(data.paidAmount ?? "");
-        if (!/^[A-Za-z0-9_-]{1,150}$/.test(bookingId) || !/^\d{1,8}(\\.\d{1,2})?$/.test(paidAmount) || Number(paidAmount) < 0) return jsonResponse({ message:"أدخل مبلغًا مدفوعًا صحيحًا." },400);
+        if (!/^[A-Za-z0-9_-]{1,150}$/.test(bookingId) || !/^\d{1,8}(\.\d{1,2})?$/.test(paidAmount) || Number(paidAmount) < 0) return jsonResponse({ message:"أدخل مبلغًا مدفوعًا صحيحًا." },400);
         const booking = await updateBooking(serviceAccount.project_id, accessToken, { id:bookingId, paidAmount });
         return jsonResponse({ booking:{ id:booking.id, paidAmount:booking.paidAmount } });
       }
