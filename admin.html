@@ -82,8 +82,8 @@
         <div>
           <h3>تم التحقق من حساب الدكتور</h3>
           <p>
-            يمكنك الوصول إلى مساحة الإدارة. ستتم إضافة الوظائف تدريجيًا
-            بعد تأمين صلاحيات البيانات.
+            يمكنك إدارة حسابات فريق العيادة وصلاحياتهم من القسم المخصص.
+            ستظل إدارة الحجوزات والمرضى ضمن مرحلة لاحقة.
           </p>
         </div>
       </div>
@@ -94,24 +94,186 @@
         <article class="management-card">
           <span class="card-icon" aria-hidden="true">♙</span>
           <h3>إدارة الموظفين</h3>
-          <p>تجهيز حسابات الموظفين وتحديد صلاحيات كل موظف.</p>
-          <span class="status-label">ضمن المرحلة الحالية</span>
+          <p>إنشاء حسابات الموظفين وتحديد صلاحيات كل موظف.</p>
+          <button
+            id="openEmployeesButton"
+            class="card-action-button"
+            type="button"
+          >
+            فتح إدارة الموظفين
+          </button>
         </article>
 
         <article class="management-card">
           <span class="card-icon" aria-hidden="true">▤</span>
           <h3>صلاحيات الوصول</h3>
-          <p>تحديد المشاهدة والتعديل والحذف بشكل منفصل لكل تبويب.</p>
-          <span class="status-label">ضمن المرحلة الحالية</span>
+          <p>
+            تحديد مستوى الوصول لكل قسم بصورة مستقلة، مع التحقق من الطلبات
+            على الخادم.
+          </p>
+          <span class="status-label">إدارة مركزية للصلاحيات</span>
         </article>
 
         <article class="management-card upcoming-card">
           <span class="card-icon" aria-hidden="true">▦</span>
           <h3>الحجوزات والمرضى</h3>
-          <p>ستتم معالجة هذا القسم في مرحلة لاحقة دون تغيير وظائفه الحالية.</p>
+          <p>
+            ستتم معالجة هذا القسم في مرحلة لاحقة دون تغيير وظائفه الحالية.
+          </p>
           <span class="status-label">مرحلة لاحقة</span>
         </article>
       </div>
+
+      <section id="employeeManagementSection" class="employee-section" hidden>
+        <div class="employee-section-heading">
+          <div>
+            <p class="eyebrow">فريق العيادة</p>
+            <h3>إدارة الموظفين</h3>
+            <p class="muted-text">
+              أنشئ حساب الموظف وحدد صلاحيات الوصول لكل قسم.
+            </p>
+          </div>
+
+          <button
+            id="backToDashboardButton"
+            class="secondary-button"
+            type="button"
+          >
+            العودة للوحة
+          </button>
+        </div>
+
+        <div class="security-information">
+          <strong>تنبيه أمني</strong>
+          <p>
+            لا تُخزَّن كلمات المرور في قاعدة البيانات. تُنشأ حسابات الدخول
+            في Firebase Authentication، وتُحفظ الصلاحيات بصورة منفصلة.
+          </p>
+        </div>
+
+        <div class="employee-form-card">
+          <h4>إضافة موظف جديد</h4>
+
+          <form id="createEmployeeForm" class="employee-form" novalidate>
+            <label for="employeeName">اسم الموظف</label>
+            <input
+              id="employeeName"
+              name="displayName"
+              type="text"
+              maxlength="100"
+              autocomplete="name"
+              placeholder="اسم الموظف"
+              required
+            >
+
+            <label for="employeeEmail">البريد الإلكتروني</label>
+            <input
+              id="employeeEmail"
+              name="email"
+              type="email"
+              maxlength="254"
+              autocomplete="off"
+              placeholder="employee@example.com"
+              required
+            >
+
+            <label for="employeePassword">كلمة المرور المؤقتة</label>
+            <input
+              id="employeePassword"
+              name="password"
+              type="password"
+              minlength="6"
+              maxlength="128"
+              autocomplete="new-password"
+              placeholder="6 أحرف على الأقل"
+              required
+            >
+
+            <p class="form-hint">
+              لا تستخدم كلمة مرور شخصية أو مشتركة مع حساب آخر.
+              الحد الأدنى الذي تقبله Firebase هو 6 أحرف.
+            </p>
+
+            <h5 class="permissions-heading">صلاحيات الموظف</h5>
+
+            <div class="permissions-table">
+              <div class="permission-row permission-header">
+                <span>القسم</span>
+                <span>مستوى الوصول</span>
+              </div>
+
+              <div class="permission-row">
+                <label for="permissionBookings">الحجوزات</label>
+                <select id="permissionBookings" name="bookings">
+                  <option value="none">بدون وصول</option>
+                  <option value="view">مشاهدة فقط</option>
+                  <option value="edit">مشاهدة وتعديل</option>
+                </select>
+              </div>
+
+              <div class="permission-row">
+                <label for="permissionPatients">بيانات المرضى</label>
+                <select id="permissionPatients" name="patients">
+                  <option value="none">بدون وصول</option>
+                  <option value="view">مشاهدة فقط</option>
+                  <option value="edit">مشاهدة وتعديل</option>
+                </select>
+              </div>
+
+              <div class="permission-row">
+                <label for="permissionMedicalRecords">السجلات الطبية</label>
+                <select
+                  id="permissionMedicalRecords"
+                  name="medicalRecords"
+                >
+                  <option value="none">بدون وصول</option>
+                  <option value="view">مشاهدة فقط</option>
+                  <option value="edit">مشاهدة وتعديل</option>
+                </select>
+              </div>
+
+              <div class="permission-row">
+                <label for="permissionSettings">إعدادات العيادة</label>
+                <select id="permissionSettings" name="settings">
+                  <option value="none">بدون وصول</option>
+                  <option value="view">مشاهدة فقط</option>
+                  <option value="edit">مشاهدة وتعديل</option>
+                </select>
+              </div>
+            </div>
+
+            <p id="createEmployeeMessage" class="message" role="status" hidden></p>
+
+            <button
+              id="createEmployeeButton"
+              class="primary-button"
+              type="submit"
+            >
+              إنشاء حساب الموظف
+            </button>
+          </form>
+        </div>
+
+        <div class="employee-list-heading">
+          <div>
+            <h4>الموظفون المسجلون</h4>
+            <p class="muted-text">
+              يمكنك مراجعة صلاحيات كل موظف وحفظ التغييرات.
+            </p>
+          </div>
+
+          <button
+            id="refreshEmployeesButton"
+            class="secondary-button"
+            type="button"
+          >
+            تحديث القائمة
+          </button>
+        </div>
+
+        <p id="employeeListMessage" class="message" role="status" hidden></p>
+        <div id="employeeList" class="employee-list" aria-live="polite"></div>
+      </section>
 
       <p id="dashboardMessage" class="message" role="status" hidden></p>
     </section>
