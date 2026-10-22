@@ -151,9 +151,9 @@
             <label for="newBookingDate">التاريخ المطلوب</label>
             <input id="newBookingDate" name="appointmentDate" type="date" required>
             <label for="newBookingService">نوع الحجز أو الخدمة</label>
-            <input id="newBookingService" name="service" type="text" maxlength="120" list="clinicServiceOptions" placeholder="اختر خدمة أو اكتبها يدويًا">
+            <div class="service-quick-field"><input id="newBookingService" name="service" type="text" maxlength="120" placeholder="اكتب الخدمة يدويًا"><select class="service-quick-select" aria-label="اختيار خدمة جاهزة"><option value="">أو اختر خدمة جاهزة</option><option value="كشف">كشف</option><option value="استشارة">استشارة</option><option value="متابعة">متابعة</option><option value="سونار">سونار</option><option value="إعادة كشف">إعادة كشف</option><option value="خدمة أخرى">خدمة أخرى</option></select></div>
             <label for="newBookingServicePrice">قيمة الكشف أو الاستشارة (جنيه)</label><input id="newBookingServicePrice" name="servicePrice" type="number" min="0" max="99999999" step="0.01" inputmode="decimal" placeholder="مثال: 300">
-            <datalist id="clinicServiceOptions"><option value="كشف"></option><option value="استشارة"></option><option value="متابعة"></option><option value="سونار"></option><option value="إعادة كشف"></option><option value="خدمة أخرى"></option></datalist>
+            
             <label for="newBookingNotes">ملاحظات</label>
             <textarea id="newBookingNotes" name="notes" maxlength="2000" rows="3"></textarea>
             <p id="createBookingMessage" class="message" role="status" hidden></p>
