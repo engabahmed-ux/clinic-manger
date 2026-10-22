@@ -720,3 +720,5 @@ button:disabled {
 
 /* حالات المواعيد والأرشيف */
 .booking-status-select{width:100%;min-height:42px;margin-bottom:10px;padding:8px 10px;border:1px solid var(--color-border);border-radius:10px;background:#fff;color:var(--color-dark);font:inherit;font-weight:700}.doctor-archive-section{margin-top:28px;padding-top:20px;border-top:1px solid var(--color-border)}
+
+.schedule-booking-card .booking-request-summary{margin-bottom:8px}.schedule-booking-card>.secondary-button{margin:8px 0 12px}
