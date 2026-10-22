@@ -842,3 +842,28 @@ a {
     margin-top: 0;
   }
 }
+
+
+/* ضبط نهائي لتحية الموظف على الشاشات الصغيرة دون قص الاسم */
+#staffDashboard > .staff-welcome { justify-content: flex-start !important; }
+#staffDashboard > .staff-welcome > .staff-compact-welcome {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+#staffDashboard > #staffTabs { margin-top: 0 !important; }
+@media (max-width: 640px) {
+  #staffDashboard > .staff-welcome { margin-bottom: 8px !important; padding: 0 !important; }
+  #staffDashboard > .staff-welcome > .staff-compact-welcome {
+    width: 100%;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
