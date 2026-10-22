@@ -62,6 +62,12 @@ const doctorAccountLabel = $("#doctorAccountLabel");
 const openEmployeesButton = $("#openEmployeesButton");
 const backToDashboardButton = $("#backToDashboardButton");
 const employeeManagementSection = $("#employeeManagementSection");
+const openBookingsButton = $("#openBookingsButton");
+const backFromBookingsButton = $("#backFromBookingsButton");
+const bookingManagementSection = $("#bookingManagementSection");
+const bookingList = $("#bookingList");
+const bookingListMessage = $("#bookingListMessage");
+const refreshBookingsButton = $("#refreshBookingsButton");
 const createEmployeeForm = $("#createEmployeeForm");
 const createEmployeeButton = $("#createEmployeeButton");
 const createEmployeeMessage = $("#createEmployeeMessage");
@@ -72,6 +78,7 @@ const refreshEmployeesButton = $("#refreshEmployeesButton");
 let isSubmitting = false;
 let isCreatingEmployee = false;
 let isLoadingEmployees = false;
+let isLoadingBookings = false;
 let verificationRequestNumber = 0;
 
 function showMessage(element, message, type = "error") {
@@ -111,6 +118,24 @@ function showEmployeeSection(show) {
   if (employeeManagementSection) {
     employeeManagementSection.hidden = !show;
   }
+
+  if (bookingManagementSection) bookingManagementSection.hidden = true;
+
+  const managementGrid = $(".management-grid");
+  const welcomeCard = $(".welcome-card");
+  const sectionHeading = $(".section-heading");
+
+  if (managementGrid) managementGrid.hidden = show;
+  if (welcomeCard) welcomeCard.hidden = show;
+  if (sectionHeading) sectionHeading.hidden = show;
+}
+
+function showBookingSection(show) {
+  if (bookingManagementSection) {
+    bookingManagementSection.hidden = !show;
+  }
+
+  if (employeeManagementSection) employeeManagementSection.hidden = true;
 
   const managementGrid = $(".management-grid");
   const welcomeCard = $(".welcome-card");
@@ -257,6 +282,154 @@ async function verifyDoctorOnServer(user, requestNumber) {
       loginError,
       "تعذر الاتصال بخدمة التحقق. تحقق من الإنترنت وحاول مرة أخرى."
     );
+  }
+}
+
+async function bookingApiRequest(action, data = {}) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى.");
+
+  const idToken = await user.getIdToken();
+  const response = await fetch("/api/doctor/bookings", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify({ action, ...data }),
+    cache: "no-store"
+  });
+
+  let result = {};
+  try { result = await response.json(); } catch {}
+
+  if (response.status === 401) {
+    throw new Error("انتهت جلسة الدخول. سجّل الدخول مجددًا.");
+  }
+  if (response.status === 403) {
+    throw new Error(result.message || "ليس لديك صلاحية إدارة الحجوزات.");
+  }
+  if (!response.ok) {
+    throw new Error(result.message || "تعذر تنفيذ طلب الحجوزات.");
+  }
+  return result;
+}
+
+function createBookingInput(labelText, value, field, type = "text") {
+  const wrapper = document.createElement("label");
+  wrapper.className = "booking-edit-field";
+  wrapper.textContent = labelText;
+
+  const input = document.createElement(type === "select" ? "select" : "input");
+  input.dataset.bookingField = field;
+  if (type !== "select") input.type = type;
+
+  if (field === "status") {
+    for (const [value, label] of [
+      ["pending", "قيد المراجعة"],
+      ["confirmed", "مؤكد"],
+      ["completed", "مكتمل"],
+      ["cancelled", "ملغي"]
+    ]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      input.append(option);
+    }
+  } else {
+    input.value = value || "";
+    if (field === "patientName") input.maxLength = 120;
+    if (field === "patientPhone") input.maxLength = 40;
+    if (field === "service") input.maxLength = 120;
+    if (field === "notes") input.maxLength = 2000;
+    if (field === "appointmentDate") input.type = "date";
+  }
+
+  if (field === "status") input.value = value || "pending";
+  wrapper.append(input);
+  return wrapper;
+}
+
+function renderBookingCard(booking) {
+  const card = document.createElement("article");
+  card.className = "employee-card booking-card";
+  card.dataset.bookingId = booking.id;
+
+  const heading = document.createElement("div");
+  heading.className = "employee-card-header";
+  const identity = document.createElement("div");
+  const title = document.createElement("h5");
+  title.textContent = booking.patientName || "طلب حجز جديد";
+  const created = document.createElement("p");
+  created.className = "employee-email";
+  created.textContent = `رقم الطلب: ${booking.id}`;
+  identity.append(title, created);
+  heading.append(identity);
+
+  const fields = document.createElement("div");
+  fields.className = "booking-edit-grid";
+  fields.append(
+    createBookingInput("اسم المريضة", booking.patientName, "patientName"),
+    createBookingInput("رقم الهاتف", booking.patientPhone, "patientPhone", "tel"),
+    createBookingInput("التاريخ المطلوب", booking.appointmentDate, "appointmentDate", "date"),
+    createBookingInput("الخدمة", booking.service, "service"),
+    createBookingInput("الحالة", booking.status, "status", "select"),
+    createBookingInput("ملاحظات", booking.notes, "notes")
+  );
+
+  const actions = document.createElement("div");
+  actions.className = "booking-card-actions";
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "primary-button";
+  save.dataset.action = "save-booking";
+  save.textContent = "حفظ التعديلات";
+
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "secondary-button";
+  cancel.dataset.action = "cancel-booking";
+  cancel.textContent = "إلغاء الحجز";
+  cancel.disabled = booking.status === "cancelled";
+
+  actions.append(save, cancel);
+  card.append(heading, fields, actions);
+  return card;
+}
+
+async function loadBookings() {
+  if (isLoadingBookings || !bookingList) return;
+  isLoadingBookings = true;
+  if (refreshBookingsButton) {
+    refreshBookingsButton.disabled = true;
+    refreshBookingsButton.textContent = "جارٍ التحديث...";
+  }
+  hideMessage(bookingListMessage);
+
+  try {
+    const result = await bookingApiRequest("list");
+    bookingList.replaceChildren();
+    const bookings = Array.isArray(result.bookings) ? result.bookings : [];
+    if (!bookings.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty-employees";
+      empty.textContent = "لا توجد طلبات حجز حتى الآن.";
+      bookingList.append(empty);
+    } else {
+      bookings.forEach((booking) => {
+        if (booking?.id) bookingList.append(renderBookingCard(booking));
+      });
+    }
+  } catch (error) {
+    console.error("تعذر تحميل الحجوزات:", error);
+    showMessage(bookingListMessage, error.message || "تعذر تحميل الحجوزات.");
+  } finally {
+    isLoadingBookings = false;
+    if (refreshBookingsButton) {
+      refreshBookingsButton.disabled = false;
+      refreshBookingsButton.textContent = "تحديث الحجوزات";
+    }
   }
 }
 
@@ -542,6 +715,69 @@ if (backToDashboardButton) {
 
 if (refreshEmployeesButton) {
   refreshEmployeesButton.addEventListener("click", loadEmployees);
+}
+
+if (openBookingsButton) {
+  openBookingsButton.addEventListener("click", async () => {
+    showBookingSection(true);
+    await loadBookings();
+  });
+}
+
+if (backFromBookingsButton) {
+  backFromBookingsButton.addEventListener("click", () => {
+    showBookingSection(false);
+  });
+}
+
+if (refreshBookingsButton) {
+  refreshBookingsButton.addEventListener("click", loadBookings);
+}
+
+if (bookingList) {
+  bookingList.addEventListener("click", async (event) => {
+    const button = event.target.closest('button[data-action]');
+    if (!button || !bookingList.contains(button)) return;
+
+    const card = button.closest("[data-booking-id]");
+    const id = card?.dataset.bookingId;
+    if (!id) return;
+
+    const action = button.dataset.action;
+    const busyText = button.textContent;
+    button.disabled = true;
+    button.textContent = action === "cancel-booking" ? "جارٍ الإلغاء..." : "جارٍ الحفظ...";
+    hideMessage(bookingListMessage);
+
+    try {
+      if (action === "cancel-booking") {
+        if (!window.confirm("هل تريد إلغاء طلب الحجز؟")) return;
+        await bookingApiRequest("cancel", { id });
+      } else if (action === "save-booking") {
+        const booking = { id };
+        for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "notes", "status"]) {
+          const input = card.querySelector(`[data-booking-field="${field}"]`);
+          booking[field] = input?.value ?? "";
+        }
+        await bookingApiRequest("update", { booking });
+      } else {
+        return;
+      }
+
+      showMessage(
+        bookingListMessage,
+        action === "cancel-booking" ? "تم إلغاء الحجز." : "تم حفظ تعديلات الحجز.",
+        "success"
+      );
+      await loadBookings();
+    } catch (error) {
+      console.error("تعذر تعديل الحجز:", error);
+      showMessage(bookingListMessage, error.message || "تعذر تعديل الحجز.");
+    } finally {
+      button.disabled = false;
+      button.textContent = busyText;
+    }
+  });
 }
 
 if (createEmployeeForm) {
