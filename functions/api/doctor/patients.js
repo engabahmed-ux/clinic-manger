@@ -148,8 +148,41 @@ export async function onRequest({ request, env }) {
     return jsonResponse({ message: "بيانات الطلب غير صحيحة." }, 400);
   }
 
-  if (!body || typeof body !== "object" || Array.isArray(body) || body.action !== "create") {
+  if (!body || typeof body !== "object" || Array.isArray(body) || !["create", "list"].includes(body.action)) {
     return jsonResponse({ message: "الإجراء المطلوب غير معروف." }, 400);
+  }
+
+  if (body.action === "list") {
+    const user = await verifyUser(request, env);
+    if (!user.ok) return jsonResponse({ message: user.message }, user.status);
+    if (user.uid !== DOCTOR_ADMIN_UID) return jsonResponse({ message: "قائمة حسابات المريضات متاحة للدكتور فقط." }, 403);
+    let account, token;
+    try {
+      account = parseServiceAccount(env);
+      token = await googleAccessToken(account);
+      const result = await firestore(account.project_id, token, ":runQuery", {
+        method: "POST",
+        body: JSON.stringify({ structuredQuery: { from: [{ collectionId: PATIENTS_COLLECTION }] } })
+      });
+      const patients = (Array.isArray(result) ? result : []).filter(item => item.document).map(item => {
+        const fields = item.document.fields || {};
+        return {
+          uid: readString(fields, "uid") || String(item.document.name || "").split("/").pop(),
+          role: readString(fields, "role"),
+          active: fields.active?.booleanValue === true,
+          displayName: readString(fields, "displayName"),
+          email: readString(fields, "email"),
+          phone: readString(fields, "phone"),
+          username: readString(fields, "username"),
+          createdAt: readString(fields, "createdAt"),
+          updatedAt: readString(fields, "updatedAt")
+        };
+      });
+      return jsonResponse({ patients });
+    } catch (error) {
+      console.error("Patient list export failed:", error);
+      return jsonResponse({ message: "تعذر تحميل بيانات حسابات المريضات للتصدير." }, 503);
+    }
   }
 
   const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
