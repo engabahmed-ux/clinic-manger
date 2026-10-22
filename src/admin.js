@@ -1325,7 +1325,7 @@ finalizeMonthlySettlementButton?.addEventListener("click",async()=>{
   if(!periodKey){showMessage(doctorSettlementMessage,"اختر الشهر المراد تصفيته.");return}
   if(!window.confirm("هل تريد تصفية عهدة "+employeeName+" لشهر "+periodKey+"؟ لن يمكن إضافة مصروفات أو تعديل مقبوضات هذه العهدة بعد الإقفال."))return;
   finalizeMonthlySettlementButton.disabled=true;
-  try{const result=await accountsApiRequest("finalizeSettlement",{periodType:"month",periodKey,employeeUid});showMessage(doctorSettlementMessage,"تمت تصفية عهدة "+employeeName+" للشهر. الصافي: "+doctorMoney(result.settlement?.netTotal),"success");await loadDoctorSettlements();renderDoctorAccounts()}
+  try{const result=await accountsApiRequest("finalizeSettlement",{periodType:"month",periodKey,employeeUid});showMessage(doctorSettlementMessage,"تمت تصفية عهدة "+employeeName+" للشهر. الصافي: "+doctorMoney(result.settlement?.netTotal),"success");await loadDoctorSettlements();renderDoctorAccounts();await previewDoctorSettlement("month")}
   catch(error){showMessage(doctorSettlementMessage,error.message||"تعذر تصفية الشهر.")}
   finally{finalizeMonthlySettlementButton.disabled=false}
 });
