@@ -83,7 +83,7 @@
         </form>
         <button id="staffOpenBookingRequests" class="staff-request-toggle" type="button" aria-expanded="false">طلبات الحجوزات <span id="staffPendingBookingBadge" class="booking-notification-badge" aria-live="polite" hidden></span><span aria-hidden="true">⌄</span></button><div id="staffBookingRequestsPanel" hidden><div class="staff-booking-filters"><label>تصفية بتاريخ الموعد<input id="staffBookingDateFilter" type="date"></label></div>
         <p id="staffBookingsMessage" class="staff-message" hidden></p><div id="staffPendingBookingsList" class="staff-bookings-list" aria-live="polite"></div></div>
-    <dialog id="staffQueueDialog" class="queue-number-dialog" aria-labelledby="staffQueueDialogTitle"><div class="queue-number-dialog-content"><h2 id="staffQueueDialogTitle">تمت إضافة الحجز</h2><p>رقم الدور</p><strong id="staffQueueNumber">—</strong><button id="staffQueueDialogDone" class="staff-primary" type="button">تم</button></div></dialog>
+    
           <section id="staffBookingDetail" class="staff-booking-detail" hidden><div class="staff-section-heading"><h3>تفاصيل طلب الحجز</h3><button id="closeStaffBookingDetail" class="staff-secondary" type="button">العودة للطلبات</button></div><div id="staffBookingDetailContent"></div></section>
       </section>
       <section id="staffPatientsSection" class="staff-section staff-tab-panel" hidden><div class="staff-section-heading"><h2>حسابات المريضات</h2></div><div id="staffPatientTools"></div><p id="staffPatientMessage" class="staff-message" hidden></p></section>
@@ -99,5 +99,6 @@
   </main>
 
   <script type="module" src="./src/staff.js"></script>
+  <dialog id="staffQueueDialog" class="queue-number-dialog" aria-labelledby="staffQueueDialogTitle"><div class="queue-number-dialog-content"><h2 id="staffQueueDialogTitle">تمت إضافة الحجز</h2><p>رقم الدور</p><strong id="staffQueueNumber">—</strong><button id="staffQueueDialogDone" class="staff-primary" type="button">تم</button></div></dialog>
 </body>
 </html>
