@@ -781,18 +781,27 @@ if (refreshBookingsButton) {
   refreshBookingsButton.addEventListener("click", loadBookings);
 }
 
+function clearPatientCredentials() {
+  if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
+  if (createdPatientUsername) createdPatientUsername.textContent = "";
+  if (createdPatientEmail) createdPatientEmail.textContent = "";
+  if (createdPatientPassword) createdPatientPassword.textContent = "";
+  if (patientCredentialsMessage) patientCredentialsMessage.textContent = "";
+  if (copyPatientCredentialsButton) copyPatientCredentialsButton.textContent = "نسخ بيانات الدخول";
+}
+
 if (openPatientsButton) {
   openPatientsButton.addEventListener("click", () => {
+    clearPatientCredentials();
     showPatientSection(true);
-    if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
     hideMessage(createPatientMessage);
   });
 }
 
 if (backFromPatientsButton) {
   backFromPatientsButton.addEventListener("click", () => {
+    clearPatientCredentials();
     showPatientSection(false);
-    if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
   });
 }
 
