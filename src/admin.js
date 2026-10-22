@@ -68,6 +68,9 @@ const bookingManagementSection = $("#bookingManagementSection");
 const bookingList = $("#bookingList");
 const bookingListMessage = $("#bookingListMessage");
 const refreshBookingsButton = $("#refreshBookingsButton");
+const createBookingForm = $("#createBookingForm");
+const createBookingButton = $("#createBookingButton");
+const createBookingMessage = $("#createBookingMessage");
 const openPatientsButton = $("#openPatientsButton");
 const backFromPatientsButton = $("#backFromPatientsButton");
 const patientManagementSection = $("#patientManagementSection");
@@ -91,6 +94,7 @@ let isSubmitting = false;
 let isCreatingEmployee = false;
 let isLoadingEmployees = false;
 let isLoadingBookings = false;
+let isCreatingBooking = false;
 let isCreatingPatient = false;
 let verificationRequestNumber = 0;
 
@@ -788,6 +792,47 @@ function clearPatientCredentials() {
   if (createdPatientPassword) createdPatientPassword.textContent = "";
   if (patientCredentialsMessage) patientCredentialsMessage.textContent = "";
   if (copyPatientCredentialsButton) copyPatientCredentialsButton.textContent = "نسخ بيانات الدخول";
+}
+
+if (createBookingForm) {
+  createBookingForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (isCreatingBooking) return;
+    hideMessage(createBookingMessage);
+
+    const booking = {
+      patientName: $("#newBookingPatientName")?.value.trim() || "",
+      patientPhone: $("#newBookingPatientPhone")?.value.trim() || "",
+      appointmentDate: $("#newBookingDate")?.value || "",
+      service: $("#newBookingService")?.value.trim() || "",
+      notes: $("#newBookingNotes")?.value.trim() || ""
+    };
+    if (!booking.patientName || !booking.patientPhone || !booking.appointmentDate) {
+      showMessage(createBookingMessage, "أدخل اسم المريضة ورقم الهاتف والتاريخ.");
+      return;
+    }
+
+    isCreatingBooking = true;
+    if (createBookingButton) {
+      createBookingButton.disabled = true;
+      createBookingButton.textContent = "جارٍ إضافة الحجز...";
+    }
+    try {
+      await bookingApiRequest("create", { booking });
+      createBookingForm.reset();
+      showMessage(createBookingMessage, "تمت إضافة الحجز بحالة قيد المراجعة.", "success");
+      await loadBookings();
+    } catch (error) {
+      console.error("Manual booking creation failed:", error);
+      showMessage(createBookingMessage, error.message || "تعذر إضافة الحجز.");
+    } finally {
+      isCreatingBooking = false;
+      if (createBookingButton) {
+        createBookingButton.disabled = false;
+        createBookingButton.textContent = "إضافة الحجز";
+      }
+    }
+  });
 }
 
 if (openPatientsButton) {
