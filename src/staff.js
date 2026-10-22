@@ -178,6 +178,54 @@ async function loadStaffBookings(container, permission, refreshButton, message) 
       notes.textContent = booking.notes ? `ملاحظات: ${booking.notes}` : "لا توجد ملاحظات.";
       card.append(heading, details, notes);
 
+      const editable = {};
+      if (permission === "edit" && booking.status !== "cancelled") {
+        const editPanel = document.createElement("div");
+        editPanel.className = "staff-booking-edit";
+        const editFields = [
+          ["patientName", "اسم المريضة", booking.patientName, "text"],
+          ["patientPhone", "رقم الهاتف", booking.patientPhone, "tel"],
+          ["appointmentDate", "التاريخ المطلوب", String(booking.appointmentDate || "").slice(0, 10), "date"],
+          ["service", "الخدمة", booking.service, "text"],
+          ["notes", "ملاحظات", booking.notes, "text"]
+        ];
+        for (const [key, labelText, value, type] of editFields) {
+          const label = document.createElement("label");
+          label.textContent = labelText;
+          const input = document.createElement("input");
+          input.type = type;
+          input.value = value || "";
+          input.dataset.bookingField = key;
+          if (key === "patientName") input.maxLength = 120;
+          if (key === "patientPhone") input.maxLength = 40;
+          if (key === "service") input.maxLength = 120;
+          if (key === "notes") input.maxLength = 2000;
+          editable[key] = input;
+          label.append(input);
+          editPanel.append(label);
+        }
+        const statusLabel = document.createElement("label");
+        statusLabel.textContent = "حالة الحجز";
+        const statusSelect = document.createElement("select");
+        statusSelect.dataset.bookingField = "status";
+        for (const [value, labelText] of [
+          ["pending", "قيد المراجعة"],
+          ["confirmed", "مؤكد"],
+          ["completed", "مكتمل"],
+          ["cancelled", "ملغي"]
+        ]) {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = labelText;
+          statusSelect.append(option);
+        }
+        statusSelect.value = booking.status || "pending";
+        editable.status = statusSelect;
+        statusLabel.append(statusSelect);
+        editPanel.append(statusLabel);
+        card.append(editPanel);
+      }
+
       if (permission === "edit" && booking.status !== "cancelled") {
         const actions = document.createElement("div");
         actions.className = "staff-booking-actions";
@@ -219,7 +267,28 @@ async function loadStaffBookings(container, permission, refreshButton, message) 
             cancelButton.disabled = false;
           }
         });
-        actions.append(confirmButton, cancelButton);
+        const saveButton = document.createElement("button");
+        saveButton.type = "button";
+        saveButton.className = "staff-primary";
+        saveButton.textContent = "حفظ التعديلات";
+        saveButton.addEventListener("click", async () => {
+          saveButton.disabled = true;
+          try {
+            const updated = { id: booking.id };
+            for (const key of ["patientName", "patientPhone", "appointmentDate", "service", "notes", "status"]) {
+              updated[key] = editable[key]?.value ?? booking[key] ?? "";
+            }
+            await staffBookingsRequest("update", { booking: updated });
+            await loadStaffBookings(container, permission, refreshButton, message);
+          } catch (error) {
+            if (message) {
+              message.textContent = error.message || "تعذر حفظ تعديلات الحجز.";
+              message.hidden = false;
+            }
+            saveButton.disabled = false;
+          }
+        });
+        actions.append(saveButton, confirmButton, cancelButton);
         card.append(actions);
       }
       container.append(card);
