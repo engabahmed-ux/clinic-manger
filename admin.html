@@ -145,8 +145,9 @@
             <input id="newBookingPatientPhone" name="patientPhone" type="tel" maxlength="40" required>
             <label for="newBookingDate">التاريخ المطلوب</label>
             <input id="newBookingDate" name="appointmentDate" type="date" required>
-            <label for="newBookingService">الخدمة</label>
-            <input id="newBookingService" name="service" type="text" maxlength="120">
+            <label for="newBookingService">نوع الحجز أو الخدمة</label>
+            <input id="newBookingService" name="service" type="text" maxlength="120" list="clinicServiceOptions" placeholder="اختر خدمة أو اكتبها يدويًا">
+            <datalist id="clinicServiceOptions"><option value="كشف"><option value="استشارة"><option value="متابعة"><option value="سونار"><option value="إعادة كشف"><option value="خدمة أخرى"></datalist>
             <label for="newBookingNotes">ملاحظات</label>
             <textarea id="newBookingNotes" name="notes" maxlength="2000" rows="3"></textarea>
             <p id="createBookingMessage" class="message" role="status" hidden></p>
@@ -155,7 +156,7 @@
         </div>
         <div class="booking-list-filters">
           <label>بحث بالاسم أو الهاتف<input id="bookingSearchInput" type="search" placeholder="اسم المريضة أو رقم الهاتف"></label>
-          <label>تاريخ الطلب<input id="bookingDateFilter" type="date"></label>
+          <label>تاريخ الموعد<input id="bookingDateFilter" type="date"></label>
         </div>
         <p id="bookingListMessage" class="message" role="status" hidden></p>
         <div id="bookingList" class="employee-list" aria-live="polite"></div>
