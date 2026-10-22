@@ -847,3 +847,14 @@ button:disabled {
 .queue-number-dialog-content strong { font-size: 56px; line-height: 1.2; }
 .queue-number-dialog-content button { width: 100%; min-height: 44px; }
 
+
+
+/* إشعار واضح على تبويب الحجوزات وسجل نقل المواعيد */
+.dashboard-tab.has-pending-bookings{position:relative}
+.dashboard-tab.has-pending-bookings::after{content:"";position:absolute;top:7px;inset-inline-end:8px;width:8px;height:8px;border-radius:50%;background:#c62828;box-shadow:0 0 0 3px rgba(198,40,40,.12)}
+.reschedule-notice-card{border-inline-start:4px solid #b87922;background:#fffaf0;padding:14px 16px;margin-block:8px;border-radius:12px}
+.reschedule-notice-card>strong{display:block;margin-bottom:5px}
+.reschedule-notice-text{margin:0 0 5px;color:#8a5717;font-weight:800;font-size:13px}
+.reschedule-notice-card small{display:block;color:var(--color-muted);font-size:12px}
+#exportClinicExcelButton{align-self:end;min-height:42px;white-space:nowrap}
+@media(max-width:640px){#exportClinicExcelButton{width:100%}}
