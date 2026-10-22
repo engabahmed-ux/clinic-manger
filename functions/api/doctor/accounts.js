@@ -183,7 +183,7 @@ export async function onRequestPost({ request, env }) {
       const periodType = data.periodType === "month" ? "month" : data.periodType === "day" ? "day" : "";
       const periodKey = String(data.periodKey || "");
       const employeeUid = String(data.employeeUid || "");
-      if (!periodType || !(periodType === "day" ? /^\\d{4}-\\d{2}-\\d{2}$/.test(periodKey) : /^\\d{4}-\\d{2}$/.test(periodKey)) ||
+      if (!periodType || !(periodType === "day" ? /^\d{4}-\d{2}-\d{2}$/.test(periodKey) : /^\d{4}-\d{2}$/.test(periodKey)) ||
           !/^[A-Za-z0-9_-]{1,128}$/.test(employeeUid)) return jsonResponse({message:"حدد الموظف والفترة بصورة صحيحة."},400);
       const records = await listRecords(projectId, token);
       const prior = records.find(x=>x.type==="settlement" && x.employeeUid===employeeUid && x.periodType===periodType && x.periodKey===periodKey);
