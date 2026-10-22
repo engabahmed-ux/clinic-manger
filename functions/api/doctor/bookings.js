@@ -625,6 +625,21 @@ export async function onRequest(context) {
         });
       }
 
+      case "archiveDay": {
+        const date = typeof data.date === "string" ? data.date : "";
+        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00`))) {
+          return jsonResponse({ message: "تاريخ الأرشفة غير صحيح." }, 400);
+        }
+        const all = await listBookings(serviceAccount.project_id, accessToken);
+        const targets = all.filter((booking) => booking.appointmentDate.slice(0, 10) === date && !["pending", "archived", "cancelled"].includes(booking.status));
+        let archivedCount = 0;
+        for (const booking of targets) {
+          await updateBooking(serviceAccount.project_id, accessToken, { id: booking.id, status: "archived" });
+          archivedCount += 1;
+        }
+        return jsonResponse({ archivedCount, date });
+      }
+
       case "create": {
         const error = validateBooking(data.booking);
 
