@@ -73,6 +73,10 @@ const bookingCreateCard = $(".booking-create-card");
 const bookingSearchInput = $("#bookingSearchInput");
 const bookingDateFilter = $("#bookingDateFilter");
 const homeAppointmentsSection = $("#homeAppointmentsSection");
+const doctorHomeDateFilter = $("#doctorHomeDateFilter");
+const doctorHomeSearch = $("#doctorHomeSearch");
+const doctorArchiveDateFilter = $("#doctorArchiveDateFilter");
+const doctorArchiveList = $("#doctorArchiveList");
 const dailyAppointmentsList = $("#dailyAppointmentsList");
 const dailyAppointmentsMessage = $("#dailyAppointmentsMessage");
 const refreshDailyAppointmentsButton = $("#refreshDailyAppointmentsButton");
@@ -378,8 +382,12 @@ function createBookingInput(labelText, value, field, type = "text") {
   if (field === "status") {
     for (const [value, label] of [
       ["pending", "قيد المراجعة"],
-      ["confirmed", "مؤكد"],
-      ["completed", "مكتمل"],
+      ["waiting", "في الانتظار"],
+      ["confirmed", "في الانتظار"],
+      ["completed", "تم الكشف"],
+      ["postponed", "تم التأجيل"],
+      ["no_show", "لم يأتِ"],
+      ["apologized", "اعتذر"],
       ["cancelled", "ملغي"]
     ]) {
       const option = document.createElement("option");
@@ -396,7 +404,7 @@ function createBookingInput(labelText, value, field, type = "text") {
     if (field === "appointmentDate") input.type = "date";
   }
 
-  if (field === "status") input.value = value || "pending";
+  if (field === "status") input.value = normalizedStatus(value) || "pending";
   wrapper.append(input);
   return wrapper;
 }
@@ -409,11 +417,11 @@ function renderBookingCard(booking) {
   summary.type = "button"; summary.className = "booking-request-summary";
   const main = document.createElement("span"); main.className = "booking-request-main";
   const title = document.createElement("strong"); title.textContent = booking.patientName || "طلب حجز جديد";
-  const meta = document.createElement("small"); meta.textContent = `الدور: ${queueNumberFor(booking)} · تاريخ الطلب: ${formatSubmittedAt(booking.createdAt)} · الموعد: ${formatRequestDate(booking.appointmentDate)} · ${booking.patientPhone||"الهاتف غير مسجل"} · ${booking.service||"الخدمة غير محددة"}`;
+  const meta = document.createElement("small"); meta.textContent = `الدور: ${queueNumberFor(booking)} · ${bookingStatusLabel(booking.status)} · تاريخ الطلب: ${formatSubmittedAt(booking.createdAt)} · الموعد: ${formatRequestDate(booking.appointmentDate)} · ${booking.patientPhone||"الهاتف غير مسجل"} · ${booking.service||"الخدمة غير محددة"}`;
   main.append(title,meta); const badge=document.createElement("span");badge.className="booking-request-badge";badge.textContent=bookingStatusLabel(booking.status);summary.append(main,badge);
   const details=document.createElement("div");details.className="booking-request-details";details.hidden=true;
   const fields=document.createElement("div");fields.className="booking-edit-grid";
-  fields.append(createBookingInput("اسم المريضة",booking.patientName,"patientName"),createBookingInput("رقم الهاتف",booking.patientPhone,"patientPhone","tel"),createBookingInput("الموعد",String(booking.appointmentDate||"").slice(0,10),"appointmentDate","date"),createBookingInput("الخدمة",booking.service,"service"),createBookingInput("ملاحظات",booking.notes,"notes"));
+  fields.append(createBookingInput("اسم المريضة",booking.patientName,"patientName"),createBookingInput("رقم الهاتف",booking.patientPhone,"patientPhone","tel"),createBookingInput("الموعد",String(booking.appointmentDate||"").slice(0,10),"appointmentDate","date"),createBookingInput("الخدمة",booking.service,"service"),createBookingInput("ملاحظات",booking.notes,"notes"),createBookingInput("حالة الحجز",normalizedStatus(booking.status),"status","select"));
   const actions=document.createElement("div");actions.className="booking-card-actions";
   const actionItems=[["save-booking","حفظ التعديلات","secondary-button"]];
   if(booking.status==="pending")actionItems.push(["confirm-booking","تأكيد الحجز","primary-button"]);
@@ -423,32 +431,17 @@ function renderBookingCard(booking) {
 }
 function formatRequestDate(value){if(!value)return"التاريخ غير محدد";const date=new Date(`${String(value).slice(0,10)}T12:00:00`);return Number.isNaN(date.getTime())?value:new Intl.DateTimeFormat("ar-EG",{dateStyle:"medium"}).format(date)}
 function formatSubmittedAt(value){if(!value)return"وقت الطلب غير متاح";const date=new Date(value);return Number.isNaN(date.getTime())?"وقت الطلب غير متاح":new Intl.DateTimeFormat("ar-EG",{dateStyle:"medium",timeStyle:"short"}).format(date)}
-function queueNumberFor(booking){
-  const date=String(booking.appointmentDate||"").slice(0,10);
-  if(!date)return "—";
-  const rows=allBookings.filter(item=>String(item.appointmentDate||"").slice(0,10)===date)
-    .sort((x,y)=>(Date.parse(x.createdAt||"")||0)-(Date.parse(y.createdAt||"")||0));
-  const index=rows.findIndex(item=>item.id===booking.id);
-  return index<0?"—":index+1;
-}
-function bookingStatusLabel(status){
-  return ({pending:"قيد المراجعة",confirmed:"مؤكد",completed:"مكتمل",cancelled:"ملغي"})[status]||"غير محدد";
-}
-function renderDailyAppointments(){
-  dailyAppointmentsList.replaceChildren();
-  const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
-  const rows=allBookings.filter(b=>b.status==="confirmed"&&String(b.appointmentDate||"").slice(0,10)===today)
-    .sort((a,b)=>queueNumberFor(a)-queueNumberFor(b));
-  if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد مواعيد مؤكدة اليوم.";dailyAppointmentsList.append(empty);return}
-  for(const b of rows){const card=document.createElement("article");card.className="employee-card daily-appointment-card";const h=document.createElement("h4");h.textContent=`الدور ${queueNumberFor(b)} · ${b.patientName||"مريضة"}`;const p=document.createElement("p");p.textContent=[b.patientPhone,b.service].filter(Boolean).join(" · ");card.append(h,p);dailyAppointmentsList.append(card)}
-}
-function renderPendingBookings(){
-  bookingList.replaceChildren();const query=(bookingSearchInput?.value||"").trim().toLocaleLowerCase("ar"),date=bookingDateFilter?.value||"";
-  const rows=allBookings.filter(b=>(date?(b.status!=="cancelled"&&String(b.appointmentDate||"").slice(0,10)===date):b.status==="pending"))
-    .filter(b=>(!query||`${b.patientName||""} ${b.patientPhone||""}`.toLocaleLowerCase("ar").includes(query)));
-  if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent=date?"لا توجد حجوزات في هذا اليوم.":"لا توجد طلبات حجز معلقة.";bookingList.append(empty);return}
-  rows.forEach(b=>bookingList.append(renderBookingCard(b)));
-}
+function queueNumberFor(booking){const date=String(booking.appointmentDate||"").slice(0,10);if(!date)return"—";const rows=allBookings.filter(item=>String(item.appointmentDate||"").slice(0,10)===date).sort((x,y)=>(Date.parse(x.createdAt||"")||0)-(Date.parse(y.createdAt||"")||0));const index=rows.findIndex(item=>item.id===booking.id);return index<0?"—":index+1}
+const BOOKING_STATUS_OPTIONS=[["waiting","في الانتظار"],["completed","تم الكشف"],["postponed","تم التأجيل"],["no_show","لم يأتِ"],["apologized","اعتذر"]];
+const ARCHIVE_STATUSES=new Set(["completed","postponed","no_show","apologized","cancelled"]);
+function normalizedStatus(status){return status==="confirmed"?"waiting":status}
+function bookingStatusLabel(status){return({pending:"قيد المراجعة",confirmed:"في الانتظار",waiting:"في الانتظار",completed:"تم الكشف",postponed:"تم التأجيل",no_show:"لم يأتِ",apologized:"اعتذر",cancelled:"ملغي"})[status]||"غير محدد"}
+async function changeBookingStatus(booking,status,control){if(!["waiting","completed","postponed","no_show","apologized"].includes(status))return;if(control)control.disabled=true;try{await bookingApiRequest("update",{booking:{id:booking.id,status}});showMessage(bookingListMessage,ARCHIVE_STATUSES.has(status)?"تم تحديث الحالة ونقل الحجز إلى الأرشيف.":"تم تحديث حالة الحجز.","success");await loadBookings()}catch(error){showMessage(bookingListMessage,error.message||"تعذر تحديث حالة الحجز.");if(control)control.value=normalizedStatus(booking.status)}finally{if(control)control.disabled=false}}
+function makeStatusSelect(booking){const select=document.createElement("select");select.className="booking-status-select";select.setAttribute("aria-label",`حالة حجز ${booking.patientName||""}`);for(const[value,label]of BOOKING_STATUS_OPTIONS){const option=document.createElement("option");option.value=value;option.textContent=label;select.append(option)}select.value=normalizedStatus(booking.status)||"waiting";select.addEventListener("change",()=>changeBookingStatus(booking,select.value,select));return select}
+function renderScheduleCard(booking,archived=false){const card=renderBookingCard(booking);card.classList.add("schedule-booking-card");if(!archived)card.prepend(makeStatusSelect(booking));return card}
+function renderDailyAppointments(){dailyAppointmentsList.replaceChildren();const day=doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());const query=(doctorHomeSearch?.value||"").trim().toLocaleLowerCase("ar");const rows=allBookings.filter(b=>["confirmed","waiting"].includes(b.status)&&String(b.appointmentDate||"").slice(0,10)===day&&(!query||`${b.patientName||""} ${b.patientPhone||""} ${b.service||""}`.toLocaleLowerCase("ar").includes(query))).sort((a,b)=>queueNumberFor(a)-queueNumberFor(b));if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent=`لا توجد مواعيد نشطة في ${formatRequestDate(day)}.`;dailyAppointmentsList.append(empty);return}for(const booking of rows)dailyAppointmentsList.append(renderScheduleCard(booking))}
+function renderDoctorArchive(){if(!doctorArchiveList)return;doctorArchiveList.replaceChildren();const day=doctorArchiveDateFilter?.value||"";const rows=allBookings.filter(b=>ARCHIVE_STATUSES.has(b.status)&&(!day||String(b.appointmentDate||"").slice(0,10)===day)).sort((a,b)=>(Date.parse(b.updatedAt||b.createdAt||"")||0)-(Date.parse(a.updatedAt||a.createdAt||"")||0));if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد حجوزات مؤرشفة حسب الفلتر الحالي.";doctorArchiveList.append(empty);return}for(const booking of rows)doctorArchiveList.append(renderScheduleCard(booking,true))}
+function renderPendingBookings(){bookingList.replaceChildren();const query=(bookingSearchInput?.value||"").trim().toLocaleLowerCase("ar"),date=bookingDateFilter?.value||"";const rows=allBookings.filter(b=>b.status==="pending"&&(!date||String(b.appointmentDate||"").slice(0,10)===date)).filter(b=>(!query||`${b.patientName||""} ${b.patientPhone||""}`.toLocaleLowerCase("ar").includes(query)));if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد طلبات مراجعة مطابقة.";bookingList.append(empty);return}rows.forEach(b=>bookingList.append(renderBookingCard(b)))}
 async function loadBookings() {
   if (isLoadingBookings || !bookingList) return;
   isLoadingBookings = true;
@@ -458,7 +451,7 @@ async function loadBookings() {
   try {
     const result = await bookingApiRequest("list");
     allBookings = Array.isArray(result.bookings) ? result.bookings : [];
-    renderPendingBookings(); renderDailyAppointments();
+    renderPendingBookings(); renderDailyAppointments(); renderDoctorArchive();
   } catch (error) {
     console.error("تعذر تحميل الحجوزات:", error);
     showMessage(bookingListMessage,error.message||"تعذر تحميل الحجوزات.");
@@ -803,7 +796,7 @@ if (createBookingForm) {
     try {
       await bookingApiRequest("create", { booking });
       createBookingForm.reset();
-      showMessage(createBookingMessage, "تمت إضافة الحجز بحالة قيد المراجعة.", "success");
+      showMessage(createBookingMessage, "تمت إضافة الحجز مباشرةً إلى قائمة الانتظار.", "success");
       await loadBookings();
     } catch (error) {
       console.error("Manual booking creation failed:", error);
@@ -915,15 +908,16 @@ if (bookingList) {
         if (!window.confirm("هل تريد إلغاء طلب الحجز؟")) return;
         await bookingApiRequest("cancel", { id });
       } else if (action === "confirm-booking") {
-        const booking = { id, status: "confirmed" };
-        for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "notes"]) {
+        const booking = { id, status: "waiting" };
+        for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "notes", "status"]) {
           const input = card.querySelector(`[data-booking-field="${field}"]`);
           booking[field] = input?.value ?? "";
         }
+        booking.status = "waiting";
         await bookingApiRequest("update", { booking });
       } else if (action === "save-booking") {
         const booking = { id };
-        for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "notes"]) {
+        for (const field of ["patientName", "patientPhone", "appointmentDate", "service", "notes", "status"]) {
           const input = card.querySelector(`[data-booking-field="${field}"]`);
           booking[field] = input?.value ?? "";
         }
@@ -1083,4 +1077,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // لا تُعرض لوحة الدكتور قبل اكتمال التحقق من الخادم.
+if (doctorHomeDateFilter) { doctorHomeDateFilter.value = new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()); doctorHomeDateFilter.addEventListener("change",renderDailyAppointments); }
+doctorHomeSearch?.addEventListener("input",renderDailyAppointments);
+doctorArchiveDateFilter?.addEventListener("change",renderDoctorArchive);
 showLogin();
