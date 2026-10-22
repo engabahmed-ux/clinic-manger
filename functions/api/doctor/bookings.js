@@ -1,0 +1,670 @@
+
+const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
+const EXPECTED_PROJECT_ID = "clinics-manger";
+const STAFF_COLLECTION = "clinicStaff";
+const BOOKINGS_COLLECTION = "clinicBookings";
+
+const FIREBASE_LOOKUP_URL =
+  "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GOOGLE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
+
+const STATUSES = ["pending", "confirmed", "completed", "cancelled"];
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer"
+    }
+  });
+}
+
+function encodeBytes(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function encodeText(value) {
+  return encodeBytes(new TextEncoder().encode(value));
+}
+
+function decodePrivateKey(pem) {
+  const base64 = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
+    .replace(/-----END PRIVATE KEY-----/g, "")
+    .replace(/\s/g, "");
+
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes;
+}
+
+function parseServiceAccount(env) {
+  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    throw new Error("Missing service account configuration.");
+  }
+
+  const account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
+
+  if (
+    account.project_id !== EXPECTED_PROJECT_ID ||
+    typeof account.client_email !== "string" ||
+    typeof account.private_key !== "string"
+  ) {
+    throw new Error("Invalid service account configuration.");
+  }
+
+  return account;
+}
+
+async function createGoogleAccessToken(account) {
+  const now = Math.floor(Date.now() / 1000);
+
+  const header = { alg: "RS256", typ: "JWT" };
+  const claims = {
+    iss: account.client_email,
+    scope: GOOGLE_SCOPE,
+    aud: GOOGLE_TOKEN_URL,
+    iat: now,
+    exp: now + 3600
+  };
+
+  const unsigned = [
+    encodeText(JSON.stringify(header)),
+    encodeText(JSON.stringify(claims))
+  ].join(".");
+
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    decodePrivateKey(account.private_key),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(unsigned)
+  );
+
+  const assertion = `${unsigned}.${encodeBytes(new Uint8Array(signature))}`;
+
+  const response = await fetch(GOOGLE_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to obtain Google access token.");
+  }
+
+  const result = await response.json();
+
+  if (!result.access_token) {
+    throw new Error("Google access token missing.");
+  }
+
+  return result.access_token;
+}
+
+async function verifyFirebaseUser(request, env) {
+  if (!env.FIREBASE_API_KEY) {
+    return {
+      ok: false,
+      status: 503,
+      message: "خدمة التحقق غير مهيأة على الخادم."
+    };
+  }
+
+  const authorization = request.headers.get("Authorization") || "";
+  const match = authorization.match(/^Bearer\s+(\S+)$/i);
+
+  if (!match || match[1].length > 8192) {
+    return {
+      ok: false,
+      status: 401,
+      message: "يلزم تسجيل الدخول."
+    };
+  }
+
+  const response = await fetch(
+    `${FIREBASE_LOOKUP_URL}?key=${encodeURIComponent(env.FIREBASE_API_KEY)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken: match[1] })
+    }
+  );
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: 401,
+      message: "جلسة الدخول غير صالحة. سجّل الدخول مجددًا."
+    };
+  }
+
+  const result = await response.json();
+  const user = result.users?.[0];
+
+  if (!user?.localId) {
+    return {
+      ok: false,
+      status: 401,
+      message: "تعذر التحقق من الحساب."
+    };
+  }
+
+  return {
+    ok: true,
+    uid: user.localId,
+    email: user.email || ""
+  };
+}
+
+function firestoreUrl(projectId, path = "") {
+  return (
+    "https://firestore.googleapis.com/v1/projects/" +
+    `${encodeURIComponent(projectId)}/databases/(default)/documents${path}`
+  );
+}
+
+async function firestoreRequest(projectId, accessToken, path, options = {}) {
+  const response = await fetch(firestoreUrl(projectId, path), {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+
+    console.error(
+      "Bookings Firestore request failed:",
+      response.status,
+      details.slice(0, 1000)
+    );
+
+    const error = new Error("تعذر الوصول إلى بيانات الحجوزات.");
+    error.status = response.status;
+    throw error;
+  }
+
+  if (response.status === 204) return null;
+
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
+function stringField(value) {
+  return { stringValue: String(value ?? "") };
+}
+
+function readString(fields, key) {
+  return fields?.[key]?.stringValue || "";
+}
+
+function decodeBooking(document) {
+  const fields = document.fields || {};
+  const id = (document.name || "").split("/").pop();
+
+  return {
+    id,
+    patientName: readString(fields, "patientName"),
+    patientPhone: readString(fields, "patientPhone"),
+    appointmentDate: readString(fields, "appointmentDate"),
+    service: readString(fields, "service"),
+    notes: readString(fields, "notes"),
+    status: readString(fields, "status") || "pending",
+    createdAt: readString(fields, "createdAt"),
+    updatedAt: readString(fields, "updatedAt")
+  };
+}
+
+function encodeBooking(data) {
+  const fields = {};
+
+  for (const key of [
+    "patientName",
+    "patientPhone",
+    "appointmentDate",
+    "service",
+    "notes",
+    "status",
+    "createdAt",
+    "updatedAt"
+  ]) {
+    fields[key] = stringField(data[key]);
+  }
+
+  return { fields };
+}
+
+async function getAccountAccess(
+  user,
+  serviceAccount,
+  accessToken
+) {
+  if (user.uid === DOCTOR_ADMIN_UID) {
+    return {
+      ok: true,
+      accountType: "doctor",
+      permission: "edit"
+    };
+  }
+
+  let document;
+
+  try {
+    document = await firestoreRequest(
+      serviceAccount.project_id,
+      accessToken,
+      `/${STAFF_COLLECTION}/${encodeURIComponent(user.uid)}`
+    );
+  } catch {
+    return {
+      ok: false,
+      status: 403,
+      message: "هذا الحساب غير مصرح له بإدارة حجوزات العيادة."
+    };
+  }
+
+  const fields = document?.fields || {};
+  const active = fields.active?.booleanValue === true;
+  const role = readString(fields, "role");
+  const permission = readString(
+    fields.permissions?.mapValue?.fields,
+    "bookings"
+  );
+
+  if (role !== "staff" || !active) {
+    return {
+      ok: false,
+      status: 403,
+      message: "حساب الموظف غير نشط أو غير معتمد."
+    };
+  }
+
+  if (!["view", "edit"].includes(permission)) {
+    return {
+      ok: false,
+      status: 403,
+      message: "لم يمنحك الدكتور صلاحية الوصول إلى الحجوزات."
+    };
+  }
+
+  return {
+    ok: true,
+    accountType: "staff",
+    permission
+  };
+}
+
+function validateBooking(data, partial = false) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return "بيانات الحجز غير صحيحة.";
+  }
+
+  const allowed = [
+    "patientName",
+    "patientPhone",
+    "appointmentDate",
+    "service",
+    "notes",
+    "status"
+  ];
+
+  if (Object.keys(data).some((key) => !allowed.includes(key))) {
+    return "تم إرسال حقول غير معتمدة.";
+  }
+
+  for (const key of ["patientName", "patientPhone", "appointmentDate"]) {
+    if (partial && !(key in data)) continue;
+
+    if (typeof data[key] !== "string" || !data[key].trim()) {
+      return "يرجى إدخال اسم المريضة ورقم الهاتف وموعد الحجز.";
+    }
+
+    if (data[key].length > 200) {
+      return "أحد الحقول أطول من المسموح.";
+    }
+  }
+
+  if (data.patientName && data.patientName.trim().length > 120) {
+    return "اسم المريضة أطول من المسموح.";
+  }
+
+  if (data.patientPhone && data.patientPhone.trim().length > 40) {
+    return "رقم الهاتف أطول من المسموح.";
+  }
+
+  if (
+    data.appointmentDate &&
+    (
+      data.appointmentDate.length > 40 ||
+      Number.isNaN(Date.parse(data.appointmentDate))
+    )
+  ) {
+    return "تاريخ الحجز غير صحيح.";
+  }
+
+  if (data.service && data.service.length > 120) {
+    return "اسم الخدمة أطول من المسموح.";
+  }
+
+  if (data.notes && data.notes.length > 2000) {
+    return "الملاحظات أطول من المسموح.";
+  }
+
+  if (data.status && !STATUSES.includes(data.status)) {
+    return "حالة الحجز غير صحيحة.";
+  }
+
+  return null;
+}
+
+async function listBookings(projectId, accessToken) {
+  const result = await firestoreRequest(
+    projectId,
+    accessToken,
+    ":runQuery",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: BOOKINGS_COLLECTION }],
+          limit: 300
+        })
+      }
+    }
+  );
+
+  return (Array.isArray(result) ? result : [])
+    .filter((item) => item.document)
+    .map((item) => decodeBooking(item.document))
+    .sort((a, b) =>
+      a.appointmentDate.localeCompare(b.appointmentDate)
+    );
+}
+
+async function createBooking(projectId, accessToken, data) {
+  const now = new Date().toISOString();
+
+  const booking = {
+    ...data,
+    patientName: data.patientName.trim(),
+    patientPhone: data.patientPhone.trim(),
+    appointmentDate: data.appointmentDate.trim(),
+    service: (data.service || "").trim(),
+    notes: (data.notes || "").trim(),
+    status: "pending",
+    createdAt: now,
+    updatedAt: now
+  };
+
+  const result = await firestoreRequest(
+    projectId,
+    accessToken,
+    `/${BOOKINGS_COLLECTION}`,
+    {
+      method: "POST",
+      body: JSON.stringify(encodeBooking(booking))
+    }
+  );
+
+  return decodeBooking(result);
+}
+
+async function updateBooking(projectId, accessToken, data) {
+  if (
+    typeof data.id !== "string" ||
+    !/^[A-Za-z0-9_-]{1,150}$/.test(data.id)
+  ) {
+    throw new Error("رقم الحجز غير صحيح.");
+  }
+
+  const changes = { ...data };
+  delete changes.action;
+  delete changes.id;
+
+  const error = validateBooking(changes, true);
+  if (error) throw new Error(error);
+
+  const current = await firestoreRequest(
+    projectId,
+    accessToken,
+    `/${BOOKINGS_COLLECTION}/${encodeURIComponent(data.id)}`
+  );
+
+  const existing = decodeBooking(current);
+
+  const booking = {
+    ...existing,
+    ...changes,
+    patientName: changes.patientName?.trim() ?? existing.patientName,
+    patientPhone: changes.patientPhone?.trim() ?? existing.patientPhone,
+    appointmentDate:
+      changes.appointmentDate?.trim() ?? existing.appointmentDate,
+    service: changes.service?.trim() ?? existing.service,
+    notes: changes.notes?.trim() ?? existing.notes,
+    updatedAt: new Date().toISOString()
+  };
+
+  const query = new URLSearchParams();
+
+  for (const key of [
+    "patientName",
+    "patientPhone",
+    "appointmentDate",
+    "service",
+    "notes",
+    "status",
+    "updatedAt"
+  ]) {
+    query.append("updateMask.fieldPaths", key);
+  }
+
+  const result = await firestoreRequest(
+    projectId,
+    accessToken,
+    `/${BOOKINGS_COLLECTION}/${encodeURIComponent(data.id)}?${query}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(encodeBooking(booking))
+    }
+  );
+
+  return decodeBooking(result);
+}
+
+async function cancelBooking(projectId, accessToken, data) {
+  if (
+    typeof data.id !== "string" ||
+    !/^[A-Za-z0-9_-]{1,150}$/.test(data.id)
+  ) {
+    throw new Error("رقم الحجز غير صحيح.");
+  }
+
+  return updateBooking(projectId, accessToken, {
+    id: data.id,
+    status: "cancelled"
+  });
+}
+
+export async function onRequest(context) {
+  const { request, env } = context;
+
+  if (request.method !== "POST") {
+    return jsonResponse(
+      { message: "طريقة الطلب غير مسموحة." },
+      405
+    );
+  }
+
+  let data;
+
+  try {
+    const raw = await request.text();
+
+    if (raw.length > 20000) {
+      return jsonResponse(
+        { message: "حجم الطلب أكبر من المسموح." },
+        413
+      );
+    }
+
+    data = JSON.parse(raw);
+  } catch {
+    return jsonResponse(
+      { message: "صيغة الطلب غير صحيحة." },
+      400
+    );
+  }
+
+  const user = await verifyFirebaseUser(request, env);
+
+  if (!user.ok) {
+    return jsonResponse(
+      { message: user.message },
+      user.status
+    );
+  }
+
+  let serviceAccount;
+  let accessToken;
+
+  try {
+    serviceAccount = parseServiceAccount(env);
+    accessToken = await createGoogleAccessToken(serviceAccount);
+  } catch (error) {
+    console.error("Bookings service configuration error:", error);
+
+    return jsonResponse(
+      { message: "خدمة الحجوزات غير مهيأة على الخادم." },
+      503
+    );
+  }
+
+  let access;
+
+  try {
+    access = await getAccountAccess(
+      user,
+      serviceAccount,
+      accessToken
+    );
+  } catch (error) {
+    console.error("Bookings authorization error:", error);
+
+    return jsonResponse(
+      { message: "تعذر التحقق من صلاحيات الحساب." },
+      503
+    );
+  }
+
+  if (!access.ok) {
+    return jsonResponse(
+      { message: access.message },
+      access.status
+    );
+  }
+
+  const action = data?.action;
+
+  if (action !== "list" && access.permission !== "edit") {
+    return jsonResponse(
+      { message: "صلاحية العرض فقط؛ لا يمكنك تعديل الحجوزات." },
+      403
+    );
+  }
+
+  try {
+    switch (action) {
+      case "list": {
+        const bookings = await listBookings(
+          serviceAccount.project_id,
+          accessToken
+        );
+
+        return jsonResponse({
+          bookings,
+          accountType: access.accountType,
+          permission: access.permission
+        });
+      }
+
+      case "create": {
+        const error = validateBooking(data.booking);
+
+        if (error) return jsonResponse({ message: error }, 400);
+
+        const booking = await createBooking(
+          serviceAccount.project_id,
+          accessToken,
+          data.booking
+        );
+
+        return jsonResponse({ booking }, 201);
+      }
+
+      case "update": {
+        const booking = await updateBooking(
+          serviceAccount.project_id,
+          accessToken,
+          data.booking || {}
+        );
+
+        return jsonResponse({ booking });
+      }
+
+      case "cancel": {
+        const booking = await cancelBooking(
+          serviceAccount.project_id,
+          accessToken,
+          { id: data.id }
+        );
+
+        return jsonResponse({ booking });
+      }
+
+      default:
+        return jsonResponse(
+          { message: "الإجراء المطلوب غير معروف." },
+          400
+        );
+    }
+  } catch (error) {
+    console.error("Bookings request failed:", error);
+
+    return jsonResponse(
+      {
+        message: error.message || "تعذر تنفيذ العملية."
+      },
+      error.status === 404 ? 404 : 400
+    );
+  }
+}
