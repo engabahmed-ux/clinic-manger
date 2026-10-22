@@ -58,7 +58,7 @@ async function verifyDoctor(request, env) {
   catch { return { error:"الحساب غير مصرح له بحسابات اليوم.", status:403 }; }
   const fields = staffDoc?.fields || {}, permission = fields.permissions?.mapValue?.fields?.accounts?.stringValue || "none";
   if (fields.active?.booleanValue !== true || fields.role?.stringValue !== "staff" || !["view","edit"].includes(permission)) return { error:"لم يمنحك الدكتور صلاحية الوصول إلى حسابات اليوم.", status:403 };
-  return { account, token, accountType:"staff", permission };
+  return { account, token, accountType:"staff", permission, uid:user.localId, displayName:fields.displayName?.stringValue || "", expenseMode:fields.expenseMode?.stringValue === "approval" ? "approval" : "auto" };
 }
 function fsUrl(projectId, path = "") {
   return "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(projectId) + "/databases/(default)/documents" + path;
@@ -82,11 +82,16 @@ function decode(doc) {
   const f = doc.fields || {};
   return { id: doc.name.split("/").pop(), type: read(f,"type"), name: read(f,"name"), kind: read(f,"kind"),
     categoryId: read(f,"categoryId"), personName: read(f,"personName"), amount: read(f,"amount"),
-    date: read(f,"date"), notes: read(f,"notes"), createdAt: read(f,"createdAt"), updatedAt: read(f,"updatedAt") };
+    date: read(f,"date"), notes: read(f,"notes"), createdAt: read(f,"createdAt"), updatedAt: read(f,"updatedAt"),
+    status: read(f,"status"), enteredBy: read(f,"enteredBy"), enteredByName: read(f,"enteredByName"),
+    approvedBy: read(f,"approvedBy"), approvedByName: read(f,"approvedByName"), approvedAt: read(f,"approvedAt"),
+    rejectionReason: read(f,"rejectionReason"), periodType: read(f,"periodType"), periodKey: read(f,"periodKey"),
+    closedBy: read(f,"closedBy"), closedByName: read(f,"closedByName"), closedAt: read(f,"closedAt"),
+    totalReceipts: read(f,"totalReceipts"), totalExpenses: read(f,"totalExpenses"), netTotal: read(f,"netTotal"), bookingCount: read(f,"bookingCount") };
 }
 function encode(record) {
   const fields = {};
-  for (const key of ["type","name","kind","categoryId","personName","amount","date","notes","createdAt","updatedAt"]) fields[key] = str(record[key]);
+  for (const key of ["type","name","kind","categoryId","personName","amount","date","notes","createdAt","updatedAt","status","enteredBy","enteredByName","approvedBy","approvedByName","approvedAt","rejectionReason","periodType","periodKey","closedBy","closedByName","closedAt","totalReceipts","totalExpenses","netTotal","bookingCount"]) if (record[key] !== undefined) fields[key] = str(record[key]);
   return { fields };
 }
 async function listRecords(projectId, token) {
@@ -106,22 +111,84 @@ export async function onRequestPost({ request, env }) {
   catch (error) { console.error("Accounts authorization error:", error); return jsonResponse({ message: "تعذر التحقق من صلاحية الدكتور." }, 503); }
   if (verified.error) return jsonResponse({ message: verified.error }, verified.status);
   const projectId = verified.account.project_id, token = verified.token;
-  if (["list","createCategory","createEntry"].includes(data.action) && verified.accountType !== "doctor") return jsonResponse({ message:"هذه الوظيفة متاحة للدكتور فقط." },403);
-  if (data.action === "createDailyExpense" && verified.permission !== "edit") return jsonResponse({ message:"لا تملك صلاحية تسجيل المصروفات." },403);
+  if (["list","createCategory","createEntry","approveDailyExpense","rejectDailyExpense","finalizeSettlement","listSettlements"].includes(data.action) && verified.accountType !== "doctor") return jsonResponse({ message:"هذه الوظيفة متاحة للدكتور فقط." },403);
+  if (data.action === "createDailyExpense" && verified.accountType === "staff" && verified.permission !== "edit") return jsonResponse({ message:"لا تملك صلاحية تسجيل المصروفات." },403);
   try {
     if (data.action === "listDailyExpenses") {
       const date = String(data.date || "");
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
       const records = await listRecords(projectId, token);
-      const expenses = records.filter(x => x.type === "dailyExpense" && x.date === date).map(x => ({ id:x.id, description:x.personName, amount:x.amount, date:x.date, notes:x.notes, createdAt:x.createdAt }));
-      return jsonResponse({ expenses, date });
+      const expenses = records.filter(x => x.type === "dailyExpense" && x.date === date)
+        .filter(x => verified.accountType === "doctor" || !x.enteredBy || x.enteredBy === verified.uid)
+        .map(x => ({ id:x.id, description:x.personName, amount:x.amount, date:x.date, notes:x.notes, createdAt:x.createdAt,
+          status:x.status || "approved", enteredBy:x.enteredBy, enteredByName:x.enteredByName,
+          approvedByName:x.approvedByName, approvedAt:x.approvedAt, rejectionReason:x.rejectionReason }));
+      return jsonResponse({ expenses, date, accountType:verified.accountType, expenseMode:verified.expenseMode || "auto" });
     }
     if (data.action === "createDailyExpense") {
       const entry = data.entry || {}, description = String(entry.description || "").trim(), date = String(entry.date || ""), notes = String(entry.notes || "").trim(), amount = String(entry.amount ?? "");
       if (!cleanString(description,160) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00")) || !/^\d{1,8}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || notes.length > 500) return jsonResponse({ message:"راجع وصف المصروف والمبلغ والتاريخ." },400);
       const now = new Date().toISOString();
-      const result = await fsRequest(projectId, token, "/" + COLLECTION, { method:"POST", body:JSON.stringify(encode({ type:"dailyExpense", personName:description, amount, date, notes, createdAt:now, updatedAt:now })) });
+      const records = await listRecords(projectId, token);
+      if (records.some(x => x.type === "settlement" && ((x.periodType === "day" && x.periodKey === date) || (x.periodType === "month" && x.periodKey === date.slice(0,7))))) {
+        return jsonResponse({ message:"هذه الفترة تمت تصفيتها بالفعل. لا يمكن إضافة مصروف إليها بعد الإقفال." },409);
+      }
+      const isDoctor = verified.accountType === "doctor";
+      const status = isDoctor || verified.expenseMode === "auto" ? "approved" : "pending";
+      const record = { type:"dailyExpense", personName:description, amount, date, notes, status,
+        enteredBy:verified.uid || DOCTOR_ADMIN_UID, enteredByName:verified.displayName || "الدكتور",
+        approvedBy:isDoctor ? DOCTOR_ADMIN_UID : status === "approved" ? "automatic" : "",
+        approvedByName:isDoctor ? "الدكتور" : status === "approved" ? "خصم تلقائي" : "",
+        approvedAt:status === "approved" ? now : "", createdAt:now, updatedAt:now };
+      const result = await fsRequest(projectId, token, "/" + COLLECTION, { method:"POST", body:JSON.stringify(encode(record)) });
       return jsonResponse({ expense:decode(result) },201);
+    }
+    if (data.action === "approveDailyExpense" || data.action === "rejectDailyExpense") {
+      const id = String(data.id || "");
+      if (!/^[A-Za-z0-9_-]{1,150}$/.test(id)) return jsonResponse({message:"معرّف المصروف غير صحيح."},400);
+      const records = await listRecords(projectId, token);
+      const expense = records.find(x => x.id === id && x.type === "dailyExpense");
+      if (!expense) return jsonResponse({message:"المصروف غير موجود."},404);
+      if ((expense.status || "approved") !== "pending") return jsonResponse({message:"تمت معالجة هذا المصروف بالفعل."},409);
+      const now = new Date().toISOString();
+      const status = data.action === "approveDailyExpense" ? "approved" : "rejected";
+      const rejectionReason = String(data.reason || "").trim();
+      if (status === "rejected" && rejectionReason.length > 300) return jsonResponse({message:"سبب الرفض طويل جدًا."},400);
+      const patchFields = { status:str(status), approvedBy:str(DOCTOR_ADMIN_UID), approvedByName:str("الدكتور"),
+        approvedAt:str(now), updatedAt:str(now), rejectionReason:str(status === "rejected" ? (rejectionReason || "لم يُذكر سبب") : "") };
+      await fsRequest(projectId, token, "/" + COLLECTION + "/" + encodeURIComponent(id) + "?updateMask.fieldPaths=status&updateMask.fieldPaths=approvedBy&updateMask.fieldPaths=approvedByName&updateMask.fieldPaths=approvedAt&updateMask.fieldPaths=updatedAt&updateMask.fieldPaths=rejectionReason",
+        {method:"PATCH",body:JSON.stringify({fields:patchFields})});
+      return jsonResponse({id,status,approvedAt:status === "approved" ? now : "",rejectionReason:status === "rejected" ? (rejectionReason || "لم يُذكر سبب") : ""});
+    }
+    if (data.action === "listSettlements") {
+      const records = await listRecords(projectId, token);
+      const settlements = records.filter(x => x.type === "settlement").sort((a,b)=>String(b.periodKey).localeCompare(String(a.periodKey)));
+      const expenses = records.filter(x => x.type === "dailyExpense");
+      return jsonResponse({settlements, pendingExpenses:expenses.filter(x=>(x.status || "approved")==="pending").length});
+    }
+    if (data.action === "finalizeSettlement") {
+      const periodType = data.periodType === "month" ? "month" : data.periodType === "day" ? "day" : "";
+      const periodKey = String(data.periodKey || "");
+      if (!periodType || !(periodType === "day" ? /^\\d{4}-\\d{2}-\\d{2}$/.test(periodKey) : /^\\d{4}-\\d{2}$/.test(periodKey))) return jsonResponse({message:"حدد اليوم أو الشهر بصورة صحيحة."},400);
+      const records = await listRecords(projectId, token);
+      if (records.some(x=>x.type==="settlement" && x.periodType===periodType && x.periodKey===periodKey)) return jsonResponse({message:"تمت تصفية هذه الفترة من قبل."},409);
+      const inPeriod = date => periodType === "day" ? date === periodKey : String(date || "").startsWith(periodKey);
+      const expenses = records.filter(x=>x.type==="dailyExpense" && inPeriod(x.date));
+      const pending = expenses.filter(x=>(x.status || "approved")==="pending");
+      if (pending.length) return jsonResponse({message:"لا يمكن تصفية الفترة قبل اعتماد أو رفض كل المصروفات المعلقة."},409);
+      const approvedExpenses = expenses.filter(x=>(x.status || "approved")==="approved").reduce((sum,x)=>sum+(Number(x.amount)||0),0);
+      const query = await fsRequest(projectId, token, ":runQuery", {method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:"clinicBookings"}]}})});
+      const bookings = (Array.isArray(query)?query:[]).filter(x=>x.document).map(x=>{
+        const d=x.document, fields=d.fields||{};
+        const get=k=>fields[k]?.stringValue || "";
+        return {date:get("appointmentDate").slice(0,10),status:get("status"),paid:Number(get("paidAmount"))||0};
+      }).filter(x=>inPeriod(x.date) && !["pending","archived","cancelled"].includes(x.status));
+      const receipts = bookings.reduce((sum,x)=>sum+x.paid,0);
+      const now = new Date().toISOString();
+      const settlement = {type:"settlement",periodType,periodKey,date:periodKey, status:"closed", closedBy:DOCTOR_ADMIN_UID, closedByName:"الدكتور",closedAt:now,
+        totalReceipts:receipts.toFixed(2),totalExpenses:approvedExpenses.toFixed(2),netTotal:(receipts-approvedExpenses).toFixed(2),bookingCount:String(bookings.length),createdAt:now,updatedAt:now};
+      const result = await fsRequest(projectId, token, "/" + COLLECTION, {method:"POST",body:JSON.stringify(encode(settlement))});
+      return jsonResponse({settlement:decode(result)},201);
     }
     if (data.action === "list") {
       const records = await listRecords(projectId, token);
