@@ -75,9 +75,9 @@
             <label>اسم المريضة<input name="patientName" type="text" maxlength="120" required></label>
             <label>رقم الهاتف<input name="patientPhone" type="tel" maxlength="40" required></label>
             <label>الموعد المطلوب<input name="appointmentDate" type="date" required></label>
-            <label>نوع الحجز أو الخدمة<input name="service" type="text" maxlength="120" list="clinicServiceOptions" placeholder="اختر خدمة أو اكتبها يدويًا"></label>
+            <label>نوع الحجز أو الخدمة<input name="service" type="text" maxlength="120" placeholder="اكتب الخدمة يدويًا"><select class="service-quick-select" aria-label="اختيار خدمة جاهزة"><option value="">أو اختر خدمة جاهزة</option><option value="كشف">كشف</option><option value="استشارة">استشارة</option><option value="متابعة">متابعة</option><option value="سونار">سونار</option><option value="إعادة كشف">إعادة كشف</option><option value="خدمة أخرى">خدمة أخرى</option></select></label>
             <label>قيمة الكشف أو الاستشارة (جنيه)<input name="servicePrice" type="number" min="0" max="99999999" step="0.01" inputmode="decimal" placeholder="مثال: 300"></label>
-            <datalist id="clinicServiceOptions"><option value="كشف"><option value="استشارة"><option value="متابعة"><option value="سونار"><option value="إعادة كشف"><option value="خدمة أخرى"></datalist>
+            
             <label class="staff-form-wide">ملاحظات<input name="notes" type="text" maxlength="2000"></label>
           </div><p id="staffCreateBookingMessage" class="staff-message" hidden></p>
           <div class="staff-booking-actions"><button class="staff-primary" type="submit">إضافة الحجز</button><button id="cancelAddBooking" class="staff-secondary" type="button">إلغاء</button></div>
