@@ -407,9 +407,7 @@ async function listBookings(projectId, accessToken) {
   return (Array.isArray(result) ? result : [])
     .filter((item) => item.document)
     .map((item) => decodeBooking(item.document))
-    .sort((a, b) =>
-      a.appointmentDate.localeCompare(b.appointmentDate)
-    );
+    .sort((a, b) => (Date.parse(a.createdAt || "") || 0) - (Date.parse(b.createdAt || "") || 0));
 }
 
 

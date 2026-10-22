@@ -59,39 +59,40 @@
     <section id="staffDashboard" hidden>
       <div class="staff-welcome">
         <div>
-          <p class="staff-eyebrow">مساحة العمل الخاصة</p>
+          <p class="staff-eyebrow">مساحة العمل</p>
           <h1>أهلًا بك <span id="staffDisplayName">في لوحة الموظف</span></h1>
-          <p>
-            الأقسام التالية مبنية على الصلاحيات التي حددها الدكتور لحسابك.
-          </p>
         </div>
-
         <span class="staff-role">موظف العيادة</span>
       </div>
-
-      <div class="staff-notice" role="status">
-        <strong>تنبيه الصلاحيات</strong>
-        <p>
-          تظهر الحجوزات وحسابات المريضات وفق الصلاحيات التي منحها الدكتور.
-          يتم التحقق من صلاحية كل عملية على الخادم قبل تنفيذها.
-        </p>
-      </div>
-
-      <section class="staff-section">
-        <div class="staff-section-heading">
-          <h2>الأقسام المسموح بها</h2>
-          <p>الأقسام التي لا تملك صلاحية الوصول إليها لن تظهر هنا.</p>
-        </div>
-
-        <div id="staffPermissionsGrid" class="staff-permissions-grid"></div>
-
-        <p id="staffNoPermissions" class="staff-empty" hidden>
-          لم يمنحك الدكتور صلاحية الوصول إلى أي قسم حتى الآن.
-          تواصل معه إذا كنت تحتاج إلى صلاحية إضافية.
-        </p>
+      <nav id="staffTabs" class="staff-tabs" aria-label="أقسام العمل"></nav>
+      <section id="staffHomeSection" class="staff-section staff-tab-panel">
+        <div class="staff-section-heading"><h2>مواعيد اليوم</h2><button id="refreshDailyAppointments" class="staff-secondary" type="button">تحديث المواعيد</button></div>
+        <p id="dailyAppointmentsMessage" class="staff-message" hidden></p>
+        <div id="dailyAppointmentsList" class="staff-bookings-list" aria-live="polite"></div>
       </section>
-
-      <p id="staffDashboardMessage" class="staff-message" hidden></p>
+      <section id="staffBookingsSection" class="staff-section staff-tab-panel" hidden>
+        <div class="staff-section-heading staff-bookings-heading"><h2>إدارة الحجوزات</h2><div class="staff-bookings-toolbar">
+          <button id="addBookingToggle" class="staff-primary staff-add-button" type="button" hidden><span aria-hidden="true">＋</span> إضافة حجز جديد</button>
+          <button id="refreshStaffBookings" class="staff-secondary" type="button">تحديث الطلبات</button>
+        </div></div>
+        <form id="staffCreateBookingForm" class="staff-booking-create-form" hidden>
+          <h3>إضافة حجز جديد</h3><div class="staff-form-grid">
+            <label>اسم المريضة<input name="patientName" type="text" maxlength="120" required></label>
+            <label>رقم الهاتف<input name="patientPhone" type="tel" maxlength="40" required></label>
+            <label>الموعد المطلوب<input name="appointmentDate" type="date" required></label>
+            <label>الخدمة<input name="service" type="text" maxlength="120"></label>
+            <label class="staff-form-wide">ملاحظات<input name="notes" type="text" maxlength="2000"></label>
+          </div><p id="staffCreateBookingMessage" class="staff-message" hidden></p>
+          <div class="staff-booking-actions"><button class="staff-primary" type="submit">إضافة الطلب</button><button id="cancelAddBooking" class="staff-secondary" type="button">إلغاء</button></div>
+        </form>
+        <div class="staff-booking-filters"><label>بحث بالاسم أو الهاتف<input id="staffBookingSearch" type="search" placeholder="اسم المريضة أو رقم الهاتف"></label><label>تاريخ الطلب<input id="staffBookingDateFilter" type="date"></label></div>
+        <p id="staffBookingsMessage" class="staff-message" hidden></p><div id="staffPendingBookingsList" class="staff-bookings-list" aria-live="polite"></div>
+        <section id="staffBookingDetail" class="staff-booking-detail" hidden><div class="staff-section-heading"><h3>تفاصيل طلب الحجز</h3><button id="closeStaffBookingDetail" class="staff-secondary" type="button">العودة للطلبات</button></div><div id="staffBookingDetailContent"></div></section>
+      </section>
+      <section id="staffPatientsSection" class="staff-section staff-tab-panel" hidden><div class="staff-section-heading"><h2>حسابات المريضات</h2></div><div id="staffPatientTools"></div><p id="staffPatientMessage" class="staff-message" hidden></p></section>
+      <section id="staffRecordsSection" class="staff-section staff-tab-panel" hidden><div class="staff-section-heading"><h2>السجلات الطبية</h2></div><p class="staff-empty">لا توجد أدوات متاحة لهذا القسم حاليًا.</p></section>
+      <section id="staffSettingsSection" class="staff-section staff-tab-panel" hidden><div class="staff-section-heading"><h2>إعدادات العيادة</h2></div><p class="staff-empty">لا توجد أدوات متاحة لهذا القسم حاليًا.</p></section>
+      <p id="staffNoPermissions" class="staff-empty" hidden>لا توجد أقسام متاحة لحسابك.</p><p id="staffDashboardMessage" class="staff-message" hidden></p>
     </section>
 
     <footer class="staff-footer">
