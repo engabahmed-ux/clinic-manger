@@ -58,7 +58,7 @@ async function verifyDoctor(request, env) {
   catch { return { error:"الحساب غير مصرح له بحسابات اليوم.", status:403 }; }
   const fields = staffDoc?.fields || {}, permission = fields.permissions?.mapValue?.fields?.accounts?.stringValue || "none";
   if (fields.active?.booleanValue !== true || fields.role?.stringValue !== "staff" || !["view","edit"].includes(permission)) return { error:"لم يمنحك الدكتور صلاحية الوصول إلى حسابات اليوم.", status:403 };
-  return { account, token, accountType:"staff", permission, uid:user.localId, displayName:fields.displayName?.stringValue || "", expenseMode:fields.expenseMode?.stringValue === "approval" ? "approval" : "auto" };
+  return { account, token, accountType:"staff", permission, uid:user.localId, displayName:fields.displayName?.stringValue || "", expenseMode:fields.expenseMode?.stringValue === "auto" ? "auto" : "approval" };
 }
 function fsUrl(projectId, path = "") {
   return "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(projectId) + "/databases/(default)/documents" + path;
