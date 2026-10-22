@@ -498,7 +498,7 @@ async function loadDoctorDailyExpenses(day,paidTotal=0){
         const row=document.createElement("div");row.className="doctor-daily-expense-row";
         const details=document.createElement("div");
         const description=document.createElement("strong");description.textContent=item.description+(item.notes?" · "+item.notes:"");
-        const meta=document.createElement("p");meta.className="muted-text";meta.textContent="سجله: "+(item.enteredByName||"غير محدد")+" · "+({pending:"بانتظار اعتماد الدكتور",approved:"معتمد ومحتسب",rejected:"مرفوض وغير محتسب"}[item.status||"approved"]||"غير محدد")+(item.approvedByName?" · اعتمده: "+item.approvedByName:"")+(item.rejectionReason?" · سبب الرفض: "+item.rejectionReason:"");
+        const meta=document.createElement("p");meta.className="muted-text";meta.textContent="سجله: "+(item.enteredByName||"غير محدد")+" · "+({pending:"بانتظار اعتماد الدكتور",approved:"معتمد ومحتسب",rejected:"مرفوض وغير محتسب"}[item.status||"approved"]||"غير محدد")+(item.approvedByName?" · اعتمده: "+item.approvedByName:"")+(item.reviewedByName?" · راجعه: "+item.reviewedByName:"")+(item.reviewedAt?" · "+formatSubmittedAt(item.reviewedAt):"")+(item.rejectionReason?" · سبب الرفض: "+item.rejectionReason:"");
         details.append(description,meta);
         const amount=document.createElement("strong");amount.textContent=(item.status==="rejected"?"": "− ")+doctorMoney(Number(item.amount)||0);
         row.append(details,amount);
@@ -548,7 +548,7 @@ async function loadDoctorSettlements(){
       doctorMonthlyExpensesList.replaceChildren();
       const rows=expenses.filter(x=>String(x.date||"").startsWith(month)).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
       if(!rows.length){const p=document.createElement("p");p.className="muted-text";p.textContent="لا توجد مصروفات مسجلة لهذا الشهر.";doctorMonthlyExpensesList.append(p)}
-      for(const x of rows){const row=document.createElement("div");row.className="doctor-daily-expense-row";const label=document.createElement("span");label.textContent=x.date+" · "+x.personName+" · "+({pending:"معلق",approved:"معتمد",rejected:"مرفوض"}[x.status||"approved"]||"غير محدد")+" · سجله: "+(x.enteredByName||"غير محدد")+(x.approvedByName?" · اعتمده: "+x.approvedByName:"")+(x.rejectionReason?" · سبب الرفض: "+x.rejectionReason:"");const amount=document.createElement("strong");amount.textContent=doctorMoney(x.amount);row.append(label,amount);doctorMonthlyExpensesList.append(row)}
+      for(const x of rows){const row=document.createElement("div");row.className="doctor-daily-expense-row";const label=document.createElement("span");label.textContent=x.date+" · "+x.personName+" · "+({pending:"معلق",approved:"معتمد",rejected:"مرفوض"}[x.status||"approved"]||"غير محدد")+" · سجله: "+(x.enteredByName||"غير محدد")+(x.approvedByName?" · اعتمده: "+x.approvedByName:"")+(x.reviewedByName?" · راجعه: "+x.reviewedByName:"")+(x.reviewedAt?" · "+formatSubmittedAt(x.reviewedAt):"")+(x.rejectionReason?" · سبب الرفض: "+x.rejectionReason:"");const amount=document.createElement("strong");amount.textContent=doctorMoney(x.amount);row.append(label,amount);doctorMonthlyExpensesList.append(row)}
     }
     if(doctorSettlementsList){
       doctorSettlementsList.replaceChildren();
