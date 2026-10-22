@@ -694,7 +694,12 @@ export async function onRequest(context) {
         const targets = all.filter((booking) => booking.appointmentDate.slice(0, 10) === date && !["pending", "archived", "cancelled"].includes(booking.status));
         let archivedCount = 0;
         for (const booking of targets) {
-          await updateBooking(serviceAccount.project_id, accessToken, { id: booking.id, status: "archived" });
+          await updateBooking(
+            serviceAccount.project_id,
+            accessToken,
+            { id: booking.id, status: "archived" },
+            access.accountType === "staff" ? access.uid : ""
+          );
           archivedCount += 1;
         }
         return jsonResponse({ archivedCount, date });
