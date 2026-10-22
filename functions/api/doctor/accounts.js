@@ -164,7 +164,7 @@ export async function onRequestPost({ request, env }) {
       const records = await listRecords(projectId, token);
       const settlements = records.filter(x => x.type === "settlement").sort((a,b)=>String(b.periodKey).localeCompare(String(a.periodKey)));
       const expenses = records.filter(x => x.type === "dailyExpense");
-      return jsonResponse({settlements, pendingExpenses:expenses.filter(x=>(x.status || "approved")==="pending").length});
+      return jsonResponse({settlements, expenses, pendingExpenses:expenses.filter(x=>(x.status || "approved")==="pending").length});
     }
     if (data.action === "finalizeSettlement") {
       const periodType = data.periodType === "month" ? "month" : data.periodType === "day" ? "day" : "";
