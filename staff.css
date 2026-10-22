@@ -443,3 +443,49 @@ a {
   opacity: 0.6;
   cursor: wait;
 }
+
+.staff-patient-create {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #dedbd5;
+}
+
+.staff-patient-create h4 {
+  margin: 0;
+}
+
+.staff-patient-form {
+  display: grid;
+  gap: 10px;
+}
+
+.staff-patient-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.staff-patient-form input {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid #dedbd5;
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+}
+
+.staff-patient-credentials {
+  padding: 14px;
+  border-radius: 12px;
+  background: #f8fbf5;
+  overflow-wrap: anywhere;
+}
+
+.staff-patient-credentials p {
+  margin: 8px 0;
+  font-size: 13px;
+}
