@@ -186,6 +186,23 @@
             <button id="backFromBookingsButton" class="secondary-button" type="button">العودة للوحة</button>
           </div>
         </div>
+        <div class="employee-form-card booking-create-card">
+          <h4>إضافة حجز من العيادة</h4>
+          <form id="createBookingForm" class="employee-form" novalidate>
+            <label for="newBookingPatientName">اسم المريضة</label>
+            <input id="newBookingPatientName" name="patientName" type="text" maxlength="120" required>
+            <label for="newBookingPatientPhone">رقم الهاتف</label>
+            <input id="newBookingPatientPhone" name="patientPhone" type="tel" maxlength="40" required>
+            <label for="newBookingDate">التاريخ المطلوب</label>
+            <input id="newBookingDate" name="appointmentDate" type="date" required>
+            <label for="newBookingService">الخدمة</label>
+            <input id="newBookingService" name="service" type="text" maxlength="120">
+            <label for="newBookingNotes">ملاحظات</label>
+            <textarea id="newBookingNotes" name="notes" maxlength="2000" rows="3"></textarea>
+            <p id="createBookingMessage" class="message" role="status" hidden></p>
+            <button id="createBookingButton" class="primary-button" type="submit">إضافة الحجز</button>
+          </form>
+        </div>
         <p id="bookingListMessage" class="message" role="status" hidden></p>
         <div id="bookingList" class="employee-list" aria-live="polite"></div>
       </section>
