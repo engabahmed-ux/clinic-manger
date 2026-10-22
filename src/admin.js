@@ -560,7 +560,7 @@ async function previewDoctorSettlement(periodType = settlementPreviewPeriodType)
       if (settleButton) settleButton.disabled = true;
     } else {
       preview.textContent = "العهدة المتوقعة للموظف: المقبوضات " + receipts + " − المصروفات المعتمدة " + expenses + " = صافي مستحق للعيادة " + net + (Number(result.netTotal) < 0 ? " (على العيادة للموظف)." : " (على الموظف للعيادة).") + (result.pendingExpenses ? " يوجد " + result.pendingExpenses + " مصروف معلق يجب اعتماده أو رفضه قبل التصفية." : "");
-      if (settleButton) settleButton.disabled = false;
+      if (settleButton) settleButton.disabled = Number(result.pendingExpenses) > 0;
     }
   } catch (error) {
     preview.textContent = error.message || "تعذر حساب عهدة الموظف.";
