@@ -16,13 +16,29 @@ import {
 /*
  * Doctor Admin Page
  *
- * تسجيل الدخول يتم عبر Firebase Authentication.
- * لا تظهر لوحة الدكتور إلا بعد نجاح التحقق من الخادم.
- * لا يتم تعديل Firestore أو قواعده هنا.
+ * - تسجيل الدخول عبر Firebase Authentication.
+ * - التحقق من حساب الدكتور على الخادم.
+ * - إدارة حسابات الموظفين وصلاحياتهم عبر Cloudflare Pages Functions.
+ * - لا يتم الوصول إلى Firestore مباشرة من المتصفح.
+ * - لا يتم تعديل قواعد Firestore من هذا الملف.
  */
 
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const DOCTOR_VERIFY_URL = "/api/doctor/verify";
+const EMPLOYEES_API_URL = "/api/doctor/employees";
+
+const PERMISSION_SECTIONS = [
+  { key: "bookings", label: "الحجوزات" },
+  { key: "patients", label: "بيانات المرضى" },
+  { key: "medicalRecords", label: "السجلات الطبية" },
+  { key: "settings", label: "إعدادات العيادة" }
+];
+
+const PERMISSION_OPTIONS = [
+  { value: "none", label: "بدون وصول" },
+  { value: "view", label: "مشاهدة فقط" },
+  { value: "edit", label: "مشاهدة وتعديل" }
+];
 
 const app =
   getApps().find((item) => item.name === "[DEFAULT]") ||
@@ -30,7 +46,8 @@ const app =
 
 const auth = getAuth(app);
 
-const $ = (selector) => document.querySelector(selector);
+const $ = (selector, parent = document) =>
+  parent.querySelector(selector);
 
 const loginSection = $("#loginSection");
 const dashboardSection = $("#dashboardSection");
@@ -42,7 +59,19 @@ const loginError = $("#loginError");
 const logoutButton = $("#logoutButton");
 const doctorAccountLabel = $("#doctorAccountLabel");
 
+const openEmployeesButton = $("#openEmployeesButton");
+const backToDashboardButton = $("#backToDashboardButton");
+const employeeManagementSection = $("#employeeManagementSection");
+const createEmployeeForm = $("#createEmployeeForm");
+const createEmployeeButton = $("#createEmployeeButton");
+const createEmployeeMessage = $("#createEmployeeMessage");
+const employeeList = $("#employeeList");
+const employeeListMessage = $("#employeeListMessage");
+const refreshEmployeesButton = $("#refreshEmployeesButton");
+
 let isSubmitting = false;
+let isCreatingEmployee = false;
+let isLoadingEmployees = false;
 let verificationRequestNumber = 0;
 
 function showMessage(element, message, type = "error") {
@@ -63,6 +92,8 @@ function hideMessage(element) {
 function showLogin() {
   if (loginSection) loginSection.hidden = false;
   if (dashboardSection) dashboardSection.hidden = true;
+
+  showEmployeeSection(false);
 }
 
 function showDashboard(user) {
@@ -72,6 +103,22 @@ function showDashboard(user) {
   if (doctorAccountLabel) {
     doctorAccountLabel.textContent = user.email || "حساب الدكتور";
   }
+
+  showEmployeeSection(false);
+}
+
+function showEmployeeSection(show) {
+  if (employeeManagementSection) {
+    employeeManagementSection.hidden = !show;
+  }
+
+  const managementGrid = $(".management-grid");
+  const welcomeCard = $(".welcome-card");
+  const sectionHeading = $(".section-heading");
+
+  if (managementGrid) managementGrid.hidden = show;
+  if (welcomeCard) welcomeCard.hidden = show;
+  if (sectionHeading) sectionHeading.hidden = show;
 }
 
 function setLoginBusy(busy) {
@@ -152,7 +199,6 @@ async function verifyDoctorOnServer(user, requestNumber) {
       result = {};
     }
 
-    // تجاهل نتيجة طلب قديم إذا تغيّر المستخدم أثناء التحقق.
     if (
       requestNumber !== verificationRequestNumber ||
       auth.currentUser?.uid !== user.uid
@@ -214,6 +260,212 @@ async function verifyDoctorOnServer(user, requestNumber) {
   }
 }
 
+async function employeeApiRequest(action, data = {}) {
+  const user = auth.currentUser;
+
+  if (!user) {
+    throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى.");
+  }
+
+  const idToken = await user.getIdToken();
+
+  const response = await fetch(EMPLOYEES_API_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    body: JSON.stringify({
+      action,
+      ...data
+    }),
+    cache: "no-store"
+  });
+
+  let result = {};
+
+  try {
+    result = await response.json();
+  } catch {
+    result = {};
+  }
+
+  if (response.status === 401) {
+    throw new Error("انتهت جلسة الدخول أو تعذر التحقق منها. سجّل الدخول مجددًا.");
+  }
+
+  if (response.status === 403) {
+    throw new Error("غير مسموح بتنفيذ هذا الإجراء.");
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      result.message ||
+      "تعذر تنفيذ الطلب. حاول مرة أخرى."
+    );
+  }
+
+  return result;
+}
+
+function readPermissionsFromForm() {
+  const permissions = {};
+
+  for (const section of PERMISSION_SECTIONS) {
+    const select = $(`#permission${section.key[0].toUpperCase()}${section.key.slice(1)}`);
+
+    permissions[section.key] = select?.value || "none";
+  }
+
+  return permissions;
+}
+
+function setCreateEmployeeBusy(busy) {
+  isCreatingEmployee = busy;
+
+  if (createEmployeeButton) {
+    createEmployeeButton.disabled = busy;
+    createEmployeeButton.textContent = busy
+      ? "جارٍ إنشاء الحساب..."
+      : "إنشاء حساب الموظف";
+  }
+}
+
+function createPermissionSelect(section, currentValue) {
+  const select = document.createElement("select");
+
+  select.className = "permission-select";
+  select.dataset.permission = section.key;
+  select.setAttribute(
+    "aria-label",
+    `صلاحية ${section.label}`
+  );
+
+  for (const optionData of PERMISSION_OPTIONS) {
+    const option = document.createElement("option");
+
+    option.value = optionData.value;
+    option.textContent = optionData.label;
+    option.selected = optionData.value === currentValue;
+
+    select.appendChild(option);
+  }
+
+  return select;
+}
+
+function renderEmployeeCard(employee) {
+  const card = document.createElement("article");
+  card.className = "employee-card";
+  card.dataset.uid = employee.uid;
+
+  const header = document.createElement("div");
+  header.className = "employee-card-header";
+
+  const identity = document.createElement("div");
+
+  const name = document.createElement("h5");
+  name.textContent = employee.displayName || "موظف بدون اسم";
+
+  const email = document.createElement("p");
+  email.className = "employee-email";
+  email.textContent = employee.email || "لا يوجد بريد إلكتروني";
+
+  const uid = document.createElement("p");
+  uid.className = "employee-uid";
+  uid.textContent = `معرّف الحساب: ${employee.uid}`;
+
+  identity.append(name, email, uid);
+  header.appendChild(identity);
+
+  const permissionsContainer = document.createElement("div");
+  permissionsContainer.className = "employee-permissions";
+
+  const currentPermissions = employee.permissions || {};
+
+  for (const section of PERMISSION_SECTIONS) {
+    const row = document.createElement("div");
+    row.className = "employee-permission-row";
+
+    const label = document.createElement("label");
+    label.textContent = section.label;
+
+    const select = createPermissionSelect(
+      section,
+      PERMISSION_OPTIONS.some(
+        (option) => option.value === currentPermissions[section.key]
+      )
+        ? currentPermissions[section.key]
+        : "none"
+    );
+
+    row.append(label, select);
+    permissionsContainer.appendChild(row);
+  }
+
+  const saveButton = document.createElement("button");
+  saveButton.type = "button";
+  saveButton.className = "primary-button save-permissions-button";
+  saveButton.dataset.action = "save-permissions";
+  saveButton.textContent = "حفظ الصلاحيات";
+
+  card.append(header, permissionsContainer, saveButton);
+
+  return card;
+}
+
+function renderEmployeeList(employees) {
+  if (!employeeList) return;
+
+  employeeList.replaceChildren();
+
+  if (!Array.isArray(employees) || employees.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-employees";
+    empty.textContent = "لا يوجد موظفون مسجلون حتى الآن.";
+    employeeList.appendChild(empty);
+    return;
+  }
+
+  for (const employee of employees) {
+    if (!employee?.uid) continue;
+    employeeList.appendChild(renderEmployeeCard(employee));
+  }
+}
+
+async function loadEmployees() {
+  if (isLoadingEmployees || !employeeList) return;
+
+  isLoadingEmployees = true;
+
+  if (refreshEmployeesButton) {
+    refreshEmployeesButton.disabled = true;
+    refreshEmployeesButton.textContent = "جارٍ التحديث...";
+  }
+
+  hideMessage(employeeListMessage);
+
+  try {
+    const result = await employeeApiRequest("list");
+    renderEmployeeList(result.employees || []);
+  } catch (error) {
+    console.error("تعذر تحميل قائمة الموظفين:", error);
+
+    showMessage(
+      employeeListMessage,
+      error.message || "تعذر تحميل قائمة الموظفين."
+    );
+  } finally {
+    isLoadingEmployees = false;
+
+    if (refreshEmployeesButton) {
+      refreshEmployeesButton.disabled = false;
+      refreshEmployeesButton.textContent = "تحديث القائمة";
+    }
+  }
+}
+
 if (loginForm) {
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -222,8 +474,8 @@ if (loginForm) {
 
     hideMessage(loginError);
 
-    const email = emailInput.value.trim();
-    const password = passwordInput.value;
+    const email = emailInput?.value.trim() || "";
+    const password = passwordInput?.value || "";
 
     if (!email || !password) {
       showMessage(
@@ -238,8 +490,7 @@ if (loginForm) {
     try {
       await signInWithEmailAndPassword(auth, email, password);
 
-      // onAuthStateChanged سيتولى التحقق من الخادم قبل فتح اللوحة.
-      passwordInput.value = "";
+      if (passwordInput) passwordInput.value = "";
     } catch (error) {
       console.error("خطأ تسجيل دخول الدكتور:", error);
 
@@ -259,6 +510,8 @@ if (logoutButton) {
       await signOut(auth);
       showLogin();
       hideMessage(loginError);
+      hideMessage(createEmployeeMessage);
+      hideMessage(employeeListMessage);
 
       if (emailInput) emailInput.focus();
     } catch (error) {
@@ -274,15 +527,152 @@ if (logoutButton) {
   });
 }
 
+if (openEmployeesButton) {
+  openEmployeesButton.addEventListener("click", async () => {
+    showEmployeeSection(true);
+    await loadEmployees();
+  });
+}
+
+if (backToDashboardButton) {
+  backToDashboardButton.addEventListener("click", () => {
+    showEmployeeSection(false);
+  });
+}
+
+if (refreshEmployeesButton) {
+  refreshEmployeesButton.addEventListener("click", loadEmployees);
+}
+
+if (createEmployeeForm) {
+  createEmployeeForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    if (isCreatingEmployee) return;
+
+    hideMessage(createEmployeeMessage);
+
+    const displayName = $("#employeeName")?.value.trim() || "";
+    const email = $("#employeeEmail")?.value.trim() || "";
+    const password = $("#employeePassword")?.value || "";
+    const permissions = readPermissionsFromForm();
+
+    if (!displayName || !email || !password) {
+      showMessage(
+        createEmployeeMessage,
+        "أدخل اسم الموظف والبريد الإلكتروني وكلمة المرور."
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      showMessage(
+        createEmployeeMessage,
+        "كلمة المرور يجب أن تتكون من 6 أحرف على الأقل."
+      );
+      return;
+    }
+
+    setCreateEmployeeBusy(true);
+
+    try {
+      await employeeApiRequest("create", {
+        displayName,
+        email,
+        password,
+        permissions
+      });
+
+      createEmployeeForm.reset();
+
+      showMessage(
+        createEmployeeMessage,
+        "تم إنشاء حساب الموظف وحفظ صلاحياته.",
+        "success"
+      );
+
+      await loadEmployees();
+    } catch (error) {
+      console.error("تعذر إنشاء حساب الموظف:", error);
+
+      showMessage(
+        createEmployeeMessage,
+        error.message || "تعذر إنشاء حساب الموظف."
+      );
+    } finally {
+      setCreateEmployeeBusy(false);
+    }
+  });
+}
+
+if (employeeList) {
+  employeeList.addEventListener("click", async (event) => {
+    const button = event.target.closest(
+      'button[data-action="save-permissions"]'
+    );
+
+    if (!button || !employeeList.contains(button)) return;
+
+    const card = button.closest(".employee-card");
+    const uid = card?.dataset.uid;
+
+    if (!uid) {
+      showMessage(
+        employeeListMessage,
+        "تعذر تحديد حساب الموظف المطلوب."
+      );
+      return;
+    }
+
+    const permissions = {};
+
+    for (const section of PERMISSION_SECTIONS) {
+      const select = $(
+        `.permission-select[data-permission="${section.key}"]`,
+        card
+      );
+
+      permissions[section.key] = select?.value || "none";
+    }
+
+    button.disabled = true;
+    button.textContent = "جارٍ الحفظ...";
+    hideMessage(employeeListMessage);
+
+    try {
+      await employeeApiRequest("updatePermissions", {
+        uid,
+        permissions
+      });
+
+      showMessage(
+        employeeListMessage,
+        "تم حفظ صلاحيات الموظف.",
+        "success"
+      );
+    } catch (error) {
+      console.error("تعذر حفظ صلاحيات الموظف:", error);
+
+      showMessage(
+        employeeListMessage,
+        error.message || "تعذر حفظ صلاحيات الموظف."
+      );
+    } finally {
+      button.disabled = false;
+      button.textContent = "حفظ الصلاحيات";
+    }
+  });
+}
+
 onAuthStateChanged(auth, async (user) => {
   const requestNumber = ++verificationRequestNumber;
 
   if (!user) {
     showLogin();
+    setLoginBusy(false);
     return;
   }
 
-  // لا نعتمد على UID في المتصفح وحده لفتح لوحة الدكتور.
   showLogin();
   setLoginBusy(true);
 
