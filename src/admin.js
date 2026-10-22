@@ -893,7 +893,6 @@ if (openBookingsButton) {
 }
 
 
-if (refreshBookingsButton) refreshBookingsButton.addEventListener("click", loadBookings);
 if (addBookingToggleButton && bookingCreateCard) addBookingToggleButton.addEventListener("click", () => { bookingCreateCard.hidden = !bookingCreateCard.hidden; });
 createBookingForm?.querySelector(".service-quick-select")?.addEventListener("change",e=>{const input=createBookingForm.querySelector('[name="service"]');if(input&&e.target.value)input.value=e.target.value});
 if (bookingSearchInput) bookingSearchInput.addEventListener("input", renderPendingBookings);
