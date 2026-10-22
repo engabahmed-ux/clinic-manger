@@ -500,7 +500,7 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
       String(existing.appointmentDate || "").slice(0,10),
       String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0,10)
     ].filter(Boolean));
-    const ownerUid = existing.paymentEnteredByUid || "";
+    const ownerUid = existing.paymentEnteredByUid || (actorAccountType === "staff" && changes.status === "completed" ? actorUid : "");
     if (ownerUid) {
       for (const date of dates) {
         if (await isFinancialPeriodClosed(projectId, accessToken, date, ownerUid)) {
