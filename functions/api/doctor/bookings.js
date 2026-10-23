@@ -674,6 +674,12 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
       paymentEnteredByUid = actorUid;
       paymentEnteredByName = completedByName;
       paymentUpdatedAt = now;
+    } else if (Number(existing.paidAmount) > 0) {
+      // Keep the already-recorded amount from being counted twice, but attribute
+      // this completed visit to the account that finalized it.
+      paymentEnteredByUid = actorUid;
+      paymentEnteredByName = completedByName;
+      paymentUpdatedAt = now;
     }
   }
 
