@@ -1,4 +1,5 @@
 import { APP_CONFIG } from "./config/app-config.js";
+import { loadRuntimeSettings, statusLabel, applyRuntimeStatusColor } from "./config/runtime-settings.js";
 import { FIREBASE_CONFIG } from "./config/firebase-config.js";
 
 import {
@@ -12,7 +13,7 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-const config = APP_CONFIG;
+const config = await loadRuntimeSettings(APP_CONFIG);
 
 const firebaseApp =
   getApps().find((item) => item.name === "[DEFAULT]") ||
@@ -575,10 +576,15 @@ function renderPatientPortal() {
     }
 
     const labels = {
-      pending: "قيد المراجعة",
-      confirmed: "تم تأكيد الموعد",
-      completed: "مكتمل",
-      cancelled: "ملغي"
+      pending: statusLabel(config, "pending", "قيد المراجعة"),
+      confirmed: statusLabel(config, "confirmed", "تم تأكيد الموعد"),
+      waiting: statusLabel(config, "waiting", "في الانتظار"),
+      completed: statusLabel(config, "completed", "مكتمل"),
+      postponed: statusLabel(config, "postponed", "تم التأجيل"),
+      no_show: statusLabel(config, "no_show", "لم يأتِ"),
+      apologized: statusLabel(config, "apologized", "اعتذر"),
+      cancelled: statusLabel(config, "cancelled", "ملغي"),
+      archived: statusLabel(config, "archived", "مؤرشف")
     };
 
     for (const appointment of appointments) {
@@ -590,7 +596,8 @@ function renderPatientPortal() {
       service.textContent = appointment.service || "الخدمة: لم تُحدد";
       const status = document.createElement("span");
       status.className = "patient-appointment-status";
-      status.textContent = labels[appointment.status] || "قيد المراجعة";
+      status.textContent = labels[appointment.status] || statusLabel(config, appointment.status, "قيد المراجعة");
+      applyRuntimeStatusColor(status, config, appointment.status);
       card.append(date, service, status);
       patientAppointmentsList.append(card);
     }
