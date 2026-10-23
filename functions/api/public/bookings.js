@@ -154,6 +154,33 @@ async function createBooking(projectId, accessToken, data) {
   return (document.name || "").split("/").pop();
 }
 
+async function writePublicAuditLog(projectId, accessToken, action, level, message, targetId = "") {
+  const now = new Date();
+  const expires = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const fields = {
+    actorUid: { stringValue: "public-visitor" },
+    actorName: { stringValue: "زائر الموقع" },
+    actorType: { stringValue: "public" },
+    action: { stringValue: action },
+    area: { stringValue: "public_booking" },
+    level: { stringValue: level },
+    message: { stringValue: message },
+    targetType: { stringValue: "booking" },
+    targetId: { stringValue: targetId },
+    createdAt: { timestampValue: now.toISOString() },
+    expiresAt: { timestampValue: expires.toISOString() }
+  };
+  const response = await fetch(firestoreUrl(projectId, "/clinicLogs"), {
+    method: "POST",
+    headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields })
+  });
+  if (!response.ok) {
+    const details = await response.text();
+    console.error("Public audit log write failed:", response.status, details.slice(0, 300));
+  }
+}
+
 function validateBooking(data) {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     return "بيانات الحجز غير صحيحة.";
@@ -257,6 +284,7 @@ export async function onRequest({ request, env }) {
       service: data.service ?? "",
       notes: data.notes ?? ""
     });
+    try { await writePublicAuditLog(account.project_id, accessToken, "booking_created", "info", "تم استلام طلب حجز من الموقع العام.", id); } catch (logError) { console.error("Public audit log failed:", logError); }
 
     return jsonResponse({
       success: true,
@@ -266,6 +294,7 @@ export async function onRequest({ request, env }) {
     }, 201);
   } catch (error) {
     console.error("Public booking request failed:", error);
+    try { if (account?.project_id && accessToken) await writePublicAuditLog(account.project_id, accessToken, "request_failed", "error", "فشل حفظ طلب حجز من الموقع العام."); } catch (logError) { console.error("Public booking failure log failed:", logError); }
     return jsonResponse({ message: "تعذر حفظ طلب الحجز الآن. حاولي مرة أخرى لاحقًا." }, 503);
   }
 }
