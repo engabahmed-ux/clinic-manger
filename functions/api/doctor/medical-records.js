@@ -46,7 +46,7 @@ function read(fields,key){return fields?.[key]?.stringValue||"";}
 function norm(value){return String(value||"").normalize("NFKC").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/\s+/g," ").trim().toLocaleLowerCase("ar");}
 function normPhone(value){return String(value||"").replace(/\D/g,"");}
 function decode(document){const fields=document?.fields||{};return {id:(document?.name||"").split("/").pop(),patientNumber:read(fields,"patientNumber"),displayName:read(fields,"displayName"),phone:read(fields,"phone"),gender:read(fields,"gender"),birthDate:read(fields,"birthDate"),notes:read(fields,"notes"),createdAt:read(fields,"createdAt"),updatedAt:read(fields,"updatedAt")};}
-function decodeVisit(document){const f=document?.fields||{};return {id:(document?.name||"").split("/").pop(),patientId:read(f,"patientId"),bookingId:read(f,"bookingId"),visitDate:read(f,"visitDate"),queueNumber:read(f,"queueNumber"),bloodPressure:read(f,"bloodPressure"),weight:read(f,"weight"),bloodSugar:read(f,"bloodSugar"),preVisitNotes:read(f,"preVisitNotes"),diagnosis:read(f,"diagnosis"),clinicalNotes:read(f,"clinicalNotes"),treatment:read(f,"treatment"),followUp:read(f,"followUp"),createdAt:read(f,"createdAt"),updatedAt:read(f,"updatedAt"),createdByName:read(f,"createdByName")};}
+function decodeVisit(document){const f=document?.fields||{};return {id:(document?.name||"").split("/").pop(),patientId:read(f,"patientId"),bookingId:read(f,"bookingId"),visitDate:read(f,"visitDate"),queueNumber:read(f,"queueNumber"),bloodPressure:read(f,"bloodPressure"),weight:read(f,"weight"),bloodSugar:read(f,"bloodSugar"),preVisitNotes:read(f,"preVisitNotes"),diagnosis:read(f,"diagnosis"),clinicalNotes:read(f,"clinicalNotes"),treatment:read(f,"treatment"),followUp:read(f,"followUp"),followUpNotes:read(f,"followUpNotes"),followUpDays:read(f,"followUpDays"),followUpDate:read(f,"followUpDate"),createdAt:read(f,"createdAt"),updatedAt:read(f,"updatedAt"),createdByName:read(f,"createdByName")};}
 function fieldsFrom(value,keys){const fields={};for(const key of keys)fields[key]=str(value[key]);return {fields};}
 async function collection(projectId,token,name){const result=await firestore(projectId,token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:name}]}})});return (Array.isArray(result)?result:[]).filter(x=>x.document).map(x=>x.document);}
 async function verifyUser(request,env){
@@ -156,9 +156,11 @@ export async function onRequest({request,env}){
     if(read(bf,"status")==="completed")return jsonResponse({message:"تم اعتماد هذا الكشف نهائيًا؛ لا يمكن تعديل بياناته."},409);
     const visitDate=String(data.visitDate||read(bf,"appointmentDate")||"").slice(0,10);
     if(!/^\d{4}-\d{2}-\d{2}$/.test(visitDate)||Number.isNaN(Date.parse(visitDate+"T12:00:00")))return jsonResponse({message:"تاريخ الكشف غير صحيح."},400);
-    const keys=["bloodPressure","weight","bloodSugar","preVisitNotes","diagnosis","clinicalNotes","treatment","followUp"];
+    const keys=["bloodPressure","weight","bloodSugar","preVisitNotes","diagnosis","clinicalNotes","treatment","followUp","followUpNotes","followUpDays","followUpDate"];
     const visit={patientId,bookingId,visitDate,queueNumber:String(data.queueNumber||""),createdByName:access.displayName||"الدكتور"};
     for(const key of keys){visit[key]=String(data[key]||"").trim();if(visit[key].length>(key==="clinicalNotes"||key==="treatment"?4000:1000))return jsonResponse({message:"أحد حقول الكشف أطول من المسموح."},400);}
+    if(visit.followUpDays && (!/^\d{1,4}$/.test(visit.followUpDays)||Number(visit.followUpDays)>3650))return jsonResponse({message:"عدد أيام المتابعة غير صحيح."},400);
+    if(visit.followUpDate && (!/^\d{4}-\d{2}-\d{2}$/.test(visit.followUpDate)||Number.isNaN(Date.parse(visit.followUpDate+"T12:00:00"))))return jsonResponse({message:"تاريخ المتابعة غير صحيح."},400);
     if(visit.weight && (!/^\d{1,3}(\.\d{1,2})?$/.test(visit.weight)||Number(visit.weight)<0||Number(visit.weight)>500))return jsonResponse({message:"قيمة الوزن غير صحيحة."},400);
     const now=new Date().toISOString(),existing=(await collection(account.project_id,token,VISITS_COLLECTION)).map(decodeVisit).find(v=>v.bookingId===bookingId);
     if(existing&&existing.patientId!==patientId)return jsonResponse({message:"هذا الكشف مرتبط بملف مريض آخر ولا يمكن نقله."},409);
