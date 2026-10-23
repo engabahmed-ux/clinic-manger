@@ -108,15 +108,14 @@
         </div>
         <div class="employee-form-card">
           <form id="createPatientForm" class="employee-form" novalidate>
-            <label for="patientAccountName">اسم المريضة</label>
-            <input id="patientAccountName" name="displayName" type="text" maxlength="120" autocomplete="name" required>
-            <label for="patientAccountEmail">البريد الإلكتروني</label>
-            <input id="patientAccountEmail" name="email" type="email" maxlength="254" autocomplete="email" required>
-            <label for="patientAccountPhone">رقم الهاتف</label>
-            <input id="patientAccountPhone" name="phone" type="tel" maxlength="40" autocomplete="tel" required>
-            <label for="patientAccountUsername">اسم المستخدم</label>
-            <input id="patientAccountUsername" name="username" type="text" minlength="3" maxlength="30" pattern="[A-Za-z0-9._-]+" autocomplete="off" required>
-            <p class="form-hint">من 3 إلى 30 حرفًا إنجليزيًا أو رقمًا، ويمكن استخدام النقطة والشرطة والشرطة السفلية.</p>
+            <label for="patientAccountSearch">ابحث عن المريض بالاسم أو رقم الهاتف</label>
+            <input id="patientAccountSearch" type="search" maxlength="120" autocomplete="off" placeholder="اكتب أول حروف الاسم أو رقم الهاتف">
+            <div id="patientAccountSearchResults" class="medical-patient-results" aria-live="polite"></div>
+            <input id="patientAccountPatientId" type="hidden" required>
+            <div id="patientAccountSelected" class="security-information" hidden></div>
+            <label for="patientAccountUsername">اسم المستخدم أو رقم الهاتف</label>
+            <input id="patientAccountUsername" name="username" type="text" minlength="3" maxlength="40" autocomplete="off" required>
+            <p class="form-hint">يمكن استخدام اسم عربي أو رقم هاتف. كلمة المرور المؤقتة ستظهر بعد إنشاء الحساب.</p>
             <p id="createPatientMessage" class="message" role="status" hidden></p>
             <button id="createPatientButton" class="primary-button" type="submit">إنشاء حساب المريضة</button>
           </form>
@@ -125,7 +124,6 @@
             <p id="patientCredentialsMessage" role="status"></p>
             <dl>
               <dt>اسم المستخدم</dt><dd id="createdPatientUsername"></dd>
-              <dt>البريد الإلكتروني</dt><dd id="createdPatientEmail"></dd>
               <dt>كلمة المرور المؤقتة</dt><dd id="createdPatientPassword"></dd>
             </dl>
             <button id="copyPatientCredentialsButton" class="secondary-button" type="button">نسخ بيانات الدخول</button>
