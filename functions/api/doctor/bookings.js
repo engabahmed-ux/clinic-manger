@@ -245,6 +245,10 @@ function decodeBooking(document) {
     service: readString(fields, "service"),
     servicePrice: readString(fields, "servicePrice"),
     paidAmount: readString(fields, "paidAmount"),
+    completedFee: readString(fields, "completedFee"),
+    completedAt: readString(fields, "completedAt"),
+    completedByUid: readString(fields, "completedByUid"),
+    completedByName: readString(fields, "completedByName"),
     paymentEnteredByUid: readString(fields, "paymentEnteredByUid"),
     paymentEnteredByName: readString(fields, "paymentEnteredByName"),
     paymentUpdatedAt: readString(fields, "paymentUpdatedAt"),
@@ -271,6 +275,10 @@ function encodeBooking(data) {
     "service",
     "servicePrice",
     "paidAmount",
+    "completedFee",
+    "completedAt",
+    "completedByUid",
+    "completedByName",
     "paymentEnteredByUid",
     "paymentEnteredByName",
     "paymentUpdatedAt",
@@ -507,6 +515,9 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
   );
 
   const existing = decodeBooking(current);
+  if (existing.status === "completed" && changes.status !== undefined && changes.status !== "completed") {
+    throw new Error("حالة «تم الكشف» نهائية ولا يمكن تغييرها بعد اعتماد الكشف.");
+  }
   const financialFields = ["appointmentDate","servicePrice","paidAmount","status"];
   const changesFinancialFields = financialFields.some(key => changes[key] !== undefined);
   if (
@@ -555,15 +566,23 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     rescheduleHistory.push({ fromDate: oldDate, toDate: nextDate, at: now });
   }
   let paidAmount = changes.paidAmount !== undefined ? String(changes.paidAmount).trim() : existing.paidAmount;
+  let completedFee = existing.completedFee || "";
+  let completedAt = existing.completedAt || "";
+  let completedByUid = existing.completedByUid || "";
+  let completedByName = existing.completedByName || "";
   let paymentEnteredByUid = existing.paymentEnteredByUid || "";
   let paymentEnteredByName = existing.paymentEnteredByName || "";
   let paymentUpdatedAt = existing.paymentUpdatedAt || "";
-  if (actorAccountType === "staff" && changes.status === "completed" && !(Number(existing.paidAmount) > 0) && !closedPeriodForUnpaidCompletion) {
+  if (changes.status === "completed" && existing.status !== "completed") {
     const fee = Number(changes.servicePrice ?? existing.servicePrice) || 0;
-    if (fee > 0) {
+    completedFee = fee.toFixed(2);
+    completedAt = now;
+    completedByUid = actorUid;
+    completedByName = actorDisplayName || (actorAccountType === "doctor" ? "الدكتور" : "الموظف");
+    if (!(Number(existing.paidAmount) > 0) && !closedPeriodForUnpaidCompletion && fee > 0) {
       paidAmount = fee.toFixed(2);
       paymentEnteredByUid = actorUid;
-      paymentEnteredByName = actorDisplayName || "الموظف";
+      paymentEnteredByName = completedByName;
       paymentUpdatedAt = now;
     }
   }
@@ -578,6 +597,10 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     service: changes.service?.trim() ?? existing.service,
     servicePrice: changes.servicePrice !== undefined ? String(changes.servicePrice).trim() : existing.servicePrice,
     paidAmount,
+    completedFee,
+    completedAt,
+    completedByUid,
+    completedByName,
     paymentEnteredByUid,
     paymentEnteredByName,
     paymentUpdatedAt,
@@ -595,6 +618,10 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     "service",
     "servicePrice",
     "paidAmount",
+    "completedFee",
+    "completedAt",
+    "completedByUid",
+    "completedByName",
     "paymentEnteredByUid",
     "paymentEnteredByName",
     "paymentUpdatedAt",
@@ -767,7 +794,7 @@ export async function onRequest(context) {
           return jsonResponse({ message: "تاريخ الأرشفة غير صحيح." }, 400);
         }
         const all = await listBookings(serviceAccount.project_id, accessToken);
-        const targets = all.filter((booking) => booking.appointmentDate.slice(0, 10) === date && !["pending", "archived", "cancelled"].includes(booking.status));
+        const targets = all.filter((booking) => booking.appointmentDate.slice(0, 10) === date && !["pending", "archived", "cancelled", "completed"].includes(booking.status));
         let archivedCount = 0;
         for (const booking of targets) {
           await updateBooking(
