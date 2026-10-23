@@ -865,3 +865,140 @@ button:disabled {
 /* Medical records and patient lookup */
 
 .patient-suggestions,.medical-patient-results,.medical-visit-history{display:grid;gap:8px;margin:10px 0 18px}.patient-suggestions button,.medical-patient-result{width:100%;text-align:right;border:1px solid rgba(17,20,26,.12);border-radius:12px;padding:10px 14px;background:#fff;color:inherit;cursor:pointer}.patient-suggestions button span,.medical-patient-result span{display:block;font-size:.9em;opacity:.75}.medical-records-section{display:grid;gap:14px}.medical-search-label{display:block;font-weight:700}.medical-patient-profile{border:1px solid rgba(17,20,26,.12);border-radius:16px;padding:16px;margin-top:12px}.medical-patient-summary{display:grid;gap:5px;padding-bottom:12px;border-bottom:1px solid rgba(17,20,26,.12)}.medical-visit-card{border:1px solid rgba(17,20,26,.12);border-radius:12px;padding:12px;margin:8px 0}.medical-visit-card h4{margin:0 0 8px}.medical-visit-card p{margin:5px 0;white-space:pre-wrap}.medical-visit-form{display:grid;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(17,20,26,.12)}.medical-visit-form label{display:grid;gap:5px;font-weight:600}.medical-visit-form input,.medical-visit-form select,.medical-visit-form textarea,.medical-search-label+input{width:100%;padding:10px;border:1px solid rgba(17,20,26,.18);border-radius:10px;background:#fff;color:inherit;font:inherit}.medical-vitals-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}@media(max-width:650px){.medical-vitals-grid{grid-template-columns:1fr}}
+
+
+/* Clinic management settings and private audit log */
+.clinic-management-section h4 {
+  margin: 24px 0 10px;
+}
+.clinic-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.clinic-settings-grid label,
+.clinic-dynamic-field,
+.clinic-logs-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+.clinic-settings-grid input,
+.clinic-settings-grid textarea,
+.clinic-dynamic-field input,
+.clinic-logs-toolbar select,
+.clinic-advanced-settings {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--color-dark);
+  padding: 10px 12px;
+}
+.clinic-settings-grid input[type="color"],
+.clinic-dynamic-field input[type="color"] {
+  min-height: 44px;
+  padding: 4px;
+}
+.clinic-settings-wide {
+  grid-column: 1 / -1;
+}
+.clinic-dynamic-list {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0;
+}
+.clinic-dynamic-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: rgba(255,255,255,.65);
+}
+.clinic-status-row {
+  grid-template-columns: minmax(90px, .7fr) minmax(150px, 1.4fr) minmax(100px, .7fr);
+}
+.clinic-status-row > strong {
+  align-self: center;
+}
+.clinic-service-enabled {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.clinic-remove-button {
+  justify-self: start;
+}
+.clinic-advanced-settings {
+  direction: ltr;
+  text-align: left;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.clinic-logs-heading,
+.clinic-log-heading,
+.clinic-logs-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.clinic-logs-heading {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+.clinic-logs-toolbar {
+  justify-content: flex-start;
+  margin: 16px 0;
+}
+.clinic-logs-list {
+  display: grid;
+  gap: 10px;
+}
+.clinic-log-entry {
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-right: 4px solid var(--color-secondary);
+  border-radius: 12px;
+  background: #fff;
+}
+.clinic-log-error { border-right-color: #B45353; }
+.clinic-log-warning { border-right-color: #D97706; }
+.clinic-log-security { border-right-color: #8B7BB5; }
+.clinic-log-heading time {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.clinic-log-entry p {
+  margin: 5px 0 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .clinic-settings-grid,
+  .clinic-dynamic-row,
+  .clinic-status-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .clinic-logs-heading,
+  .clinic-log-heading,
+  .clinic-logs-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .clinic-settings-wide {
+    grid-column: auto;
+  }
+}
