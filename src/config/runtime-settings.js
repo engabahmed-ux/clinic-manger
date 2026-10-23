@@ -52,3 +52,18 @@ export function applyRuntimeStatusColor(element, settings, status) {
   element.style.backgroundColor = paleColor(color);
   element.style.setProperty("--dynamic-status-color", color);
 }
+
+
+export async function recordRuntimeLog(user, log) {
+  if (!user) return;
+  try {
+    await fetch("/api/clinic-management", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + await user.getIdToken(), "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "recordLog", log }),
+      cache: "no-store"
+    });
+  } catch {
+    // Logging must never break the user's primary workflow.
+  }
+}
