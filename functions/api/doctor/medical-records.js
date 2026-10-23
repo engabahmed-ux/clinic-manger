@@ -104,7 +104,7 @@ async function resolvePatient(projectId,token,data,access){
   const bookings=await collection(projectId,token,BOOKINGS_COLLECTION);
   for(const doc of bookings){
     const f=doc.fields||{};
-    if(read(f,"patientId")||norm(read(f,"patientName"))!==norm(patient.displayName)||normPhone(read(f,"patientPhone"))!==normPhone(patient.phone))continue;
+    if(read(f,"status")==="completed"||read(f,"patientId")||norm(read(f,"patientName"))!==norm(patient.displayName)||normPhone(read(f,"patientPhone"))!==normPhone(patient.phone))continue;
     await updateBookingPatient(projectId,token,doc,patient.id);
   }
   return patient;
