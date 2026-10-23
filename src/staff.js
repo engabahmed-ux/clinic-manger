@@ -99,7 +99,6 @@ function renderDailyAccounts(rows){
   if(!rows.length)accountsBookings.append(empty("لا توجد حجوزات في هذا اليوم."));
   for(const booking of rows){
     const completionDay=String(booking.completedAt||"").slice(0,10);
-    const appointmentDay=String(booking.appointmentDate||"").slice(0,10);
     const fee=Number(booking.completedFee!==undefined&&booking.completedFee!==""?booking.completedFee:(booking.status==="completed"?booking.servicePrice:0))||0;
     // Older completed bookings may have a fee but no stored receipt amount.
     const recordedAmount=Number(booking.paidAmount)||0;
