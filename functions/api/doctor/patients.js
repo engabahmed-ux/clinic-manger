@@ -124,7 +124,7 @@ async function verifyPatientsEditor(user, account, token) {
   }
   const permissions = fields.permissions?.mapValue?.fields || {};
   const permission = readString(permissions, "patients");
-  if (permission !== "edit") return { ok: false, status: 403, message: "تحتاج إلى صلاحية تعديل بيانات المرضى لإنشاء حساب." };
+  if (permission !== "edit") return { ok: false, status: 403, message: "تحتاج إلى صلاحية تعديل بيانات المرضى لإدارة الحسابات." };
   return { ok: true };
 }
 
