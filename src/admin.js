@@ -27,6 +27,7 @@ import {
 
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const RUNTIME_SETTINGS = await loadRuntimeSettings(APP_CONFIG);
+document.querySelectorAll("[data-status-filter]").forEach((button)=>{const key=button.dataset.statusFilter;if(key!=="all"&&RUNTIME_SETTINGS.statuses?.[key]){const prefix=button.textContent.trim().startsWith("✓")?"✓ ":"";button.textContent=prefix+statusLabel(RUNTIME_SETTINGS,key);applyRuntimeStatusColor(button,RUNTIME_SETTINGS,key)}});
 const DOCTOR_VERIFY_URL = "/api/doctor/verify";
 const EMPLOYEES_API_URL = "/api/doctor/employees";
 
