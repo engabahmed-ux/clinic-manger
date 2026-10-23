@@ -104,7 +104,7 @@ function renderDailyAccounts(rows){
     // Older completed bookings may have a fee but no stored receipt amount.
     const recordedAmount=Number(booking.paidAmount)||0;
     const received=recordedAmount>0?recordedAmount:(booking.status==="completed"?fee:0);
-    if(booking.status==="completed"&&completionDay===selectedDate)completedTotal+=received;
+    if(booking.status==="completed"&&completionDay===selectedDate&&booking.isArchived!==true&&!["archived","cancelled"].includes(booking.status))completedTotal+=received;
     const card=document.createElement("article");
     card.className="staff-account-booking";
     const details=document.createElement("div"),title=document.createElement("h4"),meta=document.createElement("p");
