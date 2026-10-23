@@ -475,10 +475,45 @@ async function isFinancialPeriodClosed(projectId, accessToken, dateValue, employ
   });
 }
 
+async function normalizeQueueNumbersForDate(projectId, accessToken, date, knownBookings = null) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) return knownBookings || await listBookings(projectId, accessToken);
+  const all = knownBookings || await listBookings(projectId, accessToken);
+  const rows = all
+    .filter(booking => String(booking.appointmentDate || "").slice(0, 10) === date)
+    .sort((a, b) => (Date.parse(a.createdAt || "") || 0) - (Date.parse(b.createdAt || "") || 0) || a.id.localeCompare(b.id));
+  let max = 0;
+  for (const booking of all) {
+    if (String(booking.appointmentDate || "").slice(0, 10) === date) max = Math.max(max, Number(booking.queueNumber) || 0);
+    for (const entry of historyForBooking(booking)) {
+      if (entry.fromDate === date) max = Math.max(max, Number(entry.fromQueueNumber) || 0);
+      if (entry.toDate === date) max = Math.max(max, Number(entry.toQueueNumber) || 0);
+    }
+  }
+  const used = new Set();
+  for (const booking of rows) {
+    const current = Number(booking.queueNumber);
+    if (Number.isInteger(current) && current > 0 && !used.has(current)) {
+      used.add(current);
+      continue;
+    }
+    do { max++; } while (used.has(max));
+    const queueNumber = String(max);
+    const fields = { queueNumber: stringField(queueNumber), updatedAt: stringField(booking.updatedAt || new Date().toISOString()) };
+    await firestoreRequest(projectId, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(booking.id)}?updateMask.fieldPaths=queueNumber`, {
+      method: "PATCH",
+      body: JSON.stringify({ fields: { queueNumber: fields.queueNumber } })
+    });
+    booking.queueNumber = queueNumber;
+    used.add(max);
+  }
+  return all;
+}
+
 async function createBooking(projectId, accessToken, data) {
   const now = new Date().toISOString();
-  const existingBookings = await listBookings(projectId, accessToken);
-  const queueNumber = nextQueueNumberForDate(existingBookings, String(data.appointmentDate || "").slice(0, 10));
+  const date = String(data.appointmentDate || "").slice(0, 10);
+  const existingBookings = await normalizeQueueNumbersForDate(projectId, accessToken, date);
+  const queueNumber = nextQueueNumberForDate(existingBookings, date);
 
   const booking = {
     ...data,
@@ -606,8 +641,11 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
   const nextDate = String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0, 10);
   let queueNumber = String(existing.queueNumber || "");
   if (changes.appointmentDate !== undefined && oldDate && nextDate && oldDate !== nextDate) {
-    const allBookings = await listBookings(projectId, accessToken);
-    const oldQueueNumber = Number(existing.queueNumber) > 0 ? Number(existing.queueNumber) : currentQueueNumberForDate(allBookings, existing, oldDate);
+    let allBookings = await listBookings(projectId, accessToken);
+    allBookings = await normalizeQueueNumbersForDate(projectId, accessToken, oldDate, allBookings);
+    allBookings = await normalizeQueueNumbersForDate(projectId, accessToken, nextDate, allBookings);
+    const refreshedExisting = allBookings.find(item => item.id === existing.id) || existing;
+    const oldQueueNumber = Number(refreshedExisting.queueNumber) > 0 ? Number(refreshedExisting.queueNumber) : currentQueueNumberForDate(allBookings, refreshedExisting, oldDate);
     const newQueueNumber = nextQueueNumberForDate(allBookings, nextDate);
     rescheduleHistory.push({ fromDate: oldDate, toDate: nextDate, fromQueueNumber: oldQueueNumber, toQueueNumber: newQueueNumber, at: now });
     queueNumber = String(newQueueNumber);
@@ -856,13 +894,35 @@ export async function onRequest(context) {
         });
       }
 
+      case "restoreArchived": {
+        const id = typeof data.id === "string" ? data.id : "";
+        if (!/^[A-Za-z0-9_-]{1,150}$/.test(id)) return jsonResponse({ message: "رقم الحجز غير صحيح." }, 400);
+        const current = await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(id)}`);
+        const booking = decodeBooking(current);
+        if (!booking.isArchived) return jsonResponse({ booking, restored: false });
+        const now = new Date().toISOString();
+        const fields = {
+          isArchived: stringField("false"),
+          archivedAt: stringField(""),
+          archivedByUid: stringField(""),
+          archivedByName: stringField(""),
+          updatedAt: stringField(now)
+        };
+        const mask = new URLSearchParams();
+        for (const key of Object.keys(fields)) mask.append("updateMask.fieldPaths", key);
+        const updated = await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(id)}?${mask}`, {
+          method: "PATCH", body: JSON.stringify({ fields })
+        });
+        return jsonResponse({ booking: decodeBooking(updated), restored: true });
+      }
+
       case "archiveDay": {
         const date = typeof data.date === "string" ? data.date : "";
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00`))) {
           return jsonResponse({ message: "تاريخ الأرشفة غير صحيح." }, 400);
         }
         const all = await listBookings(serviceAccount.project_id, accessToken);
-        const targets = all.filter((booking) => booking.appointmentDate.slice(0, 10) === date && !booking.isArchived && !["pending", "archived", "cancelled"].includes(booking.status));
+        const targets = all.filter((booking) => String(booking.appointmentDate || "").slice(0, 10) === date && !booking.isArchived);
         let archivedCount = 0;
         const archivedAt = new Date().toISOString();
         for (const booking of targets) {
