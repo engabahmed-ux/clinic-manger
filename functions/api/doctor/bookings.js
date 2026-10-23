@@ -228,6 +228,20 @@ function readString(fields, key) {
   return fields?.[key]?.stringValue || "";
 }
 
+function cairoDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function decodeBooking(document) {
   const fields = document.fields || {};
   const id = (document.name || "").split("/").pop();
@@ -853,8 +867,8 @@ export async function onRequest(context) {
         const bookings = await listBookings(serviceAccount.project_id, accessToken);
         const daily = bookings.filter(b => {
           const appointmentDay = String(b.appointmentDate || "").slice(0,10);
-          const completionDay = String(b.completedAt || "").slice(0,10);
-          const paymentDay = String(b.paymentUpdatedAt || "").slice(0,10);
+          const completionDay = cairoDate(b.completedAt);
+          const paymentDay = cairoDate(b.paymentUpdatedAt);
           return (appointmentDay === date && (b.status !== "pending" || Number(b.paidAmount) > 0)) ||
             (b.status === "completed" && completionDay === date) ||
             (Number(b.paidAmount) > 0 && paymentDay === date);
