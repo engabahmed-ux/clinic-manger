@@ -142,7 +142,7 @@ const doctorArchiveSearch = $("#doctorArchiveSearch");
 const homeAddBookingButton = $("#homeAddBookingButton");
 const dailyAppointmentsList = $("#dailyAppointmentsList");
 const dailyAppointmentsMessage = $("#dailyAppointmentsMessage");
-const doctorAccountsSection=$("#doctorAccountsSection"),openAccountsTabButton=$("#openAccountsTabButton"),doctorAccountsContent=$("#doctorAccountsContent"),accountsDateLabel=$("#accountsDateLabel"),doctorStatusLegend=$("#doctorStatusLegend"),archiveSelectedAppointments=$("#archiveSelectedAppointments");let activeStatusFilter="all";
+const doctorAccountsSection=$("#doctorAccountsSection"),openAccountsTabButton=$("#openAccountsTabButton"),doctorAccountsContent=$("#doctorAccountsContent"),doctorAccountsSummary=$("#doctorAccountsSummary"),accountsDateLabel=$("#accountsDateLabel"),doctorStatusLegend=$("#doctorStatusLegend"),archiveSelectedAppointments=$("#archiveSelectedAppointments");let activeStatusFilter="all";
 const accountsSubtabs=$("#doctorAccountsSubtabs"),patientDailyAccountsPanel=$("#patientDailyAccountsPanel"),salaryAccountsPanel=$("#salaryAccountsPanel"),customAccountsPanel=$("#customAccountsPanel"),salaryEntriesList=$("#salaryEntriesList"),customAccountEntriesList=$("#customAccountEntriesList"),salaryEntryForm=$("#salaryEntryForm"),customAccountEntryForm=$("#customAccountEntryForm"),accountsCategoryForm=$("#accountsCategoryForm"),doctorAccountsDate=$("#doctorAccountsDate"),doctorDailyExpenseForm=$("#doctorDailyExpenseForm"),doctorDailyExpensesList=$("#doctorDailyExpensesList"),doctorDailyExpenseMessage=$("#doctorDailyExpenseMessage"),doctorDailyNetTotal=$("#doctorDailyNetTotal"),doctorAccountsMonth=$("#doctorAccountsMonth"),doctorSettlementEmployee=$("#doctorSettlementEmployee"),finalizeDailySettlementButton=$("#finalizeDailySettlement"),finalizeMonthlySettlementButton=$("#finalizeMonthlySettlement"),doctorSettlementMessage=$("#doctorSettlementMessage"),doctorMonthlyExpensesList=$("#doctorMonthlyExpensesList"),doctorSettlementsList=$("#doctorSettlementsList");let doctorDailyExpenses=[],doctorAccountCategories=[],doctorAccountEntries=[],doctorAccountRecords=[],activeDoctorAccountSubtab="patients";
 const createBookingForm = $("#createBookingForm");
 const createBookingButton = $("#createBookingButton");
@@ -510,21 +510,67 @@ function renderBookingCard(booking) {
   const card = document.createElement("article");
   card.className = "employee-card booking-card";
   card.dataset.bookingId = booking.id;
+  const locked = booking.status === "completed";
   const summary = document.createElement("button");
-  summary.type = "button"; summary.className = "booking-request-summary";
-  const main = document.createElement("span"); main.className = "booking-request-main";
-  const title = document.createElement("strong"); title.textContent = booking.patientName || "طلب حجز جديد";
-  const meta = document.createElement("small"); meta.textContent = `الدور: ${queueNumberFor(booking)} · ${bookingStatusLabel(booking.status)} · تاريخ الطلب: ${formatSubmittedAt(booking.createdAt)} · الموعد: ${formatRequestDate(booking.appointmentDate)} · ${booking.patientPhone||"الهاتف غير مسجل"} · ${booking.service||"الخدمة غير محددة"}`;
-  main.append(title,meta); const badge=document.createElement("span");badge.className="booking-request-badge";badge.textContent=bookingStatusLabel(booking.status);summary.append(main,badge);
-  const details=document.createElement("div");details.className="booking-request-details";details.hidden=true;
-  const fields=document.createElement("div");fields.className="booking-edit-grid";
-  fields.append(createBookingInput("اسم المريضة",booking.patientName,"patientName"),createBookingInput("رقم الهاتف",booking.patientPhone,"patientPhone","tel"),createBookingInput("الموعد",String(booking.appointmentDate||"").slice(0,10),"appointmentDate","date"),createBookingInput("الخدمة",booking.service,"service"),createBookingInput("قيمة الخدمة (جنيه)",booking.servicePrice,"servicePrice","number"),createBookingInput("ضغط الدم",booking.bloodPressure,"bloodPressure"),createBookingInput("الوزن (كجم)",booking.weight,"weight","number"),createBookingInput("قياس السكر",booking.bloodSugar,"bloodSugar"),createBookingInput("ملاحظات الموظف قبل الكشف",booking.preVisitNotes,"preVisitNotes"),createBookingInput("ملاحظات الحجز",booking.notes,"notes"),createBookingInput("حالة الحجز",normalizedStatus(booking.status),"status","select"));
-  const actions=document.createElement("div");actions.className="booking-card-actions";
-  const actionItems=[["save-booking","حفظ التعديلات","secondary-button"]];
-  if(booking.status==="pending")actionItems.push(["confirm-booking","تأكيد الحجز","primary-button"],["archive-booking","نقل إلى الأرشيف","secondary-button"]);
-  if(["pending","confirmed"].includes(booking.status))actionItems.push(["cancel-booking","إلغاء الحجز","secondary-button"]);
-  for(const [action,label,cls] of actionItems){const button=document.createElement("button");button.type="button";button.className=cls;button.dataset.action=action;button.textContent=label;actions.append(button)}
-  details.append(fields,actions);summary.addEventListener("click",()=>{details.hidden=!details.hidden});card.append(summary,details);return card;
+  summary.type = "button";
+  summary.className = "booking-request-summary";
+  const main = document.createElement("span");
+  main.className = "booking-request-main";
+  const title = document.createElement("strong");
+  title.textContent = booking.patientName || "طلب حجز جديد";
+  const meta = document.createElement("small");
+  meta.textContent = `الدور: ${queueNumberFor(booking)} · ${bookingStatusLabel(booking.status)} · تاريخ الطلب: ${formatSubmittedAt(booking.createdAt)} · الموعد: ${formatRequestDate(booking.appointmentDate)} · ${booking.patientPhone || "الهاتف غير مسجل"} · ${booking.service || "الخدمة غير المحددة"}`;
+  main.append(title, meta);
+  const badge = document.createElement("span");
+  badge.className = "booking-request-badge";
+  badge.textContent = bookingStatusLabel(booking.status);
+  summary.append(main, badge);
+  const details = document.createElement("div");
+  details.className = "booking-request-details";
+  details.hidden = true;
+  const fields = document.createElement("div");
+  fields.className = "booking-edit-grid";
+  fields.append(
+    createBookingInput("اسم المريضة", booking.patientName, "patientName"),
+    createBookingInput("رقم الهاتف", booking.patientPhone, "patientPhone", "tel"),
+    createBookingInput("الموعد", String(booking.appointmentDate || "").slice(0, 10), "appointmentDate", "date"),
+    createBookingInput("الخدمة", booking.service, "service"),
+    createBookingInput("قيمة الخدمة (جنيه)", booking.servicePrice, "servicePrice", "number"),
+    createBookingInput("ضغط الدم", booking.bloodPressure, "bloodPressure"),
+    createBookingInput("الوزن (كجم)", booking.weight, "weight", "number"),
+    createBookingInput("قياس السكر", booking.bloodSugar, "bloodSugar"),
+    createBookingInput("ملاحظات الموظف قبل الكشف", booking.preVisitNotes, "preVisitNotes"),
+    createBookingInput("ملاحظات الحجز", booking.notes, "notes"),
+    createBookingInput("حالة الحجز", normalizedStatus(booking.status), "status", "select")
+  );
+  if (locked) {
+    fields.querySelectorAll("input, select, textarea").forEach(input => {
+      input.disabled = true;
+      input.setAttribute("aria-readonly", "true");
+    });
+    const note = document.createElement("p");
+    note.className = "muted-text";
+    note.textContent = "تم اعتماد الكشف؛ بيانات الحجز وحالته نهائية ولا يمكن تعديلها. يمكن أرشفة مواعيد اليوم من زر الأرشفة.";
+    details.append(fields, note);
+  } else {
+    const actions = document.createElement("div");
+    actions.className = "booking-card-actions";
+    const actionItems = [["save-booking", "حفظ التعديلات", "secondary-button"]];
+    if (booking.status === "pending") actionItems.push(["confirm-booking", "تأكيد الحجز", "primary-button"], ["archive-booking", "نقل إلى الأرشيف", "secondary-button"]);
+    if (["pending", "confirmed"].includes(booking.status)) actionItems.push(["cancel-booking", "إلغاء الحجز", "secondary-button"]);
+    for (const [action, label, cls] of actionItems) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = cls;
+      button.dataset.action = action;
+      button.textContent = label;
+      actions.append(button);
+    }
+    details.append(fields, actions);
+  }
+  summary.addEventListener("click", () => { details.hidden = !details.hidden; });
+  card.append(summary, details);
+  return card;
 }
 function formatRequestDate(value){if(!value)return"التاريخ غير محدد";const date=new Date(`${String(value).slice(0,10)}T12:00:00`);return Number.isNaN(date.getTime())?value:new Intl.DateTimeFormat("ar-EG",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}).format(date)}
 function formatSubmittedAt(value){if(!value)return"وقت الطلب غير متاح";const date=new Date(value);return Number.isNaN(date.getTime())?"وقت الطلب غير متاح":new Intl.DateTimeFormat("ar-EG",{dateStyle:"medium",timeStyle:"short"}).format(date)}
@@ -538,7 +584,7 @@ function normalizedStatus(status){return status==="confirmed"?"waiting":status}
 function bookingStatusLabel(status){return statusLabel(RUNTIME_SETTINGS,status,({pending:"قيد المراجعة",confirmed:"في الانتظار",waiting:"في الانتظار",completed:"تم الكشف",postponed:"تم التأجيل",no_show:"لم يأتِ",apologized:"اعتذر",cancelled:"ملغي",archived:"مؤرشف"})[status]||"غير محدد")}
 async function changeBookingStatus(booking,status,control){if(!["waiting","completed","postponed","no_show","apologized"].includes(status))return;if(control)control.disabled=true;try{await bookingApiRequest("update",{booking:{id:booking.id,status}});showMessage(bookingListMessage,"تم تحديث حالة الحجز.","success");await loadBookings()}catch(error){showMessage(bookingListMessage,error.message||"تعذر تحديث حالة الحجز.");if(control)control.value=normalizedStatus(booking.status)}finally{if(control)control.disabled=false}}
 function applyStatusColor(el,status){for(const name of ["waiting","completed","postponed","no_show","apologized","pending","archived","cancelled","confirmed"])el.classList.remove(`status-${name}`);el.classList.add(`status-${status||"waiting"}`);applyRuntimeStatusColor(el,RUNTIME_SETTINGS,status||"waiting")}function makeStatusSelect(booking){const select=document.createElement("select");select.className="booking-status-select";select.setAttribute("aria-label",`حالة حجز ${booking.patientName||""}`);for(const[value,label]of BOOKING_STATUS_OPTIONS){const option=document.createElement("option");option.value=value;option.textContent=label;option.className=`status-option-${value}`;select.append(option)}select.value=normalizedStatus(booking.status)||"waiting";if(booking.status==="completed"){select.disabled=true;select.title="حالة تم الكشف نهائية ولا يمكن تغييرها";select.setAttribute("aria-label",`حالة نهائية: تم الكشف عن ${booking.patientName||"المريضة"}`)}applyStatusColor(select,select.value);select.addEventListener("change",()=>{applyStatusColor(select,select.value);changeBookingStatus(booking,select.value,select)});return select}
-function renderScheduleCard(booking,archived=false){const card=renderBookingCard(booking);card.classList.add("schedule-booking-card");applyStatusColor(card,normalizedStatus(booking.status));const meta=card.querySelector(".booking-request-main small");if(meta)meta.textContent=queueNumberFor(booking)+" · الموعد: "+formatRequestDate(booking.appointmentDate)+" · "+(booking.patientPhone||"الهاتف غير مسجل")+" · "+(booking.service||"الخدمة غير محددة")+" · الضغط: "+(booking.bloodPressure||"—")+" · الوزن: "+(booking.weight?booking.weight+" كجم":"—")+" · السكر: "+(booking.bloodSugar||"—")+(booking.preVisitNotes?" · ملاحظة قبل الكشف: "+booking.preVisitNotes:"");if(!archived){card.querySelector(".booking-request-badge")?.remove();const controls=document.createElement("div");controls.className="schedule-card-controls";const edit=document.createElement("button");edit.type="button";edit.className="edit-booking-button";edit.textContent="✎";edit.title="تعديل بيانات الحجز";edit.setAttribute("aria-label","تعديل حجز "+(booking.patientName||"المريضة"));edit.addEventListener("click",()=>{const details=card.querySelector(".booking-request-details");if(details){details.hidden=false;details.querySelector("input,select,textarea")?.focus()}});controls.append(edit,makeStatusSelect(booking));card.prepend(controls)}return card}
+function renderScheduleCard(booking,archived=false){const card=renderBookingCard(booking);card.classList.add("schedule-booking-card");applyStatusColor(card,normalizedStatus(booking.status));const meta=card.querySelector(".booking-request-main small");if(meta)meta.textContent=queueNumberFor(booking)+" · الموعد: "+formatRequestDate(booking.appointmentDate)+" · "+(booking.patientPhone||"الهاتف غير مسجل")+" · "+(booking.service||"الخدمة غير محددة")+" · الضغط: "+(booking.bloodPressure||"—")+" · الوزن: "+(booking.weight?booking.weight+" كجم":"—")+" · السكر: "+(booking.bloodSugar||"—")+(booking.preVisitNotes?" · ملاحظة قبل الكشف: "+booking.preVisitNotes:"");if(!archived){card.querySelector(".booking-request-badge")?.remove();const controls=document.createElement("div");controls.className="schedule-card-controls";if(booking.status!=="completed"){const edit=document.createElement("button");edit.type="button";edit.className="edit-booking-button";edit.textContent="✎";edit.title="تعديل بيانات الحجز";edit.setAttribute("aria-label","تعديل حجز "+(booking.patientName||"المريضة"));edit.addEventListener("click",()=>{const details=card.querySelector(".booking-request-details");if(details){details.hidden=false;details.querySelector("input,select,textarea")?.focus()}});controls.append(edit)}controls.append(makeStatusSelect(booking));card.prepend(controls)}return card}
 
 function renderDailyAppointments(){dailyAppointmentsList.replaceChildren();const day=doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());const mode=doctorFilterMode?.value||"date",query=(doctorHomeSearch?.value||"").trim().toLocaleLowerCase("ar");if(doctorScheduleDateLabel)doctorScheduleDateLabel.textContent=mode==="search"?"نتائج البحث":formatRequestDate(day);const rows=allBookings.filter(b=>!b.isArchived&&!["pending","archived","cancelled"].includes(b.status)&&((mode==="search"&&query)||String(b.appointmentDate||"").slice(0,10)===day)&&(!query||(String(b.patientName||"")+" "+String(b.patientPhone||"")+" "+String(b.service||"")).toLocaleLowerCase("ar").includes(query))&&(activeStatusFilter==="all"||normalizedStatus(b.status)===activeStatusFilter)).sort((a,b)=>String(a.appointmentDate||"").localeCompare(String(b.appointmentDate||""))||queueNumberFor(a)-queueNumberFor(b));const notices=mode==="date"?allBookings.filter(b=>!b.isArchived).flatMap(b=>parseRescheduleHistory(b).filter(h=>h.fromDate===day).map(entry=>({booking:b,entry}))):[];if(!rows.length&&!notices.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent=mode==="search"?"لا توجد نتائج مطابقة للبحث.":`لا توجد مواعيد في ${formatRequestDate(day)}.`;dailyAppointmentsList.append(empty)}else{for(const booking of rows)dailyAppointmentsList.append(renderScheduleCard(booking));for(const item of notices)dailyAppointmentsList.append(renderRescheduleNotice(item.booking,item.entry))}renderDoctorAccounts();if(archiveSelectedAppointments)archiveSelectedAppointments.disabled=mode!=="date"||!allBookings.some(b=>!b.isArchived&&String(b.appointmentDate||"").slice(0,10)===day)}
 function renderDoctorArchive(){if(!doctorArchiveList)return;doctorArchiveList.replaceChildren();const from=doctorArchiveDateFilter?.value||"",to=doctorArchiveToDateFilter?.value||"",query=(doctorArchiveSearch?.value||"").trim().toLocaleLowerCase("ar");const rows=allBookings.filter(b=>b.isArchived||ARCHIVE_STATUSES.has(b.status)).filter(b=>{const date=String(b.appointmentDate||"").slice(0,10);return(!from||date>=from)&&(!to||date<=to)&&(!query||`${b.patientName||""} ${b.patientPhone||""} ${b.service||""}`.toLocaleLowerCase("ar").includes(query))}).sort((a,b)=>(Date.parse(b.archivedAt||b.updatedAt||b.createdAt||"")||0)-(Date.parse(a.archivedAt||a.updatedAt||a.createdAt||"")||0));if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد حجوزات أو طلبات مؤرشفة حسب الفلتر الحالي.";doctorArchiveList.append(empty);return}for(const booking of rows){const card=renderScheduleCard(booking,true);const meta=card.querySelector(".booking-request-main small");if(meta&&booking.isArchived)meta.textContent+=" · مؤرشف"+(booking.archivedAt?" بتاريخ "+formatSubmittedAt(booking.archivedAt):"");if(booking.isArchived){const controls=document.createElement("div");controls.className="schedule-card-controls";const restore=document.createElement("button");restore.type="button";restore.className="secondary-button";restore.textContent="استعادة إلى المواعيد";restore.addEventListener("click",async()=>{if(!window.confirm("هل تريد استعادة هذا الحجز إلى قائمة المواعيد؟ ستظل حالته الأصلية محفوظة."))return;restore.disabled=true;try{await bookingApiRequest("restoreArchived",{id:booking.id});await loadBookings();showMessage(archiveExportMessage,"تمت استعادة الحجز إلى قائمته حسب حالته الأصلية.","success")}catch(error){showMessage(archiveExportMessage,error.message||"تعذرت استعادة الحجز.")}finally{restore.disabled=false}});controls.append(restore);card.append(controls)}doctorArchiveList.append(card)}}
@@ -546,7 +592,71 @@ function excelXmlEscape(value){return String(value??"").replace(/&/g,"&amp;").re
 function excelCell(value,header=false){const raw=String(value??"");const style=header?' ss:StyleID="Header"':"";if(!header&&raw.trim()!==""&&/^-?\d+(?:\.\d+)?$/.test(raw.trim()))return `<Cell${style}><Data ss:Type="Number">${Number(raw.trim())}</Data></Cell>`;return `<Cell${style}><Data ss:Type="String">${excelXmlEscape(raw)}</Data></Cell>`}
 function excelSheet(name,headers,rows){const all=[headers,...rows];return `<Worksheet ss:Name="${excelXmlEscape(name)}"><Table>${all.map((row,index)=>`<Row>${row.map(value=>excelCell(value,index===0)).join("")}</Row>`).join("")}</Table></Worksheet>`}
 async function exportClinicExcel(){if(!exportClinicExcelButton)return;const from=doctorArchiveDateFilter?.value||"",to=doctorArchiveToDateFilter?.value||"";if(from&&to&&from>to){showMessage(archiveExportMessage,"تاريخ البداية يجب أن يكون قبل تاريخ النهاية أو مساويًا له.");return}exportClinicExcelButton.disabled=true;hideMessage(archiveExportMessage);try{const [accountResult,patientResult]=await Promise.all([accountsApiRequest("list"),patientApiRequest("list")]);doctorAccountRecords=Array.isArray(accountResult.records)?accountResult.records:[];const patientProfiles=Array.isArray(patientResult.patients)?patientResult.patients:[];const inPeriod=date=>{const value=String(date||"").slice(0,10);return(!from||value>=from)&&(!to||value<=to)};const patientBookings=allBookings.filter(b=>inPeriod(b.appointmentDate)).sort((a,b)=>String(a.appointmentDate||"").localeCompare(String(b.appointmentDate||"")));const accountRows=[...doctorAccountRecords.filter(r=>{if(r.type==="category")return true;if(r.periodType==="month"&&r.periodKey){const month=String(r.periodKey).slice(0,7);return(!from||month>=from.slice(0,7))&&(!to||month<=to.slice(0,7))}return inPeriod(r.date||r.periodKey)}),...patientBookings.filter(b=>Number(b.paidAmount)>0).map(b=>({id:"booking-receipt-"+b.id,type:"bookingReceipt",date:String(b.appointmentDate||"").slice(0,10),personName:b.patientName||"",amount:b.paidAmount,notes:[b.service?"الخدمة: "+b.service:"",b.notes||""].filter(Boolean).join(" | "),status:b.status||"",employeeUid:b.paymentEnteredByUid||"",employeeName:b.paymentEnteredByName||"",bookingId:b.id,servicePrice:b.servicePrice||"",paymentUpdatedAt:b.paymentUpdatedAt||""}))];const patientHeaders=["معرّف حساب المريضة","نوع الحساب","اسم المريضة في الحساب","هاتف الحساب","البريد الإلكتروني","اسم المستخدم","حالة الحساب","تاريخ إنشاء الحساب","آخر تحديث للحساب","معرّف الحجز","اسم المريضة في الحجز","هاتف الحجز","تاريخ الموعد","الخدمة","قيمة الكشف","المبلغ المسجل بالحسابات","حالة الحجز","ملاحظات الحجز","تاريخ إنشاء الطلب","آخر تحديث للحجز","معرّف الموظف المسجل للمبلغ","اسم الموظف المسجل للمبلغ","تاريخ تسجيل المبلغ","سجل نقل المواعيد"];const normalizePhoneForExport=value=>{let digits=String(value||"").replace(/\D/g,"");if(digits.startsWith("0020")&&digits.length===14)digits="0"+digits.slice(4);else if(digits.startsWith("20")&&digits.length===12)digits="0"+digits.slice(2);return digits};const profileByPhone=new Map();for(const profile of patientProfiles){const key=normalizePhoneForExport(profile.phone);if(key)profileByPhone.set(key,profile)}const profileValues=profile=>[profile.uid||"",profile.role||"",profile.displayName||"",profile.phone||"",profile.email||"",profile.username||"",profile.uid?(profile.active===true?"نشط":"غير نشط"):"لا يوجد حساب بوابة",profile.createdAt||"",profile.updatedAt||""];const bookingValues=b=>[b.id||"",b.patientName||"",b.patientPhone||"",b.appointmentDate||"",b.service||"",b.servicePrice||"",b.paidAmount||"",b.status||"",b.notes||"",b.createdAt||"",b.updatedAt||"",b.paymentEnteredByUid||"",b.paymentEnteredByName||"",b.paymentUpdatedAt||"",b.rescheduleHistory||""];const patientRows=patientBookings.map(b=>{const profile=profileByPhone.get(normalizePhoneForExport(b.patientPhone))||{};return[...profileValues(profile),...bookingValues(b)]});if(!from&&!to){for(const profile of patientProfiles){const phone=normalizePhoneForExport(profile.phone);if(!phone||!allBookings.some(b=>normalizePhoneForExport(b.patientPhone)===phone))patientRows.push([...profileValues(profile),...Array(15).fill("")])}}const accountKeys=[...new Set(["id","type","name","kind","date","personName","amount","notes","status","bookingId","servicePrice","paymentUpdatedAt","enteredBy","enteredByName","approvedBy","approvedByName","approvedAt","createdAt","updatedAt","categoryId","periodType","periodKey","employeeUid","employeeName","closedBy","closedByName","closedAt","totalReceipts","totalExpenses","netTotal","bookingCount",...accountRows.flatMap(r=>Object.keys(r))])];const accountLabels={id:"معرّف السجل",type:"نوع السجل",bookingReceipt:"مقبوضات الحجوزات",bookingId:"معرّف الحجز",servicePrice:"قيمة الكشف",paymentUpdatedAt:"تاريخ تسجيل المبلغ",name:"اسم القسم",kind:"نوع الحساب",date:"التاريخ",personName:"البيان",amount:"المبلغ",notes:"ملاحظات",status:"الحالة",enteredBy:"معرّف من سجل",enteredByName:"اسم من سجل",approvedBy:"معرّف المعتمد",approvedByName:"اسم المعتمد",approvedAt:"تاريخ الاعتماد",createdAt:"تاريخ الإنشاء",updatedAt:"آخر تحديث",categoryId:"معرّف القسم",periodType:"نوع الفترة",periodKey:"الفترة",employeeUid:"معرّف الموظف",employeeName:"اسم الموظف",closedBy:"معرّف من أقفل الفترة",closedByName:"اسم من أقفل الفترة",closedAt:"تاريخ الإقفال",totalReceipts:"إجمالي المقبوضات",totalExpenses:"إجمالي المصروفات",netTotal:"الصافي",bookingCount:"عدد الحجوزات"};const accountHeaders=accountKeys.map(key=>accountLabels[key]||key);const accountData=accountRows.map(r=>accountKeys.map(key=>r[key]??""));const filename="تقرير_العيادة_"+(from||"كل_الفترة")+"_"+(to||"حتى_الآن");if(window.XLSX){const workbook=window.XLSX.utils.book_new();const accountSheet=window.XLSX.utils.aoa_to_sheet([accountHeaders,...accountData]);const patientSheet=window.XLSX.utils.aoa_to_sheet([patientHeaders,...patientRows]);window.XLSX.utils.book_append_sheet(workbook,accountSheet,"الحسابات");window.XLSX.utils.book_append_sheet(workbook,patientSheet,"المرضى");window.XLSX.writeFile(workbook,filename+".xlsx",{compression:true})}else{const workbookXml='<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Styles><Style ss:ID="Header"><Font ss:Bold="1"/></Style></Styles>'+excelSheet("الحسابات",accountHeaders,accountData)+excelSheet("المرضى",patientHeaders,patientRows)+"</Workbook>";const blob=new Blob(["\ufeff",workbookXml],{type:"application/vnd.ms-excel;charset=utf-8"});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download=filename+".xls";document.body.append(link);link.click();link.remove();}showMessage(archiveExportMessage,`تم تجهيز ملف Excel: ${patientRows.length} سجل مريضة وحجز و${accountRows.length} سجل حسابات.`,"success")}catch(error){console.error("Excel export failed:",error);showMessage(archiveExportMessage,error.message||"تعذر استخراج ملف Excel.")}finally{exportClinicExcelButton.disabled=false}}function doctorMoney(v){return new Intl.NumberFormat("ar-EG",{style:"currency",currency:"EGP",maximumFractionDigits:2}).format(Number(v)||0)}
-function renderDoctorAccounts(){if(!doctorAccountsContent)return;const day=doctorAccountsDate?.value||doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());if(doctorAccountsDate&&!doctorAccountsDate.value)doctorAccountsDate.value=day;if(accountsDateLabel)accountsDateLabel.textContent=formatRequestDate(day);const rows=allBookings.filter(b=>String(b.appointmentDate||"").slice(0,10)===day&&(b.status!=="pending"||Number(b.paidAmount)>0)).sort((a,b)=>queueNumberFor(a)-queueNumberFor(b));doctorAccountsContent.replaceChildren();let total=0,completedTotal=0;const table=document.createElement("table");table.className="accounts-table";const head=document.createElement("thead");head.innerHTML="<tr><th>المريضة</th><th>الخدمة</th><th>سعر الخدمة</th><th>المدفوع الفعلي</th><th>استلمه</th><th>الحالة</th></tr>";table.append(head);const body=document.createElement("tbody");for(const b of rows){const tr=document.createElement("tr"),price=Number(b.completedFee!==""&&b.completedFee!==undefined?b.completedFee:b.servicePrice)||0,paid=Number(b.paidAmount)||0;total+=paid;if(b.status==="completed")completedTotal+=price;const vals=[b.patientName||"—",b.service||"غير محددة",doctorMoney(price),doctorMoney(paid),b.paymentEnteredByName||"غير منسوب لموظف",bookingStatusLabel(b.status)];for(let i=0;i<vals.length;i++){const td=document.createElement("td");td.textContent=vals[i];if(i===4)td.className=b.status==="completed"?"accounts-status-completed":"accounts-status-other";tr.append(td)}body.append(tr)}if(!rows.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=6;td.textContent="لا توجد حجوزات في هذا اليوم.";tr.append(td);body.append(tr)}table.append(body);const completedBox=document.createElement("div");completedBox.className="accounts-total";const completedLabel=document.createElement("span");completedLabel.textContent="إجمالي قيمة الكشوفات المنفذة";const completedAmount=document.createElement("strong");completedAmount.textContent=doctorMoney(completedTotal);completedBox.append(completedLabel,completedAmount);const box=document.createElement("div");box.className="accounts-total";const label=document.createElement("span");label.textContent="إجمالي المقبوضات لهذا اليوم";const amount=document.createElement("strong");amount.textContent=doctorMoney(total);box.append(label,amount);doctorAccountsContent.append(table,completedBox,box);loadDoctorDailyExpenses(day,total)}
+function renderDoctorAccounts() {
+  if (!doctorAccountsContent) return;
+  const day = doctorAccountsDate?.value || doctorHomeDateFilter?.value || new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  if (doctorAccountsDate && !doctorAccountsDate.value) doctorAccountsDate.value = day;
+  if (accountsDateLabel) accountsDateLabel.textContent = formatRequestDate(day);
+
+  const rows = allBookings
+    .filter(b => String(b.appointmentDate || "").slice(0, 10) === day || (b.status === "completed" && String(b.completedAt || "").slice(0, 10) === day))
+    .sort((a, b) => queueNumberFor(a) - queueNumberFor(b));
+  const completedRows = allBookings.filter(b =>
+    b.status === "completed" &&
+    (String(b.completedAt || "").slice(0, 10) === day ||
+      (!b.completedAt && String(b.appointmentDate || "").slice(0, 10) === day))
+  );
+  const completedTotal = completedRows.reduce((sum, b) => {
+    const fee = b.completedFee !== "" && b.completedFee !== undefined ? b.completedFee : b.servicePrice;
+    return sum + (Number(fee) || 0);
+  }, 0);
+
+  doctorAccountsContent.replaceChildren();
+  const table = document.createElement("table");
+  table.className = "accounts-table";
+  const head = document.createElement("thead");
+  head.innerHTML = "<tr><th>المريضة</th><th>الخدمة</th><th>قيمة الخدمة</th><th>الحالة</th></tr>";
+  table.append(head);
+  const body = document.createElement("tbody");
+  for (const b of rows) {
+    const tr = document.createElement("tr");
+    const fee = b.completedFee !== "" && b.completedFee !== undefined ? b.completedFee : b.servicePrice;
+    const vals = [b.patientName || "—", b.service || "غير محددة", doctorMoney(fee), bookingStatusLabel(b.status)];
+    for (let i = 0; i < vals.length; i++) {
+      const td = document.createElement("td");
+      td.textContent = vals[i];
+      if (i === 3) {
+        td.className = b.status === "completed" ? "accounts-status-completed" : "accounts-status-other";
+        applyStatusColor(td, normalizedStatus(b.status));
+      }
+      tr.append(td);
+    }
+    body.append(tr);
+  }
+  if (!rows.length) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 4;
+    td.textContent = "لا توجد حجوزات أو كشوفات مسجلة في هذا اليوم.";
+    tr.append(td);
+    body.append(tr);
+  }
+  table.append(body);
+  doctorAccountsContent.append(table);
+
+  if (doctorAccountsSummary) {
+    doctorAccountsSummary.replaceChildren();
+    const totalBox = document.createElement("div");
+    totalBox.className = "accounts-total";
+    const label = document.createElement("span");
+    label.textContent = "إجمالي أجور الخدمات المكتملة";
+    const amount = document.createElement("strong");
+    amount.textContent = doctorMoney(completedTotal);
+    totalBox.append(label, amount);
+    doctorAccountsSummary.append(totalBox);
+  }
+  loadDoctorDailyExpenses(day, completedTotal);
+}
 async function loadDoctorDailyExpenses(day,paidTotal=0){
   try {
     const result=await accountsApiRequest("listDailyExpenses",{date:day});
