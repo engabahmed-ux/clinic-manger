@@ -753,7 +753,23 @@ export async function onRequest(context) {
         const date = typeof data.date === "string" ? data.date : "";
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
         const bookings = await listBookings(serviceAccount.project_id, accessToken);
-        const daily = bookings.filter(b => String(b.appointmentDate || "").slice(0,10) === date && (b.status !== "pending" || Number(b.paidAmount) > 0)).map(b => { const otherOwner = access.accountType === "staff" && !!b.paymentEnteredByUid && b.paymentEnteredByUid !== access.uid; return { id:b.id, patientName:b.patientName, appointmentDate:b.appointmentDate, service:b.service, servicePrice:b.servicePrice, paidAmount:otherOwner ? "0" : (b.paidAmount || "0"), status:b.status, paymentEnteredByUid:b.paymentEnteredByUid, paymentEnteredByName:b.paymentEnteredByName, paymentReadOnly:otherOwner, paymentAttributedToCurrentUser:access.accountType === "doctor" || b.paymentEnteredByUid === access.uid, paymentUnassigned:!b.paymentEnteredByUid && Number(b.paidAmount)>0 }; });
+        const daily = bookings.filter(b => {
+          const appointmentDay = String(b.appointmentDate || "").slice(0,10);
+          const completionDay = String(b.completedAt || "").slice(0,10);
+          const paymentDay = String(b.paymentUpdatedAt || "").slice(0,10);
+          return (appointmentDay === date && (b.status !== "pending" || Number(b.paidAmount) > 0)) ||
+            (b.status === "completed" && completionDay === date) ||
+            (Number(b.paidAmount) > 0 && paymentDay === date);
+        }).map(b => {
+          const otherOwner = access.accountType === "staff" && !!b.paymentEnteredByUid && b.paymentEnteredByUid !== access.uid;
+          return { id:b.id, patientName:b.patientName, appointmentDate:b.appointmentDate, service:b.service,
+            servicePrice:b.servicePrice, completedFee:b.completedFee, completedAt:b.completedAt,
+            paidAmount:otherOwner ? "0" : (b.paidAmount || "0"), status:b.status,
+            paymentEnteredByUid:b.paymentEnteredByUid, paymentEnteredByName:b.paymentEnteredByName,
+            paymentUpdatedAt:b.paymentUpdatedAt, paymentReadOnly:otherOwner,
+            paymentAttributedToCurrentUser:access.accountType === "doctor" || b.paymentEnteredByUid === access.uid,
+            paymentUnassigned:!b.paymentEnteredByUid && Number(b.paidAmount)>0 };
+        });
         return jsonResponse({ bookings:daily, date });
       }
       case "updatePaidAmount": {
