@@ -153,6 +153,7 @@ export async function onRequest({request,env}){
     const patient=await findPatient(account.project_id,token,patientId);if(!patient)return jsonResponse({message:"ملف المريض غير موجود."},404);
     const bookingDoc=await firestore(account.project_id,token,"/"+BOOKINGS_COLLECTION+"/"+encodeURIComponent(bookingId));if(!bookingDoc)return jsonResponse({message:"الحجز المرتبط بالكشف غير موجود."},404);
     const bf=bookingDoc.fields||{};if(read(bf,"patientId")&&read(bf,"patientId")!==patientId)return jsonResponse({message:"هذا الحجز مرتبط بملف مريض آخر."},409);
+    if(read(bf,"status")==="completed")return jsonResponse({message:"تم اعتماد هذا الكشف نهائيًا؛ لا يمكن تعديل بياناته."},409);
     const visitDate=String(data.visitDate||read(bf,"appointmentDate")||"").slice(0,10);
     if(!/^\d{4}-\d{2}-\d{2}$/.test(visitDate)||Number.isNaN(Date.parse(visitDate+"T12:00:00")))return jsonResponse({message:"تاريخ الكشف غير صحيح."},400);
     const keys=["bloodPressure","weight","bloodSugar","preVisitNotes","diagnosis","clinicalNotes","treatment","followUp"];
@@ -160,6 +161,7 @@ export async function onRequest({request,env}){
     for(const key of keys){visit[key]=String(data[key]||"").trim();if(visit[key].length>(key==="clinicalNotes"||key==="treatment"?4000:1000))return jsonResponse({message:"أحد حقول الكشف أطول من المسموح."},400);}
     if(visit.weight && (!/^\d{1,3}(\.\d{1,2})?$/.test(visit.weight)||Number(visit.weight)<0||Number(visit.weight)>500))return jsonResponse({message:"قيمة الوزن غير صحيحة."},400);
     const now=new Date().toISOString(),existing=(await collection(account.project_id,token,VISITS_COLLECTION)).map(decodeVisit).find(v=>v.bookingId===bookingId);
+    if(existing&&existing.patientId!==patientId)return jsonResponse({message:"هذا الكشف مرتبط بملف مريض آخر ولا يمكن نقله."},409);
     visit.updatedAt=now;visit.createdAt=existing?.createdAt||now;
     let saved;
     if(existing){const patch=fieldsFrom(visit,["patientId","bookingId","visitDate","queueNumber",...keys,"createdByName","createdAt","updatedAt"]);saved=await firestore(account.project_id,token,"/"+VISITS_COLLECTION+"/"+encodeURIComponent(existing.id)+"?"+Object.keys(patch.fields).map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&"),{method:"PATCH",body:JSON.stringify(patch)});}
