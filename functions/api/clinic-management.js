@@ -155,6 +155,33 @@ async function saveSettings(projectId, token, uid, settings) {
 function safeText(value, max = 240) {
   return typeof value === "string" ? value.replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, max) : "";
 }
+let ttlAttempted = false;
+let ttlEnabled = null;
+async function ensureLogTtl(projectId, token) {
+  if (ttlAttempted) return ttlEnabled;
+  ttlAttempted = true;
+  const url = "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(projectId) +
+    "/databases/(default)/collectionGroups/" + LOGS_COLLECTION + "/fields/expiresAt?updateMask=ttlConfig";
+  try {
+    const result = await fetch(url, {
+      method: "PATCH",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ ttlConfig: {} })
+    });
+    if (result.ok) {
+      ttlEnabled = true;
+      return true;
+    }
+    const details = await result.text();
+    console.error("Firestore TTL configuration unavailable:", result.status, details.slice(0, 300));
+    ttlEnabled = false;
+    return false;
+  } catch (error) {
+    console.error("Firestore TTL configuration request failed:", error.message);
+    ttlEnabled = false;
+    return false;
+  }
+}
 async function cleanupExpiredLogs(projectId, token) {
   const query = {
     structuredQuery: {
@@ -240,7 +267,8 @@ async function onRequestPost({ request, env }) {
     }
     if (input.action === "listLogs") {
       if (actor.accountType !== "doctor") return response({ message: "سجل الأحداث متاح للدكتور فقط." }, 403);
-      return response({ logs: await listLogs(account.project_id, token, input), retentionDays: LOG_RETENTION_DAYS });
+      const ttlActive = await ensureLogTtl(account.project_id, token);
+      return response({ logs: await listLogs(account.project_id, token, input), retentionDays: LOG_RETENTION_DAYS, ttlEnabled: ttlActive });
     }
     if (input.action === "recordLog") {
       const allowedActions = ["page_opened", "booking_created", "booking_updated", "booking_status_changed", "booking_cancelled", "payment_updated", "patient_created", "medical_record_saved", "request_failed", "settings_saved", "login_failed", "employee_created", "expense_recorded", "settlement_closed"];
