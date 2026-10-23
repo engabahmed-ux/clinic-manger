@@ -234,7 +234,7 @@ function renderLogs() {
     date.textContent = parsed && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleString("ar-EG") : "وقت غير معروف";
     heading.append(title, date);
     const meta = document.createElement("p");
-    meta.textContent = "النوع: " + (item.level || "info") + " · القسم: " + (item.area || "غير محدد") + " · المستخدم: " + (item.actorName || "غير معروف");
+    meta.textContent = "النوع: " + (item.level || "info") + " · الحدث: " + (item.action || "غير محدد") + " · القسم: " + (item.area || "غير محدد") + " · المستخدم: " + (item.actorName || "غير معروف");
     card.append(heading, meta);
     if (item.targetType || item.targetId) {
       const target = document.createElement("p");
