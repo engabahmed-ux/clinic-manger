@@ -253,6 +253,10 @@ function decodeBooking(document) {
     paymentEnteredByName: readString(fields, "paymentEnteredByName"),
     paymentUpdatedAt: readString(fields, "paymentUpdatedAt"),
     rescheduleHistory: readString(fields, "rescheduleHistory"),
+    isArchived: readString(fields, "isArchived") === "true",
+    archivedAt: readString(fields, "archivedAt"),
+    archivedByUid: readString(fields, "archivedByUid"),
+    archivedByName: readString(fields, "archivedByName"),
     notes: readString(fields, "notes"),
     status: readString(fields, "status") || "pending",
     createdAt: readString(fields, "createdAt"),
@@ -283,6 +287,10 @@ function encodeBooking(data) {
     "paymentEnteredByName",
     "paymentUpdatedAt",
     "rescheduleHistory",
+    "isArchived",
+    "archivedAt",
+    "archivedByUid",
+    "archivedByName",
     "notes",
     "status",
     "createdAt",
@@ -810,16 +818,22 @@ export async function onRequest(context) {
           return jsonResponse({ message: "تاريخ الأرشفة غير صحيح." }, 400);
         }
         const all = await listBookings(serviceAccount.project_id, accessToken);
-        const targets = all.filter((booking) => booking.appointmentDate.slice(0, 10) === date && !["pending", "archived", "cancelled", "completed"].includes(booking.status));
+        const targets = all.filter((booking) => booking.appointmentDate.slice(0, 10) === date && !booking.isArchived && !["pending", "archived", "cancelled"].includes(booking.status));
         let archivedCount = 0;
+        const archivedAt = new Date().toISOString();
         for (const booking of targets) {
-          await updateBooking(
-            serviceAccount.project_id,
-            accessToken,
-            { id: booking.id, status: "archived" },
-            access.accountType === "staff" ? access.uid : "",
-            access.accountType
-          );
+          const fields = {
+            isArchived: stringField("true"),
+            archivedAt: stringField(archivedAt),
+            archivedByUid: stringField(access.uid || ""),
+            archivedByName: stringField(access.displayName || (access.accountType === "doctor" ? "الدكتور" : "الموظف")),
+            updatedAt: stringField(archivedAt)
+          };
+          const mask = new URLSearchParams();
+          for (const key of Object.keys(fields)) mask.append("updateMask.fieldPaths", key);
+          await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(booking.id)}?${mask}`, {
+            method: "PATCH", body: JSON.stringify({ fields })
+          });
           archivedCount += 1;
         }
         return jsonResponse({ archivedCount, date });
