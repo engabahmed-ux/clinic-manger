@@ -181,6 +181,22 @@ async function writePublicAuditLog(projectId, accessToken, action, level, messag
   }
 }
 
+async function validateConfiguredService(projectId, accessToken, serviceName) {
+  if (!serviceName) return null;
+  const response = await fetch(firestoreUrl(projectId, "/clinicSettings/current"), {
+    headers: { Authorization: "Bearer " + accessToken }
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error("Unable to read clinic settings.");
+  const document = await response.json();
+  let settings = null;
+  try { settings = JSON.parse(document.fields?.settingsJson?.stringValue || "null"); } catch { throw new Error("Clinic settings are invalid."); }
+  const services = settings?.services?.items;
+  if (!Array.isArray(services)) return null;
+  const selected = services.find(item => item && item.enabled !== false && String(item.title || "").trim() === serviceName.trim());
+  return selected ? null : "الخدمة المختارة لم تعد متاحة. حدّث الصفحة واختر خدمة من القائمة الحالية.";
+}
+
 function validateBooking(data) {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     return "بيانات الحجز غير صحيحة.";
@@ -277,6 +293,8 @@ export async function onRequest({ request, env }) {
   }
 
   try {
+    const serviceError = await validateConfiguredService(account.project_id, accessToken, data.service ?? "");
+    if (serviceError) return jsonResponse({ message: serviceError }, 400);
     const id = await createBooking(account.project_id, accessToken, {
       patientName: data.patientName,
       patientPhone: data.patientPhone,
