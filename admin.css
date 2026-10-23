@@ -1127,7 +1127,7 @@ button:disabled {
   background: var(--color-secondary, #bfd2af);
   outline: 2px solid transparent;
 }
-.booking-request-summary { padding-inline-start: 58px; }
+.booking-request-summary { padding-inline-start: 12px; padding-left: 42px; }
 .booking-request-details.medical-only-view > .booking-edit-grid,
 .booking-request-details.medical-only-view > .booking-card-actions { display: none; }
 .medical-followup-grid {
@@ -1139,5 +1139,5 @@ button:disabled {
 @media (max-width: 640px) {
   .medical-followup-grid { grid-template-columns: minmax(0, 1fr); }
   .booking-edit-pencil { width: 24px; height: 24px; left: 6px; right: auto; top: 6px; font-size: 15px; }
-  .booking-request-summary { padding-inline-start: 38px; }
+  .booking-request-summary { padding-inline-start: 8px; padding-left: 34px; }
 }
