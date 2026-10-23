@@ -249,6 +249,9 @@ function decodeBooking(document) {
     paymentEnteredByName: readString(fields, "paymentEnteredByName"),
     paymentUpdatedAt: readString(fields, "paymentUpdatedAt"),
     rescheduleHistory: readString(fields, "rescheduleHistory"),
+    queueNumber: readString(fields, "queueNumber"),
+    archiveOriginalStatus: readString(fields, "archiveOriginalStatus"),
+    archivedAt: readString(fields, "archivedAt"),
     notes: readString(fields, "notes"),
     status: readString(fields, "status") || "pending",
     createdAt: readString(fields, "createdAt"),
@@ -275,6 +278,9 @@ function encodeBooking(data) {
     "paymentEnteredByName",
     "paymentUpdatedAt",
     "rescheduleHistory",
+    "queueNumber",
+    "archiveOriginalStatus",
+    "archivedAt",
     "notes",
     "status",
     "createdAt",
@@ -457,7 +463,42 @@ async function isFinancialPeriodClosed(projectId, accessToken, dateValue, employ
   });
 }
 
+async function ensureQueueNumbersForDates(projectId, accessToken, dates) {
+  const requestedDates = new Set(dates.filter(date => /^\\d{4}-\\d{2}-\\d{2}$/.test(date)));
+  if (!requestedDates.size) return await listBookings(projectId, accessToken);
+  const all = await listBookings(projectId, accessToken);
+  for (const date of requestedDates) {
+    const rows = all
+      .filter(booking => String(booking.appointmentDate || "").slice(0, 10) === date)
+      .sort((a, b) => (Date.parse(a.createdAt || "") || 0) - (Date.parse(b.createdAt || "") || 0) || a.id.localeCompare(b.id));
+    const used = new Set(rows.map(row => Number(row.queueNumber)).filter(value => Number.isInteger(value) && value > 0));
+    let next = 1;
+    for (const booking of rows) {
+      if (Number.isInteger(Number(booking.queueNumber)) && Number(booking.queueNumber) > 0) continue;
+      while (used.has(next)) next++;
+      const queueNumber = String(next);
+      const patch = { fields: { queueNumber: stringField(queueNumber) } };
+      await firestoreRequest(
+        projectId,
+        accessToken,
+        `/${BOOKINGS_COLLECTION}/${encodeURIComponent(booking.id)}?updateMask.fieldPaths=queueNumber`,
+        { method: "PATCH", body: JSON.stringify(patch) }
+      );
+      booking.queueNumber = queueNumber;
+      used.add(next);
+      next++;
+    }
+  }
+  return all;
+}
+
 async function createBooking(projectId, accessToken, data) {
+  const date = String(data.appointmentDate || "").slice(0, 10);
+  const all = await ensureQueueNumbersForDates(projectId, accessToken, [date]);
+  const queueNumber = String(
+    all.filter(booking => String(booking.appointmentDate || "").slice(0, 10) === date)
+      .reduce((max, booking) => Math.max(max, Number(booking.queueNumber) || 0), 0) + 1
+  );
   const now = new Date().toISOString();
 
   const booking = {
@@ -467,6 +508,9 @@ async function createBooking(projectId, accessToken, data) {
     appointmentDate: data.appointmentDate.trim(),
     service: (data.service || "").trim(),
     notes: (data.notes || "").trim(),
+    queueNumber,
+    archiveOriginalStatus: "",
+    archivedAt: "",
     status: "waiting",
     createdAt: now,
     updatedAt: now
@@ -506,7 +550,21 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     `/${BOOKINGS_COLLECTION}/${encodeURIComponent(data.id)}`
   );
 
-  const existing = decodeBooking(current);
+  let existing = decodeBooking(current);
+  const originalDate = String(existing.appointmentDate || "").slice(0, 10);
+  const requestedDate = String(data.appointmentDate ?? existing.appointmentDate ?? "").slice(0, 10);
+  let rescheduleQueueNumber = existing.queueNumber || "";
+  if (requestedDate && originalDate && requestedDate !== originalDate) {
+    const dailyBookings = await ensureQueueNumbersForDates(projectId, accessToken, [originalDate, requestedDate]);
+    existing = dailyBookings.find(booking => booking.id === data.id) || existing;
+    rescheduleQueueNumber = existing.queueNumber || "";
+    const nextQueueNumber = dailyBookings
+      .filter(booking => String(booking.appointmentDate || "").slice(0, 10) === requestedDate && booking.id !== data.id)
+      .reduce((max, booking) => Math.max(max, Number(booking.queueNumber) || 0), 0) + 1;
+    changes.queueNumber = String(nextQueueNumber);
+  } else {
+    changes.queueNumber = existing.queueNumber || "";
+  }
   const financialFields = ["appointmentDate","servicePrice","paidAmount","status"];
   const changesFinancialFields = financialFields.some(key => changes[key] !== undefined);
   if (
@@ -552,7 +610,7 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
   const oldDate = String(existing.appointmentDate || "").slice(0, 10);
   const nextDate = String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0, 10);
   if (changes.appointmentDate !== undefined && oldDate && nextDate && oldDate !== nextDate) {
-    rescheduleHistory.push({ fromDate: oldDate, toDate: nextDate, at: now });
+    rescheduleHistory.push({ fromDate: oldDate, toDate: nextDate, queueNumber: rescheduleQueueNumber, at: now });
   }
   let paidAmount = changes.paidAmount !== undefined ? String(changes.paidAmount).trim() : existing.paidAmount;
   let paymentEnteredByUid = existing.paymentEnteredByUid || "";
@@ -568,9 +626,18 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     }
   }
 
+  const archiveOriginalStatus = changes.status === "archived"
+    ? (existing.status === "archived" ? (existing.archiveOriginalStatus || "") : existing.status)
+    : (changes.status && changes.status !== "archived" ? "" : existing.archiveOriginalStatus || "");
+  const archivedAt = changes.status === "archived"
+    ? (existing.status === "archived" ? (existing.archivedAt || now) : now)
+    : (changes.status && changes.status !== "archived" ? "" : existing.archivedAt || "");
   const booking = {
     ...existing,
     ...changes,
+    queueNumber: changes.queueNumber !== undefined ? String(changes.queueNumber) : existing.queueNumber || "",
+    archiveOriginalStatus,
+    archivedAt,
     patientName: changes.patientName?.trim() ?? existing.patientName,
     patientPhone: changes.patientPhone?.trim() ?? existing.patientPhone,
     appointmentDate:
@@ -599,6 +666,9 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     "paymentEnteredByName",
     "paymentUpdatedAt",
     "rescheduleHistory",
+    "queueNumber",
+    "archiveOriginalStatus",
+    "archivedAt",
     "notes",
     "status",
     "updatedAt"
@@ -767,7 +837,7 @@ export async function onRequest(context) {
           return jsonResponse({ message: "تاريخ الأرشفة غير صحيح." }, 400);
         }
         const all = await listBookings(serviceAccount.project_id, accessToken);
-        const targets = all.filter((booking) => booking.appointmentDate.slice(0, 10) === date && !["pending", "archived", "cancelled"].includes(booking.status));
+        const targets = all.filter((booking) => String(booking.appointmentDate || "").slice(0, 10) === date && booking.status !== "archived");
         let archivedCount = 0;
         for (const booking of targets) {
           await updateBooking(
