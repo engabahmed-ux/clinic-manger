@@ -268,19 +268,27 @@ export async function onRequest({ request, env }) {
       const now = new Date().toISOString();
       const updatePath = "/" + PATIENTS_COLLECTION + "/" + encodeURIComponent(linkedUid) +
         "?updateMask.fieldPaths=updatedAt&updateMask.fieldPaths=passwordResetAt&updateMask.fieldPaths=passwordResetBy";
-      await firestore(account.project_id, token, updatePath, {
-        method: "PATCH",
-        body: JSON.stringify(encodeDocument({
-          updatedAt: fsString(now),
-          passwordResetAt: fsString(now),
-          passwordResetBy: fsString(user.uid)
-        }))
-      });
+      let auditSaved = true;
+      try {
+        await firestore(account.project_id, token, updatePath, {
+          method: "PATCH",
+          body: JSON.stringify(encodeDocument({
+            updatedAt: fsString(now),
+            passwordResetAt: fsString(now),
+            passwordResetBy: fsString(user.uid)
+          }))
+        });
+      } catch (auditError) {
+        auditSaved = false;
+        console.error("Password reset succeeded but audit metadata could not be saved:", auditError);
+      }
       return jsonResponse({
         success: true,
         patient: { patientId, username: linkedUsername },
         credentials: { username: linkedUsername, password },
-        message: "تم تغيير كلمة المرور. سلّمها للمريض بشكل خاص؛ لن يتم حفظها كنص مكشوف."
+        message: auditSaved
+          ? "تم تغيير كلمة المرور. سلّمها للمريض بشكل خاص؛ لن يتم حفظها كنص مكشوف."
+          : "تم تغيير كلمة المرور، لكن تعذر حفظ سجل العملية. سلّم كلمة المرور الجديدة للمريض بشكل خاص."
       });
     } catch (error) {
       console.error("Patient account status/reset failed:", error);
