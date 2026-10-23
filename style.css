@@ -1657,3 +1657,12 @@ p {
   font-size: 12px;
   font-weight: 800;
 }
+
+
+/* Patient portal medical history and booking request */
+.patient-history-panel, .patient-request-booking { margin-top: 24px; padding-top: 18px; border-top: 1px solid rgba(17,20,26,.12); }
+.patient-history-list { display: grid; gap: 12px; }
+.patient-history-card { padding: 14px; border: 1px solid rgba(17,20,26,.12); border-radius: 12px; background: var(--color-light, #F9F5F1); }
+.patient-history-card h4 { margin: 0 0 10px; }
+.patient-history-card p { margin: 7px 0; line-height: 1.7; }
+.patient-request-booking form { display: grid; gap: 12px; }
