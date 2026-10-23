@@ -573,6 +573,7 @@ function renderBookingCard(booking) {
   const card = document.createElement("article");
   card.className = "employee-card booking-card";
   card.dataset.bookingId = booking.id;
+  applyStatusColor(card, normalizedStatus(booking.status));
   const locked = booking.status === "completed";
   const canEditBooking = currentAccountAccess?.accountType !== "staff" || currentAccountAccess?.permissions?.bookings === "edit";
   const summary = document.createElement("button");
@@ -713,15 +714,23 @@ async function openBookingVisitEditor(booking,card,panel){
     if(booking.status==="completed"){
       form.querySelectorAll("input,textarea").forEach(input=>{input.disabled=true;input.setAttribute("aria-readonly","true");});
       const note=document.createElement("p");
-      note.className="muted-text";
-      note.textContent=visit.bookingId?"تم اعتماد هذا الكشف نهائيًا؛ بيانات الحجز والسجل الطبي للزيارة لا يمكن تعديلها.":"تم تثبيت حالة الحجز، ولا يمكن تعديل بياناته.";
+      note.className="medical-visit-lock-note";
+      note.textContent=visit.bookingId?"تم اعتماد الكشف نهائيًا؛ بيانات الحجز والسجل الطبي للزيارة لا يمكن تعديلها.":"تم تثبيت حالة الحجز، ولا يمكن تعديل بياناته.";
       form.append(note);
     }else{
+      const save=document.createElement("button");
+      save.type="submit";
+      save.name="visitAction";
+      save.value="save";
+      save.className="secondary-button";
+      save.textContent="حفظ التعديلات";
       const complete=document.createElement("button");
       complete.type="submit";
-      complete.className="primary-button";
-      complete.textContent="حفظ بيانات الكشف وتسجيل «تم الكشف»";
-      actions.append(complete);
+      complete.name="visitAction";
+      complete.value="complete";
+      complete.className="primary-button medical-complete-button";
+      complete.textContent="تم الكشف";
+      actions.append(save,complete);
       form.append(actions);
     }
     form.append(message);
@@ -729,12 +738,14 @@ async function openBookingVisitEditor(booking,card,panel){
     form.addEventListener("submit",async event=>{
       event.preventDefault();
       if(booking.status==="completed")return;
-      const button=form.querySelector('button[type="submit"]');
+      const action=event.submitter?.value==="complete"?"complete":"save";
+      const button=event.submitter||form.querySelector('button[type="submit"]');
+      const buttons=[...form.querySelectorAll('button[type="submit"]')];
       const values={};
       form.querySelectorAll("[data-visit-field]").forEach(input=>{values[input.dataset.visitField]=input.value.trim();});
       if(!values.visitDate){showMessage(message,"حدد تاريخ الكشف.");return;}
-      button.disabled=true;
-      button.textContent="جارٍ حفظ الكشف...";
+      buttons.forEach(item=>item.disabled=true);
+      button.textContent=action==="complete"?"جارٍ حفظ الكشف واعتماده...":"جارٍ حفظ التعديلات...";
       hideMessage(message);
       try{
         await medicalRecordsApiRequest("saveVisit",{
@@ -744,18 +755,32 @@ async function openBookingVisitEditor(booking,card,panel){
           preVisitNotes:values.preVisitNotes,diagnosis:values.diagnosis,
           clinicalNotes:values.clinicalNotes,treatment:values.treatment,followUp:values.followUp
         });
+        Object.assign(booking,values);
+        if(action==="save"){
+          showMessage(message,"تم حفظ التعديلات بنجاح، والكارت ما زال مفتوحًا.","success");
+          buttons.forEach(item=>{item.disabled=false;item.textContent=item.value==="complete"?"تم الكشف":"حفظ التعديلات";});
+          return;
+        }
         try{
           await bookingApiRequest("update",{booking:{id:booking.id,status:"completed"}});
         }catch(statusError){
-          showMessage(message,"تم حفظ السجل الطبي، لكن تعذر تثبيت حالة الحجز على «تم الكشف»: "+(statusError.message||"حاول مرة أخرى."));
+          showMessage(message,"تم حفظ بيانات الكشف، لكن تعذر تثبيت حالة الحجز على «تم الكشف»: "+(statusError.message||"حاول مرة أخرى."));
           return;
         }
         showMessage(message,"تم حفظ الكشف وتثبيت الحالة على «تم الكشف».","success");
         await loadBookings();
+        const refreshed=document.querySelectorAll('.booking-card[data-booking-id]');
+        for(const refreshedCard of refreshed){
+          if(refreshedCard.dataset.bookingId!==booking.id)continue;
+          const details=refreshedCard.querySelector(".booking-request-details");
+          if(details)details.hidden=false;
+          const refreshedPanel=refreshedCard.querySelector(".medical-booking-panel");
+          if(refreshedPanel&&isDoctorAccount())await openBookingVisitEditor(allBookings.find(item=>item.id===booking.id)||booking,refreshedCard,refreshedPanel);
+        }
       }catch(error){
         showMessage(message,error.message||"تعذر حفظ بيانات الكشف.");
       }finally{
-        if(button.isConnected){button.disabled=false;button.textContent="حفظ بيانات الكشف وتسجيل «تم الكشف»";}
+        buttons.forEach(item=>{if(item.isConnected){item.disabled=false;item.textContent=item.value==="complete"?"تم الكشف":"حفظ التعديلات";}});
       }
     });
   }catch(error){
@@ -780,7 +805,7 @@ function normalizedStatus(status){return status==="confirmed"?"waiting":status}
 function bookingStatusLabel(status){return statusLabel(RUNTIME_SETTINGS,status,({pending:"قيد المراجعة",confirmed:"في الانتظار",waiting:"في الانتظار",completed:"تم الكشف",postponed:"تم التأجيل",no_show:"لم يأتِ",apologized:"اعتذر",cancelled:"ملغي",archived:"مؤرشف"})[status]||"غير محدد")}
 async function changeBookingStatus(booking,status,control){if(!["waiting","completed","postponed","no_show","apologized"].includes(status))return;if(control)control.disabled=true;try{await bookingApiRequest("update",{booking:{id:booking.id,status}});showMessage(bookingListMessage,"تم تحديث حالة الحجز.","success");await loadBookings()}catch(error){showMessage(bookingListMessage,error.message||"تعذر تحديث حالة الحجز.");if(control)control.value=normalizedStatus(booking.status)}finally{if(control)control.disabled=false}}
 function applyStatusColor(el,status){for(const name of ["waiting","completed","postponed","no_show","apologized","pending","archived","cancelled","confirmed"])el.classList.remove(`status-${name}`);el.classList.add(`status-${status||"waiting"}`);applyRuntimeStatusColor(el,RUNTIME_SETTINGS,status||"waiting")}function makeStatusSelect(booking){const select=document.createElement("select");select.className="booking-status-select";select.setAttribute("aria-label",`حالة حجز ${booking.patientName||""}`);for(const[value,label]of BOOKING_STATUS_OPTIONS){const option=document.createElement("option");option.value=value;option.textContent=label;option.className=`status-option-${value}`;select.append(option)}select.value=normalizedStatus(booking.status)||"waiting";if(booking.status==="completed"){select.disabled=true;select.title="حالة تم الكشف نهائية ولا يمكن تغييرها";select.setAttribute("aria-label",`حالة نهائية: تم الكشف عن ${booking.patientName||"المريضة"}`)}else if(currentAccountAccess?.accountType==="staff"&&currentAccountAccess?.permissions?.bookings!=="edit"){select.disabled=true;select.title="صلاحية المشاهدة فقط"}applyStatusColor(select,select.value);select.addEventListener("change",()=>{applyStatusColor(select,select.value);changeBookingStatus(booking,select.value,select)});return select}
-function renderScheduleCard(booking,archived=false){const card=renderBookingCard(booking);card.classList.add("schedule-booking-card");applyStatusColor(card,normalizedStatus(booking.status));const meta=card.querySelector(".booking-request-main small");if(meta)meta.textContent=queueNumberFor(booking)+" · الموعد: "+formatRequestDate(booking.appointmentDate)+" · "+(booking.patientPhone||"الهاتف غير مسجل")+" · "+(booking.service||"الخدمة غير محددة")+" · الضغط: "+(booking.bloodPressure||"—")+" · الوزن: "+(booking.weight?booking.weight+" كجم":"—")+" · السكر: "+(booking.bloodSugar||"—")+(booking.preVisitNotes?" · ملاحظة قبل الكشف: "+booking.preVisitNotes:"");if(!archived){card.querySelector(".booking-request-badge")?.remove();const controls=document.createElement("div");controls.className="schedule-card-controls";if(booking.status!=="completed"){const edit=document.createElement("button");edit.type="button";edit.className="edit-booking-button";edit.textContent="✎";edit.title="تعديل بيانات الحجز";edit.setAttribute("aria-label","تعديل حجز "+(booking.patientName||"المريضة"));edit.addEventListener("click",()=>{const details=card.querySelector(".booking-request-details");if(details){details.hidden=false;details.querySelector("input,select,textarea")?.focus()}});controls.append(edit)}controls.append(makeStatusSelect(booking));card.prepend(controls)}return card}
+function renderScheduleCard(booking,archived=false){const card=renderBookingCard(booking);card.classList.add("schedule-booking-card");applyStatusColor(card,normalizedStatus(booking.status));const meta=card.querySelector(".booking-request-main small");if(meta)meta.textContent=queueNumberFor(booking)+" · الموعد: "+formatRequestDate(booking.appointmentDate)+" · "+(booking.patientPhone||"الهاتف غير مسجل")+" · "+(booking.service||"الخدمة غير محددة")+" · الضغط: "+(booking.bloodPressure||"—")+" · الوزن: "+(booking.weight?booking.weight+" كجم":"—")+" · السكر: "+(booking.bloodSugar||"—")+(booking.preVisitNotes?" · ملاحظة قبل الكشف: "+booking.preVisitNotes:"");if(!archived){card.querySelector(".booking-request-badge")?.remove();const controls=document.createElement("div");controls.className="schedule-card-controls";controls.append(makeStatusSelect(booking));card.prepend(controls)}return card}
 
 function renderDailyAppointments(){dailyAppointmentsList.replaceChildren();const day=doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());const mode=doctorFilterMode?.value||"date",query=(doctorHomeSearch?.value||"").trim().toLocaleLowerCase("ar");if(doctorScheduleDateLabel)doctorScheduleDateLabel.textContent=mode==="search"?"نتائج البحث":formatRequestDate(day);const rows=allBookings.filter(b=>!b.isArchived&&!["pending","archived","cancelled"].includes(b.status)&&((mode==="search"&&query)||String(b.appointmentDate||"").slice(0,10)===day)&&(!query||(String(b.patientName||"")+" "+String(b.patientPhone||"")+" "+String(b.service||"")).toLocaleLowerCase("ar").includes(query))&&(activeStatusFilter==="all"||normalizedStatus(b.status)===activeStatusFilter)).sort((a,b)=>String(a.appointmentDate||"").localeCompare(String(b.appointmentDate||""))||queueNumberFor(a)-queueNumberFor(b));const notices=mode==="date"?allBookings.filter(b=>!b.isArchived).flatMap(b=>parseRescheduleHistory(b).filter(h=>h.fromDate===day).map(entry=>({booking:b,entry}))):[];if(!rows.length&&!notices.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent=mode==="search"?"لا توجد نتائج مطابقة للبحث.":`لا توجد مواعيد في ${formatRequestDate(day)}.`;dailyAppointmentsList.append(empty)}else{for(const booking of rows)dailyAppointmentsList.append(renderScheduleCard(booking));for(const item of notices)dailyAppointmentsList.append(renderRescheduleNotice(item.booking,item.entry))}renderDoctorAccounts();if(archiveSelectedAppointments)archiveSelectedAppointments.disabled=mode!=="date"||!allBookings.some(b=>(!b.isArchived&&String(b.appointmentDate||"").slice(0,10)===day)||(!b.isArchived&&parseRescheduleHistory(b).some(h=>h.fromDate===day&&!parseArchivedRescheduleHistory(b).some(a=>a.fromDate===h.fromDate&&a.toDate===h.toDate&&a.at===h.at))))}
 function renderDoctorArchive(){if(!doctorArchiveList)return;doctorArchiveList.replaceChildren();const from=doctorArchiveDateFilter?.value||"",to=doctorArchiveToDateFilter?.value||"",query=(doctorArchiveSearch?.value||"").trim().toLocaleLowerCase("ar");const matches=(date,booking)=>{const value=String(date||"").slice(0,10);return(!from||value>=from)&&(!to||value<=to)&&(!query||`${booking.patientName||""} ${booking.patientPhone||""} ${booking.service||""}`.toLocaleLowerCase("ar").includes(query))};const rows=allBookings.filter(b=>(b.isArchived||ARCHIVE_STATUSES.has(b.status))&&matches(b.appointmentDate,b)).map(booking=>({...booking,isArchivedOccurrence:false}));for(const booking of allBookings){for(const entry of parseArchivedRescheduleHistory(booking)){if(!matches(entry.fromDate,booking))continue;rows.push({...booking,appointmentDate:entry.fromDate,queueNumber:entry.fromQueueNumber||queueNumberForDate(booking,entry.fromDate),status:"postponed",isArchived:true,isArchivedOccurrence:true,archivedAt:entry.archivedAt||"",archivedByUid:entry.archivedByUid||"",archivedByName:entry.archivedByName||"",rescheduleToDate:entry.toDate})}}rows.sort((a,b)=>(Date.parse(b.archivedAt||b.updatedAt||b.createdAt||"")||0)-(Date.parse(a.archivedAt||a.updatedAt||a.createdAt||"")||0));if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد حجوزات أو مواعيد مؤجلة مؤرشفة حسب الفلتر الحالي.";doctorArchiveList.append(empty);return}for(const booking of rows){const card=renderScheduleCard(booking,true);const meta=card.querySelector(".booking-request-main small");if(meta&&booking.isArchivedOccurrence)meta.textContent+=" · الموعد مؤجل إلى "+formatRequestDate(booking.rescheduleToDate)+" · أرشيف الموعد الأصلي"+(booking.archivedAt?" · أُرشف بتاريخ "+formatSubmittedAt(booking.archivedAt):"");else if(meta&&booking.isArchived)meta.textContent+=" · مؤرشف"+(booking.archivedAt?" بتاريخ "+formatSubmittedAt(booking.archivedAt):"");if(booking.isArchived&&!booking.isArchivedOccurrence){const controls=document.createElement("div");controls.className="schedule-card-controls";const restore=document.createElement("button");restore.type="button";restore.className="secondary-button";restore.textContent="استعادة إلى المواعيد";restore.addEventListener("click",async()=>{if(!window.confirm("هل تريد استعادة هذا الحجز إلى قائمة المواعيد؟ ستظل حالته الأصلية محفوظة."))return;restore.disabled=true;try{await bookingApiRequest("restoreArchived",{id:booking.id});await loadBookings();showMessage(archiveExportMessage,"تمت استعادة الحجز إلى قائمته حسب حالته الأصلية.","success")}catch(error){showMessage(archiveExportMessage,error.message||"تعذرت استعادة الحجز.")}finally{restore.disabled=false}});controls.append(restore);card.append(controls)}doctorArchiveList.append(card)}}
@@ -1790,7 +1815,7 @@ finalizeMonthlySettlementButton?.addEventListener("click",async()=>{
   finally{await previewDoctorSettlement("month")}
 });
 doctorArchiveDateFilter?.addEventListener("change",renderDoctorArchive);doctorArchiveToDateFilter?.addEventListener("change",renderDoctorArchive);doctorArchiveSearch?.addEventListener("input",renderDoctorArchive);exportClinicExcelButton?.addEventListener("click",exportClinicExcel);
-$("#openDoctorScheduleFilter")?.addEventListener("click",()=>{if(doctorFilterDate)doctorFilterDate.value=doctorHomeDateFilter.value;if(doctorFilterQuery)doctorFilterQuery.value=doctorHomeSearch.value;doctorScheduleFilterDialog?.showModal()});doctorFilterMode?.addEventListener("change",()=>{const search=doctorFilterMode.value==="search";$("#doctorFilterDateLabel").hidden=search;$("#doctorFilterQueryLabel").hidden=!search});$("#applyDoctorScheduleFilter")?.addEventListener("click",()=>{if(doctorFilterMode.value==="date"){doctorHomeDateFilter.value=doctorFilterDate.value||doctorHomeDateFilter.value;doctorHomeSearch.value=""}else{doctorHomeSearch.value=doctorFilterQuery.value.trim()}doctorScheduleFilterDialog.close();renderDailyAppointments()});homeAddBookingButton?.addEventListener("click",()=>{showBookingSection(true);if(bookingCreateCard)bookingCreateCard.hidden=false;const date=$("#newBookingDate");if(date)date.value=doctorHomeDateFilter.value;bookingCreateCard?.scrollIntoView({behavior:"smooth",block:"start"})});function showDoctorArchive(){if(medicalRecordsSection)medicalRecordsSection.hidden=true;if(doctorAccountsSection)doctorAccountsSection.hidden=true;homeAppointmentsSection.hidden=true;bookingManagementSection.hidden=true;patientManagementSection.hidden=true;employeeManagementSection.hidden=true;doctorArchiveSection.hidden=false;for(const b of document.querySelectorAll(".dashboard-tab"))b.setAttribute("aria-selected",String(b===openArchiveTabButton));renderDoctorArchive()}openArchiveTabButton?.addEventListener("click",showDoctorArchive);setInterval(()=>{const editing=!!document.querySelector("#bookingManagementSection .booking-request-details:not([hidden]),#bookingManagementSection .booking-create-card:not([hidden])")||document.activeElement?.matches("input,select,textarea");if(auth.currentUser&&!document.hidden&&!isLoadingBookings&&!editing)loadBookings()},20000);document.addEventListener("visibilitychange",()=>{const editing=!!document.querySelector("#bookingManagementSection .booking-request-details:not([hidden]),#bookingManagementSection .booking-create-card:not([hidden])")||document.activeElement?.matches("input,select,textarea");if(!document.hidden&&auth.currentUser&&!editing)loadBookings()});
+$("#openDoctorScheduleFilter")?.addEventListener("click",()=>{if(doctorFilterDate)doctorFilterDate.value=doctorHomeDateFilter.value;if(doctorFilterQuery)doctorFilterQuery.value=doctorHomeSearch.value;doctorScheduleFilterDialog?.showModal()});doctorFilterMode?.addEventListener("change",()=>{const search=doctorFilterMode.value==="search";$("#doctorFilterDateLabel").hidden=search;$("#doctorFilterQueryLabel").hidden=!search});$("#applyDoctorScheduleFilter")?.addEventListener("click",()=>{if(doctorFilterMode.value==="date"){doctorHomeDateFilter.value=doctorFilterDate.value||doctorHomeDateFilter.value;doctorHomeSearch.value=""}else{doctorHomeSearch.value=doctorFilterQuery.value.trim()}doctorScheduleFilterDialog.close();renderDailyAppointments()});homeAddBookingButton?.addEventListener("click",()=>{showBookingSection(true);if(bookingCreateCard)bookingCreateCard.hidden=false;const date=$("#newBookingDate");if(date)date.value=doctorHomeDateFilter.value;bookingCreateCard?.scrollIntoView({behavior:"smooth",block:"start"})});function showDoctorArchive(){if(medicalRecordsSection)medicalRecordsSection.hidden=true;if(doctorAccountsSection)doctorAccountsSection.hidden=true;homeAppointmentsSection.hidden=true;bookingManagementSection.hidden=true;patientManagementSection.hidden=true;employeeManagementSection.hidden=true;doctorArchiveSection.hidden=false;for(const b of document.querySelectorAll(".dashboard-tab"))b.setAttribute("aria-selected",String(b===openArchiveTabButton));renderDoctorArchive()}openArchiveTabButton?.addEventListener("click",showDoctorArchive);setInterval(()=>{const editing=!!document.querySelector(".booking-request-details:not([hidden]),.booking-create-card:not([hidden])")||document.activeElement?.matches("input,select,textarea");if(auth.currentUser&&!document.hidden&&!isLoadingBookings&&!editing)loadBookings()},20000);document.addEventListener("visibilitychange",()=>{const editing=!!document.querySelector(".booking-request-details:not([hidden]),.booking-create-card:not([hidden])")||document.activeElement?.matches("input,select,textarea");if(!document.hidden&&auth.currentUser&&!editing)loadBookings()});
 showLogin();
 
 
