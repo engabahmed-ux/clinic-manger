@@ -352,6 +352,8 @@ form?.addEventListener("submit", async (event) => {
   try {
     const result = await apiRequest("saveSettings", { settings: next });
     currentSettings = result.settings;
+    applyRuntimeBranding(currentSettings);
+    window.dispatchEvent(new CustomEvent("clinic-settings-updated", { detail: currentSettings }));
     fillClinicFields(currentSettings);
     renderServices();
     renderStatuses();
