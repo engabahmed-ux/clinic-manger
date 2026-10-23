@@ -274,6 +274,7 @@ async function onRequestPost({ request, env }) {
       const allowedActions = ["page_opened", "booking_created", "booking_updated", "booking_status_changed", "booking_cancelled", "payment_updated", "patient_created", "medical_record_saved", "request_failed", "settings_saved", "login_failed", "employee_created", "expense_recorded", "settlement_closed"];
       const log = input.log || {}, action = safeText(log.action, 80);
       if (!allowedActions.includes(action)) return response({ message: "نوع الحدث غير مسموح بتسجيله." }, 400);
+      if (actor.accountType !== "doctor" && ["settings_saved", "employee_created", "settlement_closed"].includes(action)) return response({ message: "لا تملك صلاحية تسجيل هذا النوع من الأحداث." }, 403);
       return response({ log: await writeLog(account.project_id, token, actor, { ...log, action, message: safeText(log.message, 500) }) }, 201);
     }
     return response({ message: "الإجراء المطلوب غير معروف." }, 400);
