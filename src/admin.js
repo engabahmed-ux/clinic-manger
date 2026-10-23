@@ -450,7 +450,7 @@ async function bookingApiRequest(action, data = {}) {
   if (!response.ok) { recordRuntimeLog(user, { action: "request_failed", area: "bookings", level: "error", message: "فشل طلب إدارة الحجوزات." }); throw new Error(result.message || "تعذر تنفيذ طلب الحجوزات."); }
   if (["create", "update", "cancel", "archiveDay", "updatePaidAmount"].includes(action)) {
     const eventAction = action === "create" ? "booking_created" : action === "cancel" ? "booking_cancelled" : action === "updatePaidAmount" ? "payment_updated" : action === "update" && data.booking?.status ? "booking_status_changed" : "booking_updated";
-    recordRuntimeLog(user, { action: eventAction, area: "bookings", level: "info", message: "تم تنفيذ عملية على حجز.", targetType: "booking", targetId: data.booking?.id || data.id || "" });
+    recordRuntimeLog(user, { action: eventAction, area: "bookings", level: "info", message: "تم تنفيذ عملية على حجز.", targetType: "booking", targetId: data.booking?.id || data.id || result.booking?.id || "" });
   }
   return result;
 }
