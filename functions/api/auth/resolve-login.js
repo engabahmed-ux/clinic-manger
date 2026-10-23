@@ -27,6 +27,16 @@ function privateKeyBytes(pem) {
   for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
   return bytes;
 }
+function normalizeUsername(value) {
+  return String(value || "").normalize("NFKC")
+    .replace(/[\u064B-\u065F\u0670]/g, "")
+    .replace(/[أإآ]/g, "ا").replace(/ى/g, "ي")
+    .replace(/\s+/g, " ").trim().toLocaleLowerCase("ar");
+}
+function validUsername(value) {
+  return value.length >= 3 && value.length <= 40 &&
+    /^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u.test(value);
+}
 function parseServiceAccount(env) {
   if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) throw new Error("Missing service account secret.");
   const account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
@@ -68,9 +78,9 @@ export async function onRequest({ request, env }) {
     return jsonResponse({ message: "اسم المستخدم أو كلمة المرور غير صحيحة." }, 401);
   }
 
-  const username = typeof body?.username === "string" ? body.username.trim().toLowerCase() : "";
+  const username = normalizeUsername(body?.username);
   const password = typeof body?.password === "string" ? body.password : "";
-  if (!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(username) || password.length < 1 || password.length > 128) {
+  if (!validUsername(username) || password.length < 1 || password.length > 128) {
     return jsonResponse({ message: "اسم المستخدم أو كلمة المرور غير صحيحة." }, 401);
   }
 
