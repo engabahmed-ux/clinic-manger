@@ -237,8 +237,8 @@
 
           <form id="patientLoginForm">
             <div class="form-field">
-              <label for="patientEmail" data-portal="emailLabel"></label>
-              <input id="patientEmail" name="email" type="text" autocomplete="username" required>
+              <label for="patientEmail">اسم المستخدم أو رقم الهاتف</label>
+              <input id="patientEmail" name="username" type="text" autocomplete="username" required>
             </div>
 
             <div class="form-field">
@@ -257,6 +257,20 @@
             </div>
             <p id="patientAppointmentsMessage" class="form-message" role="status" aria-live="polite"></p>
             <div id="patientAppointmentsList" class="patient-appointments-list"></div>
+            <section id="patientHistoryPanel" class="patient-history-panel">
+              <h3>سجلي الطبي</h3>
+              <p id="patientHistoryMessage" class="form-message" role="status" aria-live="polite"></p>
+              <div id="patientHistoryList" class="patient-history-list"></div>
+            </section>
+            <section class="patient-request-booking">
+              <h3>طلب موعد جديد</h3>
+              <form id="patientRequestBookingForm">
+                <div class="form-field"><label for="patientRequestDate">التاريخ المطلوب</label><input id="patientRequestDate" name="appointmentDate" type="date" required></div>
+                <div class="form-field"><label for="patientRequestService">الخدمة المطلوبة</label><input id="patientRequestService" name="service" type="text" maxlength="160" placeholder="اكتب الخدمة المطلوبة"></div>
+                <button class="button button-primary form-submit" type="submit">إرسال طلب الحجز</button>
+                <p id="patientRequestBookingMessage" class="form-message" role="status" aria-live="polite"></p>
+              </form>
+            </section>
           </div>
         </div>
       </div>
