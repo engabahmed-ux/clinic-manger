@@ -67,3 +67,24 @@ export async function recordRuntimeLog(user, log) {
     // Logging must never break the user's primary workflow.
   }
 }
+
+export function applyRuntimeBranding(settings) {
+  const branding = settings?.branding || {};
+  const root = document.documentElement;
+  const background = branding.background || "#11141A";
+  const surface = branding.surface || "#F9F5F1";
+  const accent = branding.accent || "#FFF25C";
+  const secondary = branding.secondary || "#BFD2AF";
+  root.style.setProperty("--color-dark", background);
+  root.style.setProperty("--color-light", surface);
+  root.style.setProperty("--color-accent", accent);
+  root.style.setProperty("--color-secondary", secondary);
+  root.style.setProperty("--staff-background", surface);
+  root.style.setProperty("--staff-surface", surface);
+  root.style.setProperty("--staff-dark", background);
+  root.style.setProperty("--staff-text", background);
+  root.style.setProperty("--staff-green", secondary);
+  root.style.setProperty("--staff-yellow", accent);
+  root.style.setProperty("--font-heading", '"' + (branding.headingFont || "Cairo") + '", sans-serif');
+  root.style.setProperty("--font-body", '"' + (branding.bodyFont || "Cairo") + '", sans-serif');
+}
