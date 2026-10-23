@@ -155,7 +155,25 @@ async function saveSettings(projectId, token, uid, settings) {
 function safeText(value, max = 240) {
   return typeof value === "string" ? value.replace(/[\u0000-\u001F\u007F]/g, " ").trim().slice(0, max) : "";
 }
+async function cleanupExpiredLogs(projectId, token) {
+  const query = {
+    structuredQuery: {
+      from: [{ collectionId: LOGS_COLLECTION }],
+      where: { fieldFilter: { field: { fieldPath: "expiresAt" }, op: "LESS_THAN_OR_EQUAL", value: { timestampValue: new Date().toISOString() } } },
+      orderBy: [{ field: { fieldPath: "expiresAt" }, direction: "ASCENDING" }],
+      limit: 100
+    }
+  };
+  const rows = await firestoreRequest(projectId, token, ":runQuery", { method: "POST", body: JSON.stringify(query) });
+  const documents = (Array.isArray(rows) ? rows : []).filter(row => row.document).map(row => row.document);
+  await Promise.all(documents.map(async doc => {
+    const id = doc.name.split("/").pop();
+    try { await firestoreRequest(projectId, token, "/" + LOGS_COLLECTION + "/" + encodeURIComponent(id), { method: "DELETE" }); }
+    catch (error) { console.error("Expired audit log cleanup failed:", error.status || "server"); }
+  }));
+}
 async function writeLog(projectId, token, actor, input) {
+  try { await cleanupExpiredLogs(projectId, token); } catch (error) { console.error("Expired audit log cleanup unavailable:", error.status || "server"); }
   const allowedLevels = ["info", "warning", "error", "security"];
   const now = new Date(), expires = new Date(now.getTime() + LOG_RETENTION_DAYS * 86400000);
   const record = {
@@ -170,6 +188,7 @@ async function writeLog(projectId, token, actor, input) {
   return { id: doc.name?.split("/").pop() || "", ...record };
 }
 async function listLogs(projectId, token, input) {
+  try { await cleanupExpiredLogs(projectId, token); } catch (error) { console.error("Expired audit log cleanup unavailable:", error.status || "server"); }
   const limit = Math.min(300, Math.max(1, Number.isInteger(input.limit) ? input.limit : 100));
   const query = { structuredQuery: { from: [{ collectionId: LOGS_COLLECTION }], orderBy: [{ field: { fieldPath: "createdAt" }, direction: "DESCENDING" }], limit } };
   const rows = await firestoreRequest(projectId, token, ":runQuery", { method: "POST", body: JSON.stringify(query) });
