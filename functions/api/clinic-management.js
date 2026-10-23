@@ -259,7 +259,7 @@ async function onRequestPost({ request, env }) {
   }
   try {
     if (input.action === "saveSettings") {
-      if (actor.accountType !== "doctor" && actor.permission !== "edit") return response({ message: "تعديل إعدادات العيادة متاح للدكتور أو لموظف منحه الدكتور صلاحية التعديل." }, 403);
+      if (actor.accountType !== "doctor") return response({ message: "تعديل إعدادات العيادة متاح للدكتور فقط." }, 403);
       if (!validSettings(input.settings)) return response({ message: "راجع إعدادات العيادة؛ توجد بيانات غير صحيحة أو أكبر من المسموح." }, 400);
       const saved = await saveSettings(account.project_id, token, actor.uid, input.settings);
       await writeLog(account.project_id, token, actor, { action: "settings_saved", area: "clinic_settings", level: "info", message: "تم حفظ إعدادات العيادة." });
