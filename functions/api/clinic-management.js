@@ -197,7 +197,7 @@ async function listLogs(projectId, token, input) {
     return { id: doc.name.split("/").pop(), ...decodeFields(doc.fields || {}) };
   }).filter(row => !row.expiresAt || Date.parse(row.expiresAt) > Date.now());
 }
-export async function onRequestGet({ env }) {
+async function onRequestGet({ env }) {
   try {
     const account = parseServiceAccount(env), token = await createGoogleAccessToken(account);
     return response(await getSettings(account.project_id, token));
@@ -206,7 +206,7 @@ export async function onRequestGet({ env }) {
     return response({ message: "تعذر تحميل إعدادات العيادة حاليًا." }, 503);
   }
 }
-export async function onRequestPost({ request, env }) {
+async function onRequestPost({ request, env }) {
   if (!env.FIREBASE_API_KEY || !env.FIREBASE_SERVICE_ACCOUNT_JSON) return response({ message: "إعدادات العيادة غير مكتملة على الخادم." }, 503);
   if (Number(request.headers.get("Content-Length") || 0) > MAX_BODY_LENGTH) return response({ message: "حجم الطلب أكبر من المسموح." }, 413);
   if (!(request.headers.get("Content-Type") || "").toLowerCase().includes("application/json")) return response({ message: "نوع الطلب غير مدعوم." }, 415);
