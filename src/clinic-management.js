@@ -265,6 +265,7 @@ async function loadLogs() {
   }
 }
 async function loadSettings() {
+  saveButton.disabled = true;
   try {
     const response = await fetch(API_URL, { cache: "no-store" });
     const result = await response.json().catch(() => ({}));
@@ -278,6 +279,7 @@ async function loadSettings() {
   fillClinicFields(currentSettings);
   renderServices();
   renderStatuses();
+  saveButton.disabled = false;
 }
 tabButton?.addEventListener("click", () => {
   if (currentUser?.uid !== DOCTOR_ADMIN_UID) return;
