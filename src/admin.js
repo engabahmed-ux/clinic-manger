@@ -203,6 +203,8 @@ function hideMessage(element) {
 }
 
 function showLogin() {
+  for (const tab of document.querySelectorAll(".dashboard-tab")) tab.hidden = false;
+  if (backFromPatientsButton) backFromPatientsButton.hidden = false;
   if (loginSection) loginSection.hidden = false;
   if (dashboardSection) dashboardSection.hidden = true;
   const brandPanel = $(".brand-panel"); if (brandPanel) brandPanel.hidden = false;
@@ -210,15 +212,27 @@ function showLogin() {
   showEmployeeSection(false);
 }
 
-function showDashboard(user) {
+function showDashboard(user, access = {}) {
+  const isPatientStaff = access.accountType === "staff";
   if (loginSection) loginSection.hidden = true;
   if (dashboardSection) dashboardSection.hidden = false;
   const brandPanel = $(".brand-panel"); if (brandPanel) brandPanel.hidden = true;
 
   if (doctorAccountLabel) {
-    doctorAccountLabel.textContent = user.displayName || APP_CONFIG.clinic.doctorName || (user.email ? user.email.split("@")[0] : "الدكتور");
+    doctorAccountLabel.textContent = isPatientStaff
+      ? (access.displayName || "الموظف")
+      : (user.displayName || APP_CONFIG.clinic.doctorName || (user.email ? user.email.split("@")[0] : "الدكتور"));
   }
 
+  for (const tab of document.querySelectorAll(".dashboard-tab")) tab.hidden = isPatientStaff && tab !== openPatientsButton;
+  if (backFromPatientsButton) backFromPatientsButton.hidden = isPatientStaff;
+
+  if (isPatientStaff) {
+    clearPatientCredentials();
+    showPatientSection(true);
+    hideMessage(createPatientMessage);
+    return;
+  }
   showEmployeeSection(false);
   loadBookings();
 }
@@ -374,17 +388,14 @@ async function verifyDoctorOnServer(user, requestNumber) {
       return;
     }
 
-    if (
-      result.authorized !== true ||
-      result.uid !== DOCTOR_ADMIN_UID ||
-      result.uid !== user.uid
-    ) {
+    const isDoctor = result.accountType === "doctor" && result.uid === DOCTOR_ADMIN_UID;
+    const isAuthorizedPatientStaff = result.accountType === "staff" && result.permissions?.patients === "edit";
+    if (result.authorized !== true || result.uid !== user.uid || (!isDoctor && !isAuthorizedPatientStaff)) {
       await rejectUnauthorizedUser(user);
       return;
     }
-
     hideMessage(loginError);
-    showDashboard(user);
+    showDashboard(user, result);
   } catch (error) {
     if (
       requestNumber !== verificationRequestNumber ||
