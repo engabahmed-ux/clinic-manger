@@ -221,7 +221,7 @@ async function writeLog(projectId, token, actor, input) {
 }
 async function listLogs(projectId, token, input) {
   try { await cleanupExpiredLogs(projectId, token); } catch (error) { console.error("Expired audit log cleanup unavailable:", error.status || "server"); }
-  const limit = Math.min(300, Math.max(1, Number.isInteger(input.limit) ? input.limit : 100));
+  const limit = Math.min(1000, Math.max(1, Number.isInteger(input.limit) ? input.limit : 1000));
   const query = { structuredQuery: { from: [{ collectionId: LOGS_COLLECTION }], orderBy: [{ field: { fieldPath: "createdAt" }, direction: "DESCENDING" }], limit } };
   const rows = await firestoreRequest(projectId, token, ":runQuery", { method: "POST", body: JSON.stringify(query) });
   return (Array.isArray(rows) ? rows : []).filter(row => row.document).map(row => {
