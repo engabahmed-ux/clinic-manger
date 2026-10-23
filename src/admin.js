@@ -30,6 +30,45 @@ const RUNTIME_SETTINGS = await loadRuntimeSettings(APP_CONFIG);
 applyRuntimeBranding(RUNTIME_SETTINGS);
 document.querySelectorAll("[data-status-filter]").forEach((button)=>{const key=button.dataset.statusFilter;if(key!=="all"&&RUNTIME_SETTINGS.statuses?.[key]){const prefix=button.textContent.trim().startsWith("✓")?"✓ ":"";button.textContent=prefix+statusLabel(RUNTIME_SETTINGS,key);applyRuntimeStatusColor(button,RUNTIME_SETTINGS,key)}});
 document.querySelectorAll(".service-quick-select").forEach((select)=>{const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent="أو اختر خدمة جاهزة";select.replaceChildren(placeholder);for(const service of RUNTIME_SETTINGS.services?.items||[]){if(service.enabled===false||!service.title)continue;const option=document.createElement("option");option.value=service.title;option.textContent=service.title;select.append(option)}});
+window.addEventListener("clinic-settings-updated", (event) => {
+  const next = event.detail;
+  if (!next) return;
+  for (const key of Object.keys(RUNTIME_SETTINGS)) delete RUNTIME_SETTINGS[key];
+  Object.assign(RUNTIME_SETTINGS, next);
+  applyRuntimeBranding(RUNTIME_SETTINGS);
+  BOOKING_STATUS_OPTIONS.splice(0, BOOKING_STATUS_OPTIONS.length,
+    ["waiting", statusLabel(RUNTIME_SETTINGS, "waiting", "في الانتظار")],
+    ["completed", statusLabel(RUNTIME_SETTINGS, "completed", "تم الكشف")],
+    ["postponed", statusLabel(RUNTIME_SETTINGS, "postponed", "تم التأجيل")],
+    ["no_show", statusLabel(RUNTIME_SETTINGS, "no_show", "لم يأتِ")],
+    ["apologized", statusLabel(RUNTIME_SETTINGS, "apologized", "اعتذر")]
+  );
+  document.querySelectorAll("[data-status-filter]").forEach((button) => {
+    const key = button.dataset.statusFilter;
+    if (key !== "all" && RUNTIME_SETTINGS.statuses?.[key]) {
+      const prefix = button.textContent.trim().startsWith("✓") ? "✓ " : "";
+      button.textContent = prefix + statusLabel(RUNTIME_SETTINGS, key);
+      applyRuntimeStatusColor(button, RUNTIME_SETTINGS, key);
+    }
+  });
+  document.querySelectorAll(".service-quick-select").forEach((select) => {
+    const selected = select.value;
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "أو اختر خدمة جاهزة";
+    select.replaceChildren(placeholder);
+    for (const service of RUNTIME_SETTINGS.services?.items || []) {
+      if (service.enabled === false || !service.title) continue;
+      const option = document.createElement("option");
+      option.value = service.title;
+      option.textContent = service.title;
+      select.append(option);
+    }
+    select.value = selected;
+  });
+  if (typeof loadBookings === "function") loadBookings();
+});
+
 const DOCTOR_VERIFY_URL = "/api/doctor/verify";
 const EMPLOYEES_API_URL = "/api/doctor/employees";
 
