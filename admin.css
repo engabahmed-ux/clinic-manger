@@ -1088,23 +1088,38 @@ button:disabled {
 .booking-card { position: relative; }
 .booking-edit-pencil {
   position: absolute;
-  inset-inline-start: 12px;
-  top: 12px;
+  left: 8px;
+  right: auto;
+  top: 8px;
   z-index: 3;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 1px solid var(--color-secondary, #bfd2af);
-  border-radius: 10px;
+  border-radius: 7px;
   background: var(--color-light, #f9f5f1);
   color: var(--color-dark, #11141a);
-  font-size: 22px;
+  font-size: 16px;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 2px 8px rgb(17 20 26 / 8%);
+}
+.booking-request-main { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 9px; }
+.booking-patient-name { display: inline-block; }
+.booking-queue-number {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: #fff25c;
+  color: #11141a;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: nowrap;
 }
 .booking-edit-pencil[hidden] { display: none; }
 .booking-edit-pencil:hover,
@@ -1123,6 +1138,6 @@ button:disabled {
 }
 @media (max-width: 640px) {
   .medical-followup-grid { grid-template-columns: minmax(0, 1fr); }
-  .booking-edit-pencil { width: 32px; height: 32px; inset-inline-start: 8px; top: 8px; }
-  .booking-request-summary { padding-inline-start: 48px; }
+  .booking-edit-pencil { width: 24px; height: 24px; left: 6px; right: auto; top: 6px; font-size: 15px; }
+  .booking-request-summary { padding-inline-start: 38px; }
 }
