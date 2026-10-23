@@ -1,9 +1,10 @@
 import { FIREBASE_CONFIG } from "./config/firebase-config.js";
 import { APP_CONFIG } from "./config/app-config.js";
-import { loadRuntimeSettings, statusLabel, applyRuntimeStatusColor, recordRuntimeLog } from "./config/runtime-settings.js";
+import { loadRuntimeSettings, statusLabel, applyRuntimeStatusColor, recordRuntimeLog, applyRuntimeBranding } from "./config/runtime-settings.js";
 import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 const RUNTIME_SETTINGS = await loadRuntimeSettings(APP_CONFIG);
+applyRuntimeBranding(RUNTIME_SETTINGS);
 document.querySelectorAll("[data-status-filter]").forEach((button)=>{const key=button.dataset.statusFilter;if(key!=="all"&&RUNTIME_SETTINGS.statuses?.[key]){const prefix=button.textContent.trim().startsWith("✓")?"✓ ":"";button.textContent=prefix+statusLabel(RUNTIME_SETTINGS,key);applyRuntimeStatusColor(button,RUNTIME_SETTINGS,key)}});
 document.querySelectorAll(".service-quick-select").forEach((select)=>{const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent="أو اختر خدمة جاهزة";select.replaceChildren(placeholder);for(const service of RUNTIME_SETTINGS.services?.items||[]){if(service.enabled===false||!service.title)continue;const option=document.createElement("option");option.value=service.title;option.textContent=service.title;select.append(option)}});
 document.querySelectorAll(".service-quick-select").forEach((select)=>select.addEventListener("change",()=>{const container=select.closest("label")||select.closest(".service-quick-field");const input=container?.querySelector('[name="service"]');if(input&&select.value)input.value=select.value}));
