@@ -882,10 +882,14 @@ export async function onRequest(context) {
         return jsonResponse({ booking:{ id:booking.id, paidAmount:booking.paidAmount, paymentEnteredByUid:booking.paymentEnteredByUid, paymentEnteredByName:booking.paymentEnteredByName } });
       }
       case "list": {
-        const bookings = await listBookings(
+        let bookings = await listBookings(
           serviceAccount.project_id,
           accessToken
         );
+        const bookingDates = new Set(bookings.map(booking => String(booking.appointmentDate || "").slice(0, 10)).filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date)));
+        for (const date of bookingDates) {
+          bookings = await normalizeQueueNumbersForDate(serviceAccount.project_id, accessToken, date, bookings);
+        }
 
         return jsonResponse({
           bookings,
