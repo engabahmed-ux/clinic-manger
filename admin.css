@@ -1002,3 +1002,9 @@ button:disabled {
     grid-column: auto;
   }
 }
+
+
+/* Patient account picker */
+#patientAccountSearchResults { display: grid; gap: 8px; margin: 8px 0 14px; }
+#patientAccountSearchResults .medical-patient-result { width: 100%; text-align: right; cursor: pointer; border: 1px solid var(--border-color, #d9ddd8); border-radius: 10px; padding: 12px; background: var(--surface, #fff); color: inherit; font: inherit; }
+#patientAccountSelected { margin: 10px 0; }
