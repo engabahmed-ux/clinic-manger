@@ -1113,6 +1113,8 @@ button:disabled {
   outline: 2px solid transparent;
 }
 .booking-request-summary { padding-inline-start: 58px; }
+.booking-request-details.medical-only-view > .booking-edit-grid,
+.booking-request-details.medical-only-view > .booking-card-actions { display: none; }
 .medical-followup-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
