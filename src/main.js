@@ -451,11 +451,16 @@ function renderPatientPortal() {
   const patientAppointmentsPanel = $("#patientAppointmentsPanel");
   const patientAppointmentsList = $("#patientAppointmentsList");
   const patientAppointmentsMessage = $("#patientAppointmentsMessage");
+  const patientHistoryList = $("#patientHistoryList");
+  const patientHistoryMessage = $("#patientHistoryMessage");
+  const patientRequestBookingForm = $("#patientRequestBookingForm");
+  const patientRequestBookingMessage = $("#patientRequestBookingMessage");
   const refreshPatientAppointmentsButton = $("#refreshPatientAppointmentsButton");
 
   if (emailInput) {
-    emailInput.placeholder =
-      config.patientPortal?.emailPlaceholder ?? "";
+    emailInput.placeholder = "اسم المستخدم أو رقم الهاتف";
+    const label = loginForm?.querySelector('label[for="patientEmail"]');
+    if (label) label.textContent = "اسم المستخدم أو رقم الهاتف";
   }
 
   if (passwordInput) {
@@ -603,6 +608,44 @@ function renderPatientPortal() {
     }
   }
 
+  function renderPatientMedicalHistory(patient, visits) {
+    if (!patientHistoryList) return;
+    patientHistoryList.replaceChildren();
+    if (patientHistoryMessage) {
+      patientHistoryMessage.textContent = patient?.displayName ? "الملف الطبي: " + patient.displayName + (patient.patientNumber ? " · رقم الملف: " + patient.patientNumber : "") : "";
+      patientHistoryMessage.className = "form-message";
+    }
+    if (!Array.isArray(visits) || !visits.length) {
+      const empty = document.createElement("p");
+      empty.className = "form-message";
+      empty.textContent = "لا توجد كشوفات طبية مسجلة في الملف حتى الآن.";
+      patientHistoryList.append(empty);
+      return;
+    }
+    for (const visit of visits) {
+      const card = document.createElement("article");
+      card.className = "patient-history-card";
+      const heading = document.createElement("h4");
+      heading.textContent = "كشف بتاريخ " + (visit.visitDate || "غير محدد");
+      card.append(heading);
+      const fields = [
+        ["التشخيص", visit.diagnosis], ["ملاحظات الدكتور", visit.clinicalNotes],
+        ["العلاج والتوصيات", visit.treatment], ["المتابعة", visit.followUp],
+        ["ضغط الدم", visit.bloodPressure], ["الوزن", visit.weight ? visit.weight + " كجم" : ""],
+        ["قياس السكر", visit.bloodSugar], ["ملاحظات قبل الكشف", visit.preVisitNotes]
+      ];
+      for (const [label, value] of fields) {
+        if (!value) continue;
+        const row = document.createElement("p");
+        const strong = document.createElement("strong");
+        strong.textContent = label + ": ";
+        row.append(strong, document.createTextNode(value));
+        card.append(row);
+      }
+      patientHistoryList.append(card);
+    }
+  }
+
   async function loadPatientAppointments(user) {
     if (refreshPatientAppointmentsButton) {
       refreshPatientAppointmentsButton.disabled = true;
@@ -631,6 +674,7 @@ function renderPatientPortal() {
       }
 
       renderPatientAppointments(result.appointments || []);
+      renderPatientMedicalHistory(result.patient, result.visits || []);
       if (patientAppointmentsMessage && result.message) {
         patientAppointmentsMessage.textContent = result.message;
       }
@@ -760,6 +804,43 @@ function renderPatientPortal() {
     await loadPatientAppointments(user);
   });
 
+  patientRequestBookingForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!auth.currentUser) return;
+    const submit = patientRequestBookingForm.querySelector('button[type="submit"]');
+    const date = $("#patientRequestDate")?.value || "";
+    const service = $("#patientRequestService")?.value.trim() || "";
+    if (patientRequestBookingMessage) {
+      patientRequestBookingMessage.textContent = "";
+      patientRequestBookingMessage.className = "form-message";
+    }
+    if (submit) { submit.disabled = true; submit.textContent = "جارٍ إرسال الطلب..."; }
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const response = await fetch("/api/patient/portal", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + idToken, "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ action: "requestBooking", appointmentDate: date, service }),
+        cache: "no-store"
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) throw new Error(result.message || "تعذر إرسال طلب الحجز.");
+      if (patientRequestBookingMessage) {
+        patientRequestBookingMessage.textContent = result.message || "تم إرسال طلب الحجز.";
+        patientRequestBookingMessage.className = "form-message";
+      }
+      patientRequestBookingForm.reset();
+      await loadPatientAppointments(auth.currentUser);
+    } catch (error) {
+      if (patientRequestBookingMessage) {
+        patientRequestBookingMessage.textContent = error.message || "تعذر إرسال طلب الحجز.";
+        patientRequestBookingMessage.className = "form-message error";
+      }
+    } finally {
+      if (submit) { submit.disabled = false; submit.textContent = "إرسال طلب الحجز"; }
+    }
+  });
+
   logoutButton.addEventListener("click", async () => {
     logoutButton.disabled = true;
 
@@ -768,6 +849,7 @@ function renderPatientPortal() {
 
       if (loginForm) loginForm.hidden = false;
       if (patientAppointmentsPanel) patientAppointmentsPanel.hidden = true;
+      if (patientHistoryList) patientHistoryList.replaceChildren();
       if (emailInput) emailInput.disabled = false;
       if (passwordInput) passwordInput.disabled = false;
 
