@@ -88,19 +88,24 @@ export async function onRequestPost({ request, env }) {
     const staffDocument = await readStaffDocument(account.project_id, token, user.localId);
     const fields = staffDocument?.fields || {};
     const permissions = fields.permissions?.mapValue?.fields || {};
-    const patientPermission = readString(permissions, "patients");
+    const staffPermissions = {
+      bookings: readString(permissions, "bookings"),
+      patients: readString(permissions, "patients"),
+      medicalRecords: readString(permissions, "medicalRecords"),
+      accounts: readString(permissions, "accounts")
+    };
 
     if (readString(fields, "role") !== "staff" || fields.active?.booleanValue !== true) {
       return jsonResponse({ error: "forbidden", message: "حساب الموظف غير نشط أو غير معتمد." }, 403);
     }
-    if (patientPermission !== "edit") {
-      return jsonResponse({ error: "forbidden", message: "يجب أن يمنحك الدكتور صلاحية مشاهدة وتعديل قسم حسابات المرضى." }, 403);
+    if (!Object.values(staffPermissions).some(value => value === "view" || value === "edit")) {
+      return jsonResponse({ error: "forbidden", message: "لم تُمنح لهذا الحساب أي صلاحية دخول." }, 403);
     }
 
     return jsonResponse({
       authorized: true, uid: user.localId, email: user.email || null,
       accountType: "staff", displayName: readString(fields, "displayName") || "الموظف",
-      permissions: { patients: patientPermission }
+      permissions: staffPermissions
     });
   } catch (error) {
     console.error("Account verification failed:", error);
