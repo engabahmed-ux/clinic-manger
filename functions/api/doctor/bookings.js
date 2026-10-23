@@ -865,14 +865,14 @@ export async function onRequest(context) {
         const date = typeof data.date === "string" ? data.date : "";
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
         const bookings = await listBookings(serviceAccount.project_id, accessToken);
-        const daily = bookings.filter(b => {
-          const appointmentDay = String(b.appointmentDate || "").slice(0,10);
-          const completionDay = cairoDate(b.completedAt);
-          const paymentDay = cairoDate(b.paymentUpdatedAt);
-          return (appointmentDay === date && (b.status !== "pending" || Number(b.paidAmount) > 0)) ||
-            (b.status === "completed" && completionDay === date) ||
-            (Number(b.paidAmount) > 0 && paymentDay === date);
-        }).map(b => {
+        // Daily accounts include only visits completed on the selected Cairo-local date.
+        // Exclude archived/cancelled records even if legacy data still has completion fields.
+        const daily = bookings.filter(b =>
+          b.status === "completed" &&
+          !b.isArchived &&
+          !["archived", "cancelled"].includes(b.status) &&
+          cairoDate(b.completedAt) === date
+        ).map(b => {
           // Older completed visits may predate paidAmount tracking. Completion has
           // historically represented a collected service fee, so restore that
           // amount for account calculations when the receipt field is missing.
