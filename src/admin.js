@@ -1305,6 +1305,7 @@ resetPatientPasswordButton?.addEventListener("click", async () => {
   resetPatientPasswordButton.disabled = true;
   try {
     const result = await patientApiRequest("resetPassword", { patientId, password });
+    recordRuntimeLog(auth.currentUser, { action: "patient_password_reset", area: "patients", level: "info", message: "تمت إعادة تعيين كلمة مرور مريض." });
     if (createdPatientUsername) createdPatientUsername.textContent = result.credentials?.username || patientAccountExistingUsername?.textContent || "";
     if (createdPatientPassword) createdPatientPassword.textContent = result.credentials?.password || "";
     if (patientCredentialsMessage) patientCredentialsMessage.textContent = result.message || "تم تغيير كلمة المرور.";
