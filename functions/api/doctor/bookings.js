@@ -859,14 +859,24 @@ export async function onRequest(context) {
             (b.status === "completed" && completionDay === date) ||
             (Number(b.paidAmount) > 0 && paymentDay === date);
         }).map(b => {
+          // Older completed visits may predate paidAmount tracking. Completion has
+          // historically represented a collected service fee, so restore that
+          // amount for account calculations when the receipt field is missing.
+          const recordedPaidAmount = Number(b.paidAmount) || 0;
+          const completedFee = Number(b.completedFee) || Number(b.servicePrice) || 0;
+          const effectivePaidAmount = recordedPaidAmount > 0
+            ? String(b.paidAmount)
+            : b.status === "completed" && completedFee > 0
+              ? completedFee.toFixed(2)
+              : "0";
           const otherOwner = access.accountType === "staff" && !!b.paymentEnteredByUid && b.paymentEnteredByUid !== access.uid;
           return { id:b.id, patientName:b.patientName, appointmentDate:b.appointmentDate, service:b.service,
             servicePrice:b.servicePrice, completedFee:b.completedFee, completedAt:b.completedAt,
-            paidAmount:otherOwner ? "0" : (b.paidAmount || "0"), status:b.status,
+            paidAmount:otherOwner ? "0" : effectivePaidAmount, status:b.status,
             paymentEnteredByUid:b.paymentEnteredByUid, paymentEnteredByName:b.paymentEnteredByName,
             paymentUpdatedAt:b.paymentUpdatedAt, paymentReadOnly:otherOwner,
             paymentAttributedToCurrentUser:access.accountType === "doctor" || b.paymentEnteredByUid === access.uid,
-            paymentUnassigned:!b.paymentEnteredByUid && Number(b.paidAmount)>0 };
+            paymentUnassigned:!b.paymentEnteredByUid && Number(effectivePaidAmount)>0 };
         });
         return jsonResponse({ bookings:daily, date });
       }
@@ -898,6 +908,15 @@ export async function onRequest(context) {
         for (const date of bookingDates) {
           bookings = await normalizeQueueNumbersForDate(serviceAccount.project_id, accessToken, date, bookings);
         }
+
+        // Backward compatibility for completed visits created before paidAmount
+        // was consistently stored: use the completed fee/service price as the
+        // collected amount when no receipt amount exists.
+        bookings = bookings.map(booking => {
+          if (booking.status !== "completed" || Number(booking.paidAmount) > 0) return booking;
+          const fee = Number(booking.completedFee) || Number(booking.servicePrice) || 0;
+          return fee > 0 ? { ...booking, paidAmount: fee.toFixed(2) } : booking;
+        });
 
         return jsonResponse({
           bookings,
