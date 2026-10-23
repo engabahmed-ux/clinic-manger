@@ -186,6 +186,7 @@ let isCreatingBooking = false;
 let isCreatingPatient = false;
 let verificationRequestNumber = 0;
 let allBookings = [];
+let currentAccountAccess = null;
 
 function showMessage(element, message, type = "error") {
   if (!element) return;
@@ -213,28 +214,68 @@ function showLogin() {
 }
 
 function showDashboard(user, access = {}) {
-  const isPatientStaff = access.accountType === "staff";
+  const isStaff = access.accountType === "staff";
+  currentAccountAccess = access;
   if (loginSection) loginSection.hidden = true;
   if (dashboardSection) dashboardSection.hidden = false;
   const brandPanel = $(".brand-panel"); if (brandPanel) brandPanel.hidden = true;
 
   if (doctorAccountLabel) {
-    doctorAccountLabel.textContent = isPatientStaff
+    doctorAccountLabel.textContent = isStaff
       ? (access.displayName || "الموظف")
       : (user.displayName || APP_CONFIG.clinic.doctorName || (user.email ? user.email.split("@")[0] : "الدكتور"));
   }
 
-  for (const tab of document.querySelectorAll(".dashboard-tab")) tab.hidden = isPatientStaff && tab !== openPatientsButton;
-  if (backFromPatientsButton) backFromPatientsButton.hidden = isPatientStaff;
+  const canBookings = !isStaff || ["view", "edit"].includes(access.permissions?.bookings);
+  const canPatients = !isStaff || access.permissions?.patients === "edit";
+  const canMedicalRecords = !isStaff || ["view", "edit"].includes(access.permissions?.medicalRecords);
+  const canAccounts = !isStaff || ["view", "edit"].includes(access.permissions?.accounts);
+  const tabAccess = new Map([
+    [openHomeTabButton, canBookings],
+    [openArchiveTabButton, !isStaff && true],
+    [openAccountsTabButton, canAccounts],
+    [openBookingsButton, canBookings],
+    [openPatientsButton, canPatients],
+    [openMedicalRecordsButton, canMedicalRecords],
+    [openEmployeesButton, !isStaff],
+    [$("#openClinicManagementButton"), !isStaff]
+  ]);
+  for (const tab of document.querySelectorAll(".dashboard-tab")) {
+    tab.hidden = isStaff && !(tabAccess.get(tab) === true);
+  }
+  if (backFromPatientsButton) backFromPatientsButton.hidden = isStaff && !canBookings;
 
-  if (isPatientStaff) {
-    clearPatientCredentials();
-    showPatientSection(true);
-    hideMessage(createPatientMessage);
+  if (!isStaff) {
+    showEmployeeSection(false);
+    loadBookings();
     return;
   }
-  showEmployeeSection(false);
-  loadBookings();
+
+  clearPatientCredentials();
+  hideMessage(createPatientMessage);
+  if (canBookings) {
+    showHomeSection();
+    loadBookings();
+  } else if (canPatients) {
+    showPatientSection(true);
+  } else if (canMedicalRecords) {
+    if (doctorAccountsSection) doctorAccountsSection.hidden = true;
+    if (doctorArchiveSection) doctorArchiveSection.hidden = true;
+    if (homeAppointmentsSection) homeAppointmentsSection.hidden = true;
+    if (employeeManagementSection) employeeManagementSection.hidden = true;
+    if (bookingManagementSection) bookingManagementSection.hidden = true;
+    if (patientManagementSection) patientManagementSection.hidden = true;
+    if (medicalRecordsSection) medicalRecordsSection.hidden = false;
+    setActiveTab(openMedicalRecordsButton);
+  } else if (canAccounts) {
+    if (doctorAccountsSection) doctorAccountsSection.hidden = false;
+    if (homeAppointmentsSection) homeAppointmentsSection.hidden = true;
+    if (bookingManagementSection) bookingManagementSection.hidden = true;
+    if (employeeManagementSection) employeeManagementSection.hidden = true;
+    if (patientManagementSection) patientManagementSection.hidden = true;
+    setActiveTab(openAccountsTabButton);
+    loadDoctorAccountRecords();
+  }
 }
 
 function setActiveTab(button) {
@@ -389,8 +430,10 @@ async function verifyDoctorOnServer(user, requestNumber) {
     }
 
     const isDoctor = result.accountType === "doctor" && result.uid === DOCTOR_ADMIN_UID;
-    const isAuthorizedPatientStaff = result.accountType === "staff" && result.permissions?.patients === "edit";
-    if (result.authorized !== true || result.uid !== user.uid || (!isDoctor && !isAuthorizedPatientStaff)) {
+    const staffPermissions = result.permissions || {};
+    const isAuthorizedStaff = result.accountType === "staff" &&
+      ["bookings", "patients", "medicalRecords", "accounts"].some(key => ["view", "edit"].includes(staffPermissions[key]));
+    if (result.authorized !== true || result.uid !== user.uid || (!isDoctor && !isAuthorizedStaff)) {
       await rejectUnauthorizedUser(user);
       return;
     }
@@ -531,6 +574,7 @@ function renderBookingCard(booking) {
   card.className = "employee-card booking-card";
   card.dataset.bookingId = booking.id;
   const locked = booking.status === "completed";
+  const canEditBooking = currentAccountAccess?.accountType !== "staff" || currentAccountAccess?.permissions?.bookings === "edit";
   const summary = document.createElement("button");
   summary.type = "button";
   summary.className = "booking-request-summary";
@@ -563,14 +607,16 @@ function renderBookingCard(booking) {
     createBookingInput("ملاحظات الحجز", booking.notes, "notes"),
     createBookingInput("حالة الحجز", normalizedStatus(booking.status), "status", "select")
   );
-  if (locked) {
+  if (locked || !canEditBooking) {
     fields.querySelectorAll("input, select, textarea").forEach(input => {
       input.disabled = true;
       input.setAttribute("aria-readonly", "true");
     });
     const note = document.createElement("p");
     note.className = "muted-text";
-    note.textContent = "تم اعتماد الكشف؛ بيانات الحجز وحالته نهائية ولا يمكن تعديلها. يمكن أرشفة مواعيد اليوم من زر الأرشفة.";
+    note.textContent = locked
+      ? "تم اعتماد الكشف؛ بيانات الحجز وحالته نهائية ولا يمكن تعديلها. يمكن أرشفة مواعيد اليوم من زر الأرشفة."
+      : "صلاحية هذا الحساب تسمح بالمشاهدة فقط؛ لا يمكن تعديل الحجز.";
     details.append(fields, note);
   } else {
     const actions = document.createElement("div");
@@ -733,7 +779,7 @@ const ARCHIVE_STATUSES=new Set(["archived","cancelled"]);
 function normalizedStatus(status){return status==="confirmed"?"waiting":status}
 function bookingStatusLabel(status){return statusLabel(RUNTIME_SETTINGS,status,({pending:"قيد المراجعة",confirmed:"في الانتظار",waiting:"في الانتظار",completed:"تم الكشف",postponed:"تم التأجيل",no_show:"لم يأتِ",apologized:"اعتذر",cancelled:"ملغي",archived:"مؤرشف"})[status]||"غير محدد")}
 async function changeBookingStatus(booking,status,control){if(!["waiting","completed","postponed","no_show","apologized"].includes(status))return;if(control)control.disabled=true;try{await bookingApiRequest("update",{booking:{id:booking.id,status}});showMessage(bookingListMessage,"تم تحديث حالة الحجز.","success");await loadBookings()}catch(error){showMessage(bookingListMessage,error.message||"تعذر تحديث حالة الحجز.");if(control)control.value=normalizedStatus(booking.status)}finally{if(control)control.disabled=false}}
-function applyStatusColor(el,status){for(const name of ["waiting","completed","postponed","no_show","apologized","pending","archived","cancelled","confirmed"])el.classList.remove(`status-${name}`);el.classList.add(`status-${status||"waiting"}`);applyRuntimeStatusColor(el,RUNTIME_SETTINGS,status||"waiting")}function makeStatusSelect(booking){const select=document.createElement("select");select.className="booking-status-select";select.setAttribute("aria-label",`حالة حجز ${booking.patientName||""}`);for(const[value,label]of BOOKING_STATUS_OPTIONS){const option=document.createElement("option");option.value=value;option.textContent=label;option.className=`status-option-${value}`;select.append(option)}select.value=normalizedStatus(booking.status)||"waiting";if(booking.status==="completed"){select.disabled=true;select.title="حالة تم الكشف نهائية ولا يمكن تغييرها";select.setAttribute("aria-label",`حالة نهائية: تم الكشف عن ${booking.patientName||"المريضة"}`)}applyStatusColor(select,select.value);select.addEventListener("change",()=>{applyStatusColor(select,select.value);changeBookingStatus(booking,select.value,select)});return select}
+function applyStatusColor(el,status){for(const name of ["waiting","completed","postponed","no_show","apologized","pending","archived","cancelled","confirmed"])el.classList.remove(`status-${name}`);el.classList.add(`status-${status||"waiting"}`);applyRuntimeStatusColor(el,RUNTIME_SETTINGS,status||"waiting")}function makeStatusSelect(booking){const select=document.createElement("select");select.className="booking-status-select";select.setAttribute("aria-label",`حالة حجز ${booking.patientName||""}`);for(const[value,label]of BOOKING_STATUS_OPTIONS){const option=document.createElement("option");option.value=value;option.textContent=label;option.className=`status-option-${value}`;select.append(option)}select.value=normalizedStatus(booking.status)||"waiting";if(booking.status==="completed"){select.disabled=true;select.title="حالة تم الكشف نهائية ولا يمكن تغييرها";select.setAttribute("aria-label",`حالة نهائية: تم الكشف عن ${booking.patientName||"المريضة"}`)}else if(currentAccountAccess?.accountType==="staff"&&currentAccountAccess?.permissions?.bookings!=="edit"){select.disabled=true;select.title="صلاحية المشاهدة فقط"}applyStatusColor(select,select.value);select.addEventListener("change",()=>{applyStatusColor(select,select.value);changeBookingStatus(booking,select.value,select)});return select}
 function renderScheduleCard(booking,archived=false){const card=renderBookingCard(booking);card.classList.add("schedule-booking-card");applyStatusColor(card,normalizedStatus(booking.status));const meta=card.querySelector(".booking-request-main small");if(meta)meta.textContent=queueNumberFor(booking)+" · الموعد: "+formatRequestDate(booking.appointmentDate)+" · "+(booking.patientPhone||"الهاتف غير مسجل")+" · "+(booking.service||"الخدمة غير محددة")+" · الضغط: "+(booking.bloodPressure||"—")+" · الوزن: "+(booking.weight?booking.weight+" كجم":"—")+" · السكر: "+(booking.bloodSugar||"—")+(booking.preVisitNotes?" · ملاحظة قبل الكشف: "+booking.preVisitNotes:"");if(!archived){card.querySelector(".booking-request-badge")?.remove();const controls=document.createElement("div");controls.className="schedule-card-controls";if(booking.status!=="completed"){const edit=document.createElement("button");edit.type="button";edit.className="edit-booking-button";edit.textContent="✎";edit.title="تعديل بيانات الحجز";edit.setAttribute("aria-label","تعديل حجز "+(booking.patientName||"المريضة"));edit.addEventListener("click",()=>{const details=card.querySelector(".booking-request-details");if(details){details.hidden=false;details.querySelector("input,select,textarea")?.focus()}});controls.append(edit)}controls.append(makeStatusSelect(booking));card.prepend(controls)}return card}
 
 function renderDailyAppointments(){dailyAppointmentsList.replaceChildren();const day=doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());const mode=doctorFilterMode?.value||"date",query=(doctorHomeSearch?.value||"").trim().toLocaleLowerCase("ar");if(doctorScheduleDateLabel)doctorScheduleDateLabel.textContent=mode==="search"?"نتائج البحث":formatRequestDate(day);const rows=allBookings.filter(b=>!b.isArchived&&!["pending","archived","cancelled"].includes(b.status)&&((mode==="search"&&query)||String(b.appointmentDate||"").slice(0,10)===day)&&(!query||(String(b.patientName||"")+" "+String(b.patientPhone||"")+" "+String(b.service||"")).toLocaleLowerCase("ar").includes(query))&&(activeStatusFilter==="all"||normalizedStatus(b.status)===activeStatusFilter)).sort((a,b)=>String(a.appointmentDate||"").localeCompare(String(b.appointmentDate||""))||queueNumberFor(a)-queueNumberFor(b));const notices=mode==="date"?allBookings.filter(b=>!b.isArchived).flatMap(b=>parseRescheduleHistory(b).filter(h=>h.fromDate===day).map(entry=>({booking:b,entry}))):[];if(!rows.length&&!notices.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent=mode==="search"?"لا توجد نتائج مطابقة للبحث.":`لا توجد مواعيد في ${formatRequestDate(day)}.`;dailyAppointmentsList.append(empty)}else{for(const booking of rows)dailyAppointmentsList.append(renderScheduleCard(booking));for(const item of notices)dailyAppointmentsList.append(renderRescheduleNotice(item.booking,item.entry))}renderDoctorAccounts();if(archiveSelectedAppointments)archiveSelectedAppointments.disabled=mode!=="date"||!allBookings.some(b=>(!b.isArchived&&String(b.appointmentDate||"").slice(0,10)===day)||(!b.isArchived&&parseRescheduleHistory(b).some(h=>h.fromDate===day&&!parseArchivedRescheduleHistory(b).some(a=>a.fromDate===h.fromDate&&a.toDate===h.toDate&&a.at===h.at))))}
