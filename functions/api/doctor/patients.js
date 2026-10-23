@@ -6,6 +6,7 @@ const USERNAMES_COLLECTION = "clinicPatientUsernames";
 const MEDICAL_PATIENTS_COLLECTION = "clinicMedicalPatients";
 const FIREBASE_LOOKUP_URL = "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
 const FIREBASE_SIGNUP_URL = "https://identitytoolkit.googleapis.com/v1/accounts:signUp";
+const FIREBASE_ADMIN_UPDATE_URL = "https://identitytoolkit.googleapis.com/v1/projects/clinics-manger/accounts:update";
 const FIREBASE_DELETE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:delete";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
@@ -127,11 +128,6 @@ async function verifyPatientsEditor(user, account, token) {
   return { ok: true };
 }
 
-function generateTemporaryPassword() {
-  const bytes = crypto.getRandomValues(new Uint8Array(18));
-  return "Pt!" + b64url(bytes) + "9a";
-}
-
 function encodeDocument(fields) {
   return { fields };
 }
@@ -164,7 +160,7 @@ export async function onRequest({ request, env }) {
     return jsonResponse({ message: "بيانات الطلب غير صحيحة." }, 400);
   }
 
-  if (!body || typeof body !== "object" || Array.isArray(body) || !["create", "list", "searchMedicalPatients"].includes(body.action)) {
+  if (!body || typeof body !== "object" || Array.isArray(body) || !["create", "list", "searchMedicalPatients", "accountStatus", "resetPassword"].includes(body.action)) {
     return jsonResponse({ message: "الإجراء المطلوب غير معروف." }, 400);
   }
 
@@ -229,8 +225,71 @@ export async function onRequest({ request, env }) {
 
   const patientId = typeof body.patientId === "string" ? body.patientId.trim() : "";
   const username = normalizeUsername(body.username);
+  const password = typeof body.password === "string" ? body.password : "";
   if (!/^[A-Za-z0-9_-]{1,150}$/.test(patientId)) return jsonResponse({ message: "اختَر ملف مريض مسجلًا من نتائج البحث." }, 400);
+
+  if (["accountStatus", "resetPassword"].includes(body.action)) {
+    if (body.action === "resetPassword" && (password.length < 8 || password.length > 128)) {
+      return jsonResponse({ message: "كلمة المرور الجديدة يجب أن تكون من 8 إلى 128 حرفًا." }, 400);
+    }
+    const user = await verifyUser(request, env);
+    if (!user.ok) return jsonResponse({ message: user.message }, user.status);
+    try {
+      const account = parseServiceAccount(env);
+      const token = await googleAccessToken(account);
+      const permission = await verifyPatientsEditor(user, account, token);
+      if (!permission.ok) return jsonResponse({ message: permission.message }, permission.status);
+      const patientDoc = await firestore(account.project_id, token, "/" + MEDICAL_PATIENTS_COLLECTION + "/" + encodeURIComponent(patientId));
+      if (!patientDoc) return jsonResponse({ message: "ملف المريض المحدد غير موجود. ابحث عنه مرة أخرى." }, 404);
+      const accountQuery = await firestore(account.project_id, token, ":runQuery", {
+        method: "POST",
+        body: JSON.stringify({ structuredQuery: { from: [{ collectionId: PATIENTS_COLLECTION }] } })
+      });
+      const linkedDoc = (Array.isArray(accountQuery) ? accountQuery : []).find(item => item.document &&
+        readString(item.document.fields || {}, "patientId") === patientId &&
+        item.document.fields?.active?.booleanValue === true)?.document;
+      if (!linkedDoc) return jsonResponse({ accountExists: false, message: "لا يوجد حساب نشط مرتبط بهذا الملف." });
+      const linkedFields = linkedDoc.fields || {};
+      const linkedUid = readString(linkedFields, "uid") || String(linkedDoc.name || "").split("/").pop();
+      const linkedUsername = readString(linkedFields, "username");
+      if (body.action === "accountStatus") {
+        return jsonResponse({ accountExists: true, username: linkedUsername, active: true });
+      }
+      const updateResponse = await fetch(FIREBASE_ADMIN_UPDATE_URL, {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({ localId: linkedUid, password })
+      });
+      if (!updateResponse.ok) {
+        const detail = await updateResponse.text();
+        console.error("Patient password reset failed:", updateResponse.status, detail.slice(0, 400));
+        return jsonResponse({ message: "تعذر إعادة تعيين كلمة المرور من خدمة Firebase. لم يتم حفظ أي كلمة مرور." }, 503);
+      }
+      const now = new Date().toISOString();
+      const updatePath = "/" + PATIENTS_COLLECTION + "/" + encodeURIComponent(linkedUid) +
+        "?updateMask.fieldPaths=updatedAt&updateMask.fieldPaths=passwordResetAt&updateMask.fieldPaths=passwordResetBy";
+      await firestore(account.project_id, token, updatePath, {
+        method: "PATCH",
+        body: JSON.stringify(encodeDocument({
+          updatedAt: fsString(now),
+          passwordResetAt: fsString(now),
+          passwordResetBy: fsString(user.uid)
+        }))
+      });
+      return jsonResponse({
+        success: true,
+        patient: { patientId, username: linkedUsername },
+        credentials: { username: linkedUsername, password },
+        message: "تم تغيير كلمة المرور. سلّمها للمريض بشكل خاص؛ لن يتم حفظها كنص مكشوف."
+      });
+    } catch (error) {
+      console.error("Patient account status/reset failed:", error);
+      return jsonResponse({ message: error.message || "تعذر التحقق من حساب المريض أو إعادة تعيين كلمة المرور." }, error.status === 403 ? 403 : 503);
+    }
+  }
+
   if (!validUsername(username)) return jsonResponse({ message: "اسم المستخدم يجب أن يكون من 3 إلى 40 حرفًا أو رقمًا، ويمكن أن يكون بالعربية أو رقم الهاتف." }, 400);
+  if (password.length < 8 || password.length > 128) return jsonResponse({ message: "كلمة المرور يجب أن تكون من 8 إلى 128 حرفًا." }, 400);
 
   let account, token;
   try {
@@ -267,7 +326,6 @@ export async function onRequest({ request, env }) {
     if (alreadyLinked) return jsonResponse({ message: "يوجد حساب نشط مرتبط بملف هذا المريض بالفعل." }, 409);
 
     const email = await internalEmailFor(usernameKey);
-    const password = generateTemporaryPassword();
     const signup = await fetch(FIREBASE_SIGNUP_URL + "?key=" + encodeURIComponent(env.FIREBASE_API_KEY || ""), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -313,8 +371,8 @@ export async function onRequest({ request, env }) {
     return jsonResponse({
       success: true,
       patient: { uid, patientId, displayName, phone, username },
-      credentials: { username, temporaryPassword: password },
-      message: "تم إنشاء حساب المريض وربطه بملفه الطبي. سلّم بيانات الدخول له بشكل خاص."
+      credentials: { username, password },
+      message: "تم إنشاء حساب المريض وربطه بملفه الطبي. سلّم بيانات الدخول له بشكل خاص. كلمة المرور غير محفوظة في قاعدة البيانات."
     }, 201);
   } catch (error) {
     console.error("Patient account creation failed:", error);
