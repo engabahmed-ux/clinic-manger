@@ -649,6 +649,7 @@ function renderBookingCard(booking) {
   summary.addEventListener("click", () => {
     if (canOpenMedicalVisit()) {
       details.hidden = false;
+      details.classList.add("medical-only-view");
       visitPanel.hidden = false;
       openBookingVisitEditor(booking, card, visitPanel);
       return;
@@ -659,6 +660,7 @@ function renderBookingCard(booking) {
     event.preventDefault();
     event.stopPropagation();
     details.hidden = !details.hidden;
+    details.classList.remove("medical-only-view");
     visitPanel.hidden = true;
     if (!details.hidden) details.scrollIntoView({ behavior: "smooth", block: "nearest" });
   });
@@ -744,13 +746,13 @@ async function openBookingVisitEditor(booking,card,panel){
     const vitals=document.createElement("div");
     vitals.className="medical-vitals-grid";
     vitals.append(
-      createMedicalBookingField("ضغط الدم","bloodPressure",visit.bloodPressure??linkedBooking.bloodPressure??""),
-      createMedicalBookingField("الوزن (كجم)","weight",visit.weight??linkedBooking.weight??""),
-      createMedicalBookingField("قياس السكر","bloodSugar",visit.bloodSugar??linkedBooking.bloodSugar??"")
+      createMedicalBookingField("ضغط الدم","bloodPressure",visit.bloodPressure||linkedBooking.bloodPressure||""),
+      createMedicalBookingField("الوزن (كجم)","weight",visit.weight||linkedBooking.weight||""),
+      createMedicalBookingField("قياس السكر","bloodSugar",visit.bloodSugar||linkedBooking.bloodSugar||"")
     );
     form.append(vitals,
       createMedicalBookingField("تاريخ الكشف","visitDate",visit.visitDate||String(booking.appointmentDate||"").slice(0,10)),
-      createMedicalBookingField("ملاحظات الموظف قبل الكشف","preVisitNotes",visit.preVisitNotes??linkedBooking.preVisitNotes??"",true),
+      createMedicalBookingField("ملاحظات الموظف قبل الكشف","preVisitNotes",visit.preVisitNotes||linkedBooking.preVisitNotes||"",true),
       createMedicalBookingField("التشخيص","diagnosis",visit.diagnosis||"",true),
       createMedicalBookingField("ملاحظات الدكتور أثناء الكشف","clinicalNotes",visit.clinicalNotes||"",true),
       createMedicalBookingField("العلاج والأدوية والتوصيات","treatment",visit.treatment||"",true),
