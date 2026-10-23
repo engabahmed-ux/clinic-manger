@@ -103,8 +103,8 @@
           <button id="backFromPatientsButton" class="secondary-button" type="button">العودة للوحة</button>
         </div>
         <div class="security-information">
-          <strong>تنبيه أمني</strong>
-          <p>سلّمي كلمة المرور للمريضة بشكل خاص. لن تُحفظ كلمة المرور في Firestore، ولن تظهر مجددًا بعد مغادرة هذه الصفحة.</p>
+          <strong>إدارة حساب المريض</strong>
+          <p>اختَر ملف المريض، ثم حدّد اسم المستخدم وكلمة المرور بنفسك. إذا كان له حساب بالفعل، يمكنك تعيين كلمة مرور جديدة. كلمة المرور لا تُحفظ كنص مكشوف في قاعدة البيانات.</p>
         </div>
         <div class="employee-form-card">
           <form id="createPatientForm" class="employee-form" novalidate>
@@ -113,18 +113,29 @@
             <div id="patientAccountSearchResults" class="medical-patient-results" aria-live="polite"></div>
             <input id="patientAccountPatientId" type="hidden" required>
             <div id="patientAccountSelected" class="security-information" hidden></div>
-            <label for="patientAccountUsername">اسم المستخدم أو رقم الهاتف</label>
-            <input id="patientAccountUsername" name="username" type="text" minlength="3" maxlength="40" autocomplete="off" required>
-            <p class="form-hint">يمكن استخدام اسم عربي أو رقم هاتف. كلمة المرور المؤقتة ستظهر بعد إنشاء الحساب.</p>
+            <div id="patientAccountCreateFields">
+              <label for="patientAccountUsername">اسم المستخدم</label>
+              <input id="patientAccountUsername" name="username" type="text" minlength="3" maxlength="40" autocomplete="off" required>
+              <label for="patientAccountPassword">كلمة المرور التي تحددها للمريض</label>
+              <input id="patientAccountPassword" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required>
+              <p class="form-hint">اختر كلمة مرور من 8 أحرف على الأقل. لن يتم حفظها مكشوفة في ملف المريض.</p>
+              <button id="createPatientButton" class="primary-button" type="submit">إنشاء حساب المريض</button>
+            </div>
+            <div id="patientAccountResetPanel" class="security-information" hidden>
+              <strong>هذا الملف مرتبط بحساب موجود</strong>
+              <p>اسم المستخدم: <span id="patientAccountExistingUsername"></span></p>
+              <label for="patientAccountNewPassword">كلمة المرور الجديدة</label>
+              <input id="patientAccountNewPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password">
+              <button id="resetPatientPasswordButton" class="primary-button" type="button">إعادة تعيين كلمة المرور</button>
+            </div>
             <p id="createPatientMessage" class="message" role="status" hidden></p>
-            <button id="createPatientButton" class="primary-button" type="submit">إنشاء حساب المريضة</button>
           </form>
           <div id="patientCredentialsPanel" class="patient-credentials-panel" hidden>
-            <h4>بيانات الدخول — سلّميها للمريضة بشكل خاص</h4>
+            <h4>بيانات الدخول — سلّمها للمريض بشكل خاص</h4>
             <p id="patientCredentialsMessage" role="status"></p>
             <dl>
               <dt>اسم المستخدم</dt><dd id="createdPatientUsername"></dd>
-              <dt>كلمة المرور المؤقتة</dt><dd id="createdPatientPassword"></dd>
+              <dt>كلمة المرور المحددة</dt><dd id="createdPatientPassword"></dd>
             </dl>
             <button id="copyPatientCredentialsButton" class="secondary-button" type="button">نسخ بيانات الدخول</button>
           </div>
