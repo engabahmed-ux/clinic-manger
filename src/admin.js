@@ -1,7 +1,7 @@
 
 import { FIREBASE_CONFIG } from "./config/firebase-config.js";
 import { APP_CONFIG } from "./config/app-config.js";
-import { loadRuntimeSettings, statusLabel, applyRuntimeStatusColor } from "./config/runtime-settings.js";
+import { loadRuntimeSettings, statusLabel, applyRuntimeStatusColor, recordRuntimeLog } from "./config/runtime-settings.js";
 
 import {
   initializeApp,
@@ -379,7 +379,8 @@ async function patientApiRequest(action, data = {}) {
   });
   let result = {};
   try { result = await response.json(); } catch {}
-  if (!response.ok) throw new Error(result.message || "تعذر إنشاء حساب المريضة.");
+  if (!response.ok) { recordRuntimeLog(user, { action: "request_failed", area: "patients", level: "error", message: "فشل طلب إدارة المريضات." }); throw new Error(result.message || "تعذر إنشاء حساب المريضة."); }
+  if (action === "create") recordRuntimeLog(user, { action: "patient_created", area: "patients", level: "info", message: "تم إنشاء حساب مريضة." });
   return result;
 }
 
@@ -402,19 +403,17 @@ async function bookingApiRequest(action, data = {}) {
   let result = {};
   try { result = await response.json(); } catch {}
 
-  if (response.status === 401) {
-    throw new Error("انتهت جلسة الدخول. سجّل الدخول مجددًا.");
-  }
-  if (response.status === 403) {
-    throw new Error(result.message || "ليس لديك صلاحية إدارة الحجوزات.");
-  }
-  if (!response.ok) {
-    throw new Error(result.message || "تعذر تنفيذ طلب الحجوزات.");
+  if (response.status === 401) { recordRuntimeLog(user, { action: "request_failed", area: "bookings", level: "security", message: "فشل التحقق من جلسة طلب الحجوزات." }); throw new Error("انتهت جلسة الدخول. سجّل الدخول مجددًا."); }
+  if (response.status === 403) { recordRuntimeLog(user, { action: "request_failed", area: "bookings", level: "security", message: "تم رفض طلب حجوزات بسبب الصلاحيات." }); throw new Error(result.message || "ليس لديك صلاحية إدارة الحجوزات."); }
+  if (!response.ok) { recordRuntimeLog(user, { action: "request_failed", area: "bookings", level: "error", message: "فشل طلب إدارة الحجوزات." }); throw new Error(result.message || "تعذر تنفيذ طلب الحجوزات."); }
+  if (["create", "update", "cancel", "archiveDay", "updatePaidAmount"].includes(action)) {
+    const eventAction = action === "create" ? "booking_created" : action === "cancel" ? "booking_cancelled" : action === "updatePaidAmount" ? "payment_updated" : action === "update" && data.booking?.status ? "booking_status_changed" : "booking_updated";
+    recordRuntimeLog(user, { action: eventAction, area: "bookings", level: "info", message: "تم تنفيذ عملية على حجز.", targetType: "booking", targetId: data.booking?.id || data.id || "" });
   }
   return result;
 }
-async function medicalRecordsApiRequest(action,data={}){const user=auth.currentUser;if(!user)throw new Error("انتهت جلسة الدخول.");const response=await fetch("/api/doctor/medical-records",{method:"POST",headers:{Authorization:`Bearer ${await user.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||"تعذر الوصول إلى السجل الطبي.");return result}
-async function accountsApiRequest(action,data={}){const user=auth.currentUser;if(!user)throw new Error("انتهت جلسة الدخول.");const response=await fetch("/api/doctor/accounts",{method:"POST",headers:{Authorization:`Bearer ${await user.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||"تعذر تنفيذ عملية الحسابات.");return result}
+async function medicalRecordsApiRequest(action,data={}){const user=auth.currentUser;if(!user)throw new Error("انتهت جلسة الدخول.");const response=await fetch("/api/doctor/medical-records",{method:"POST",headers:{Authorization:`Bearer ${await user.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});const result=await response.json().catch(()=>({}));if(!response.ok){recordRuntimeLog(user,{action:"request_failed",area:"medical_records",level:"error",message:"فشل طلب السجلات الطبية."});throw new Error(result.message||"تعذر الوصول إلى السجل الطبي.")}if(/save|create|update/i.test(action))recordRuntimeLog(user,{action:"medical_record_saved",area:"medical_records",level:"info",message:"تم حفظ أو تعديل سجل طبي."});return result}
+async function accountsApiRequest(action,data={}){const user=auth.currentUser;if(!user)throw new Error("انتهت جلسة الدخول.");const response=await fetch("/api/doctor/accounts",{method:"POST",headers:{Authorization:`Bearer ${await user.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});const result=await response.json().catch(()=>({}));if(!response.ok){recordRuntimeLog(user,{action:"request_failed",area:"accounts",level:"error",message:"فشل طلب إدارة الحسابات."});throw new Error(result.message||"تعذر تنفيذ عملية الحسابات.")}if(["createEntry","createDailyExpense"].includes(action))recordRuntimeLog(user,{action:"expense_recorded",area:"accounts",level:"info",message:"تم تسجيل حركة مالية."});if(action==="finalizeSettlement")recordRuntimeLog(user,{action:"settlement_closed",area:"accounts",level:"info",message:"تمت تصفية فترة مالية."});return result}
 function renderAccountEntries(container,rows,kind){if(!container)return;container.replaceChildren();if(!rows.length){container.textContent="لا توجد حركات مسجلة في هذا القسم.";return}const table=document.createElement("table");table.className="accounts-table";const head=document.createElement("thead");head.innerHTML="<tr><th>التاريخ</th><th>البيان</th><th>القيمة</th><th>ملاحظات</th></tr>";table.append(head);const body=document.createElement("tbody");let total=0;for(const item of rows.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))){const amount=Number(item.amount)||0;total+=amount;const tr=document.createElement("tr");for(const value of [formatRequestDate(item.date),item.personName||"—",doctorMoney(amount),item.notes||"—"]){const td=document.createElement("td");td.textContent=value;tr.append(td)}body.append(tr)}table.append(body);const totalBox=document.createElement("div");totalBox.className="accounts-total";const label=document.createElement("span");label.textContent=kind==="expense"?"إجمالي المصروفات المسجلة":"إجمالي الدخل المسجل";const amount=document.createElement("strong");amount.textContent=doctorMoney(total);totalBox.append(label,amount);container.append(table,totalBox)}
 function setDoctorAccountsSubtab(key){activeDoctorAccountSubtab=key;for(const button of accountsSubtabs.querySelectorAll("[data-account-subtab]"))button.setAttribute("aria-selected",String(button.dataset.accountSubtab===key));patientDailyAccountsPanel.hidden=key!=="patients";salaryAccountsPanel.hidden=key!=="salaries";customAccountsPanel.hidden=!key.startsWith("custom:");if(key==="patients")renderDoctorAccounts();if(key==="salaries")renderAccountEntries(salaryEntriesList,doctorAccountEntries.filter(x=>x.type==="entry"&&x.categoryId==="employee-salaries"),"expense");if(key.startsWith("custom:")){const category=doctorAccountCategories.find(x=>x.id===key.slice(7));if(category){$("#customAccountTitle").textContent=category.name+" · "+(category.kind==="income"?"دخل":"مصروف");renderAccountEntries(customAccountEntriesList,doctorAccountEntries.filter(x=>x.type==="entry"&&x.categoryId===category.id),category.kind)}}}
 function renderDoctorAccountsSubtabs(){if(!accountsSubtabs)return;accountsSubtabs.replaceChildren();const tabs=[{id:"patients",label:"حسابات المرضى"},{id:"salaries",label:"مرتبات الموظفين"},...doctorAccountCategories.map(x=>({id:"custom:"+x.id,label:x.name+" · "+(x.kind==="income"?"دخل":"مصروف")}))];for(const item of tabs){const b=document.createElement("button");b.type="button";b.className="accounts-subtab";b.dataset.accountSubtab=item.id;b.textContent=item.label;b.setAttribute("aria-selected",String(item.id===activeDoctorAccountSubtab));b.addEventListener("click",()=>{if(item.id.startsWith("custom:")){activeDoctorAccountSubtab="custom:"+item.id.slice(7);for(const x of accountsSubtabs.querySelectorAll("[data-account-subtab]"))x.setAttribute("aria-selected",String(x.dataset.accountSubtab===activeDoctorAccountSubtab));patientDailyAccountsPanel.hidden=true;salaryAccountsPanel.hidden=true;customAccountsPanel.hidden=false;const category=doctorAccountCategories.find(x=>x.id===item.id.slice(7));$("#customAccountTitle").textContent=category?category.name+" · "+(category.kind==="income"?"دخل":"مصروف"):"قسم الحسابات";renderAccountEntries(customAccountEntriesList,doctorAccountEntries.filter(x=>x.type==="entry"&&x.categoryId===item.id.slice(7)),category?.kind||"income")}else setDoctorAccountsSubtab(item.id)});accountsSubtabs.append(b)}if(!tabs.some(x=>x.id===activeDoctorAccountSubtab))activeDoctorAccountSubtab="patients";setDoctorAccountsSubtab(activeDoctorAccountSubtab)}
@@ -660,21 +659,10 @@ async function employeeApiRequest(action, data = {}) {
     result = {};
   }
 
-  if (response.status === 401) {
-    throw new Error("انتهت جلسة الدخول أو تعذر التحقق منها. سجّل الدخول مجددًا.");
-  }
-
-  if (response.status === 403) {
-    throw new Error("غير مسموح بتنفيذ هذا الإجراء.");
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      result.message ||
-      "تعذر تنفيذ الطلب. حاول مرة أخرى."
-    );
-  }
-
+  if (response.status === 401) { recordRuntimeLog(user, { action: "request_failed", area: "employees", level: "security", message: "فشل التحقق من جلسة إدارة الموظفين." }); throw new Error("انتهت جلسة الدخول أو تعذر التحقق منها. سجّل الدخول مجددًا."); }
+  if (response.status === 403) { recordRuntimeLog(user, { action: "request_failed", area: "employees", level: "security", message: "تم رفض طلب إدارة الموظفين بسبب الصلاحيات." }); throw new Error("غير مسموح بتنفيذ هذا الإجراء."); }
+  if (!response.ok) { recordRuntimeLog(user, { action: "request_failed", area: "employees", level: "error", message: "فشل طلب إدارة الموظفين." }); throw new Error(result.message || "تعذر تنفيذ الطلب. حاول مرة أخرى."); }
+  if (action === "create") recordRuntimeLog(user, { action: "employee_created", area: "employees", level: "info", message: "تم إنشاء حساب موظف." });
   return result;
 }
 
