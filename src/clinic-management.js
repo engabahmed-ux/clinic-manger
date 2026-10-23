@@ -256,7 +256,7 @@ async function loadLogs() {
     const result = await apiRequest("listLogs", { limit: 300 });
     cachedLogs = Array.isArray(result.logs) ? result.logs : [];
     renderLogs();
-    showMessage(logsMessage, "تم تحميل " + cachedLogs.length + " سجلًا. مدة الاحتفاظ: " + (result.retentionDays || 30) + " يومًا.", "success");
+    showMessage(logsMessage, "تم تحميل " + cachedLogs.length + " سجلًا. مدة الاحتفاظ: " + (result.retentionDays || 30) + " يومًا. " + (result.ttlEnabled ? "الحذف التلقائي من Firestore مفعّل." : "تنبيه: لم يتأكد تفعيل الحذف التلقائي من Firestore؛ يتم تنظيف المنتهي عند فتح السجل أو تسجيل أحداث جديدة، وقد تحتاج لتفعيل TTL يدويًا."), result.ttlEnabled ? "success" : "info");
   } catch (error) {
     showMessage(logsMessage, error.message || "تعذر تحميل السجل.", "error");
   } finally {
