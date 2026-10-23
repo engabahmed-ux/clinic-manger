@@ -100,12 +100,13 @@ function renderDailyAccounts(rows){
   for(const booking of rows){
     const completionDay=String(booking.completedAt||booking.appointmentDate||"").slice(0,10);
     const fee=Number(booking.completedFee!==undefined&&booking.completedFee!==""?booking.completedFee:(booking.status==="completed"?booking.servicePrice:0))||0;
-    if(booking.status==="completed"&&completionDay===selectedDate)completedTotal+=fee;
+    const received=Number(booking.paidAmount)||0;
+    if(booking.status==="completed"&&completionDay===selectedDate)completedTotal+=received;
     const card=document.createElement("article");
     card.className="staff-account-booking";
     const details=document.createElement("div"),title=document.createElement("h4"),meta=document.createElement("p");
     title.textContent=booking.patientName||"مريضة";
-    meta.textContent=[booking.service||"الخدمة غير محددة",booking.status==="completed"?"قيمة الكشف المعتمدة: "+money(fee):"",bookingStatusLabel(booking.status)].filter(Boolean).join(" · ");
+    meta.textContent=[booking.service||"الخدمة غير محددة",booking.status==="completed"?"قيمة الكشف: "+money(fee):"",received>0?"المبلغ المقبوض: "+money(received):booking.status==="completed"?"لم يُسجّل مبلغ قبض لهذا الحجز":"",bookingStatusLabel(booking.status)].filter(Boolean).join(" · ");
     details.append(title,meta);
     card.append(details);
     accountsBookings.append(card);
