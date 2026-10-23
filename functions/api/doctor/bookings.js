@@ -592,8 +592,8 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
   );
 
   const existing = decodeBooking(current);
-  if (existing.status === "completed" && changes.status !== undefined && changes.status !== "completed") {
-    throw new Error("حالة «تم الكشف» نهائية ولا يمكن تغييرها بعد اعتماد الكشف.");
+  if (existing.status === "completed") {
+    throw new Error("حالة «تم الكشف» نهائية؛ لا يمكن تعديل حالة الحجز أو بياناته بعد اعتماد الكشف.");
   }
   const financialFields = ["appointmentDate","servicePrice","paidAmount","status"];
   const changesFinancialFields = financialFields.some(key => changes[key] !== undefined);
