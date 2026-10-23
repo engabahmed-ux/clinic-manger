@@ -98,9 +98,12 @@ function renderDailyAccounts(rows){
   const money=staffMoney;
   if(!rows.length)accountsBookings.append(empty("لا توجد حجوزات في هذا اليوم."));
   for(const booking of rows){
-    const completionDay=String(booking.completedAt||booking.appointmentDate||"").slice(0,10);
+    const completionDay=String(booking.completedAt||"").slice(0,10);
+    const appointmentDay=String(booking.appointmentDate||"").slice(0,10);
     const fee=Number(booking.completedFee!==undefined&&booking.completedFee!==""?booking.completedFee:(booking.status==="completed"?booking.servicePrice:0))||0;
-    const received=Number(booking.paidAmount)||0;
+    // Older completed bookings may have a fee but no stored receipt amount.
+    const recordedAmount=Number(booking.paidAmount)||0;
+    const received=recordedAmount>0?recordedAmount:(booking.status==="completed"?fee:0);
     if(booking.status==="completed"&&completionDay===selectedDate)completedTotal+=received;
     const card=document.createElement("article");
     card.className="staff-account-booking";
