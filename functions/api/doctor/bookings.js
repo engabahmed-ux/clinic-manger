@@ -464,7 +464,7 @@ async function isFinancialPeriodClosed(projectId, accessToken, dateValue, employ
 }
 
 async function ensureQueueNumbersForDates(projectId, accessToken, dates) {
-  const requestedDates = new Set(dates.filter(date => /^\\d{4}-\\d{2}-\\d{2}$/.test(date)));
+  const requestedDates = new Set(dates.filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date)));
   if (!requestedDates.size) return await listBookings(projectId, accessToken);
   const all = await listBookings(projectId, accessToken);
   for (const date of requestedDates) {
