@@ -83,6 +83,7 @@
         <button id="openPatientsButton" class="dashboard-tab" type="button" aria-selected="false">حسابات المريضات</button>
         <button id="openMedicalRecordsButton" class="dashboard-tab" type="button" aria-selected="false">السجلات الطبية</button>
         <button id="openEmployeesButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الموظفين</button>
+        <button id="openClinicManagementButton" class="dashboard-tab" type="button" aria-selected="false">إدارة العيادة</button>
       </nav>
       <section id="homeAppointmentsSection" class="employee-section home-appointments-section">
         <div class="employee-section-heading doctor-schedule-heading"><h3>جدول المواعيد <button id="doctorScheduleDateLabel" class="schedule-date-label" type="button" aria-label="اضغط لتغيير تاريخ المواعيد"></button><button id="openDoctorScheduleFilter" class="schedule-filter-button" type="button" aria-label="فلترة جدول المواعيد" title="فلترة جدول المواعيد">☷</button></h3><div class="doctor-home-actions"><button id="homeAddBookingButton" class="primary-button home-add-booking-button" type="button">＋ إضافة حجز</button></div></div><input id="doctorHomeDateFilter" type="date" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1"><input id="doctorHomeSearch" type="search" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1">
@@ -339,6 +340,52 @@
         <div id="employeeList" class="employee-list" aria-live="polite"></div>
       </section>
 
+      <section id="clinicManagementSection" class="employee-section clinic-management-section" hidden>
+        <div class="employee-section-heading">
+          <div><h3>إعدادات العيادة</h3><p class="muted-text">التغييرات المحفوظة تُستخدم في الموقع ولوحات العمل التي تقرأ الإعدادات المشتركة.</p></div>
+        </div>
+        <form id="clinicSettingsForm" class="employee-form clinic-settings-form">
+          <h4>بيانات العيادة</h4>
+          <div class="clinic-settings-grid">
+            <label>اسم الطبيب<input name="doctorName" maxlength="120" required></label>
+            <label>التخصص<input name="specialty" maxlength="160" required></label>
+            <label>رقم الهاتف<input name="phone" maxlength="40"></label>
+            <label>رقم واتساب<input name="whatsapp" maxlength="40"></label>
+            <label>العنوان<input name="address" maxlength="300"></label>
+            <label>رابط الشعار<input name="logo" maxlength="500"></label>
+            <label>مسار صورة الطبيب<input name="doctorImage" maxlength="500"></label>
+            <label class="clinic-settings-wide">وصف العيادة<textarea name="description" rows="2" maxlength="1000"></textarea></label>
+          </div>
+          <h4>ألوان الموقع</h4>
+          <div class="clinic-settings-grid clinic-color-grid">
+            <label>لون الخلفية<input name="background" type="color" required></label>
+            <label>لون المساحات<input name="surface" type="color" required></label>
+            <label>اللون الأساسي<input name="accent" type="color" required></label>
+            <label>اللون الثانوي<input name="secondary" type="color" required></label>
+          </div>
+          <h4>الخدمات التي تقدمها العيادة</h4>
+          <p class="muted-text">يمكن إضافة خدمة أو حذفها أو تعديل اسمها ووصفها ورمزها. الخدمات المفعلة تظهر في الموقع ونموذج الحجز.</p>
+          <div id="clinicServicesEditor" class="clinic-dynamic-list"></div>
+          <button id="addClinicServiceButton" class="secondary-button" type="button">＋ إضافة خدمة</button>
+          <h4>أسماء الحالات وألوانها</h4>
+          <p class="muted-text">يمكن تعديل الاسم واللون لكل حالة. المعرّفات الداخلية ثابتة للحفاظ على قواعد سير الحجز والتقارير.</p>
+          <div id="clinicStatusesEditor" class="clinic-dynamic-list"></div>
+          <h4>باقي متغيرات الموقع</h4>
+          <p class="muted-text">يمكن تعديل النصوص والأقسام الأخرى هنا بصيغة JSON. لا تغيّر مفاتيح الإعدادات أو بنية البيانات إذا لم تكن متأكدًا منها.</p>
+          <textarea id="clinicAdvancedSettings" class="clinic-advanced-settings" rows="16" spellcheck="false" aria-label="باقي متغيرات الموقع بصيغة JSON"></textarea>
+          <p id="clinicSettingsMessage" class="message" role="status" hidden></p>
+          <button id="saveClinicSettingsButton" class="primary-button" type="submit">حفظ إعدادات العيادة</button>
+        </form>
+        <div class="clinic-logs-heading">
+          <div><h4>سجل الأحداث والأخطاء</h4><p class="muted-text">خاص بالدكتور فقط. تُحدد صلاحية كل سجل بثلاثين يومًا، وقد يتأخر الحذف التلقائي قليلًا.</p></div>
+          <button id="openClinicLogsButton" class="secondary-button" type="button">عرض سجل الأحداث</button>
+        </div>
+        <div id="clinicLogsPanel" hidden>
+          <div class="clinic-logs-toolbar"><label>نوع الحدث<select id="clinicLogsLevelFilter"><option value="all">كل الأحداث</option><option value="error">أخطاء</option><option value="warning">تحذيرات</option><option value="security">أمان</option><option value="info">معلومات</option></select></label><button id="refreshClinicLogsButton" class="secondary-button" type="button">تحديث السجل</button></div>
+          <p id="clinicLogsMessage" class="message" role="status" hidden></p>
+          <div id="clinicLogsList" class="clinic-logs-list" aria-live="polite"></div>
+        </div>
+      </section>
       <p id="dashboardMessage" class="message" role="status" hidden></p>
     </section>
 
@@ -350,5 +397,6 @@
 
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
   <script type="module" src="./src/admin.js"></script>
+  <script type="module" src="./src/clinic-management.js"></script>
 </body>
 </html>
