@@ -1102,10 +1102,13 @@ if (bookingDateFilter) bookingDateFilter.addEventListener("change", renderPendin
 function clearPatientCredentials() {
   if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
   if (createdPatientUsername) createdPatientUsername.textContent = "";
-
   if (createdPatientPassword) createdPatientPassword.textContent = "";
   if (patientCredentialsMessage) patientCredentialsMessage.textContent = "";
   if (copyPatientCredentialsButton) copyPatientCredentialsButton.textContent = "نسخ بيانات الدخول";
+  if (patientAccountPassword) patientAccountPassword.value = "";
+  if (patientAccountNewPassword) patientAccountNewPassword.value = "";
+  if (patientAccountCreateFields) patientAccountCreateFields.hidden = true;
+  if (patientAccountResetPanel) patientAccountResetPanel.hidden = true;
 }
 
 if (createBookingForm) {
