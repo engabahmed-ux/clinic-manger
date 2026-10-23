@@ -179,7 +179,7 @@ function createPatientForm(){
     credentials.hidden=false;copy.textContent="نسخ بيانات الدخول";
   }
   search.addEventListener("input",async()=>{
-    const requestId=++sequence;selectedPatientId="";selected.hidden=true;createPanel.hidden=true;resetPanel.hidden=true;credentials.hidden=true;results.replaceChildren();
+    const requestId=++sequence;selectedPatientId="";selected.hidden=true;createPanel.hidden=true;resetPanel.hidden=true;credentials.hidden=true;newPassword.value="";password.value="";username.value="";results.replaceChildren();
     const query=search.value.trim();if(query.length<2)return;
     const loading=document.createElement("p");loading.textContent="جارٍ البحث في ملفات المرضى...";results.append(loading);
     try{
@@ -196,7 +196,9 @@ function createPatientForm(){
           selected.textContent="المريض المختار: "+(patient.displayName||"")+" · الهاتف: "+(patient.phone||"غير مسجل");selected.hidden=false;
           createPanel.hidden=true;resetPanel.hidden=true;credentials.hidden=true;showStatus("");
           try{
-            const account=await api("accountStatus",{patientId:selectedPatientId});
+            const checkedPatientId=selectedPatientId;
+            const account=await api("accountStatus",{patientId:checkedPatientId});
+            if(selectedPatientId!==checkedPatientId)return;
             if(account.accountExists){existingUsername.textContent="اسم المستخدم: "+(account.username||"");resetPanel.hidden=false}
             else{createPanel.hidden=false;username.value="";password.value=""}
           }catch(error){showStatus(error.message||"تعذر التحقق من حساب المريض.",true)}
