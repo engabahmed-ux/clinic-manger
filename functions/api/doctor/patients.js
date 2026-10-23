@@ -3,6 +3,7 @@ const EXPECTED_PROJECT_ID = "clinics-manger";
 const STAFF_COLLECTION = "clinicStaff";
 const PATIENTS_COLLECTION = "clinicPatients";
 const USERNAMES_COLLECTION = "clinicPatientUsernames";
+const MEDICAL_PATIENTS_COLLECTION = "clinicMedicalPatients";
 const FIREBASE_LOOKUP_URL = "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
 const FIREBASE_SIGNUP_URL = "https://identitytoolkit.googleapis.com/v1/accounts:signUp";
 const FIREBASE_DELETE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:delete";
@@ -82,6 +83,21 @@ async function firestore(projectId, token, path, options = {}) {
 function fsString(value) { return { stringValue: String(value ?? "") }; }
 function fsBool(value) { return { booleanValue: Boolean(value) }; }
 function readString(fields, key) { return fields?.[key]?.stringValue || ""; }
+function normalizeUsername(value) {
+  return String(value || "").normalize("NFKC")
+    .replace(/[\u064B-\u065F\u0670]/g, "")
+    .replace(/[أإآ]/g, "ا").replace(/ى/g, "ي")
+    .replace(/\s+/g, " ").trim().toLocaleLowerCase("ar");
+}
+function validUsername(value) {
+  return value.length >= 3 && value.length <= 40 &&
+    /^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u.test(value);
+}
+async function internalEmailFor(usernameKey) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(usernameKey));
+  const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+  return "patient-" + hash + "@clinic-manger.invalid";
+}
 
 async function verifyUser(request, env) {
   if (!env.FIREBASE_API_KEY) return { ok: false, status: 503, message: "خدمة التحقق غير مهيأة." };
@@ -148,7 +164,7 @@ export async function onRequest({ request, env }) {
     return jsonResponse({ message: "بيانات الطلب غير صحيحة." }, 400);
   }
 
-  if (!body || typeof body !== "object" || Array.isArray(body) || !["create", "list"].includes(body.action)) {
+  if (!body || typeof body !== "object" || Array.isArray(body) || !["create", "list", "searchMedicalPatients"].includes(body.action)) {
     return jsonResponse({ message: "الإجراء المطلوب غير معروف." }, 400);
   }
 
@@ -174,6 +190,7 @@ export async function onRequest({ request, env }) {
           email: readString(fields, "email"),
           phone: readString(fields, "phone"),
           username: readString(fields, "username"),
+          patientId: readString(fields, "patientId"),
           createdAt: readString(fields, "createdAt"),
           updatedAt: readString(fields, "updatedAt")
         };
@@ -185,16 +202,35 @@ export async function onRequest({ request, env }) {
     }
   }
 
-  const displayName = typeof body.displayName === "string" ? body.displayName.trim() : "";
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
-  const username = typeof body.username === "string" ? body.username.trim().toLowerCase() : "";
+  if (body.action === "searchMedicalPatients") {
+    const user = await verifyUser(request, env);
+    if (!user.ok) return jsonResponse({ message: user.message }, user.status);
+    try {
+      const account = parseServiceAccount(env);
+      const token = await googleAccessToken(account);
+      const permission = await verifyPatientsEditor(user, account, token);
+      if (!permission.ok) return jsonResponse({ message: permission.message }, permission.status);
+      const query = String(body.query || "").trim().normalize("NFKC").replace(/\s+/g, " ").toLocaleLowerCase("ar");
+      if (query.length < 1 || query.length > 120) return jsonResponse({ patients: [] });
+      const result = await firestore(account.project_id, token, ":runQuery", {
+        method: "POST",
+        body: JSON.stringify({ structuredQuery: { from: [{ collectionId: MEDICAL_PATIENTS_COLLECTION }] } })
+      });
+      const patients = (Array.isArray(result) ? result : []).filter(item => item.document).map(item => {
+        const fields = item.document.fields || {};
+        return { patientId: String(item.document.name || "").split("/").pop(), displayName: readString(fields, "displayName"), phone: readString(fields, "phone"), patientNumber: readString(fields, "patientNumber") };
+      }).filter(patient => patient.patientId && (patient.displayName.toLocaleLowerCase("ar").includes(query) || patient.phone.includes(query) || patient.patientNumber.toLocaleLowerCase("ar").includes(query))).slice(0, 20);
+      return jsonResponse({ patients });
+    } catch (error) {
+      console.error("Medical patient account search failed:", error);
+      return jsonResponse({ message: "تعذر البحث في ملفات المرضى." }, 503);
+    }
+  }
 
-  if (displayName.length < 2 || displayName.length > 120) return jsonResponse({ message: "اسم المريضة مطلوب ويجب ألا يتجاوز 120 حرفًا." }, 400);
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return jsonResponse({ message: "البريد الإلكتروني غير صحيح." }, 400);
-  if (!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(username)) return jsonResponse({ message: "اسم المستخدم يجب أن يكون من 3 إلى 30 حرفًا إنجليزيًا أو رقمًا، ويمكن أن يحتوي على نقطة أو شرطة أو شرطة سفلية." }, 400);
-  if (!phone) return jsonResponse({ message: "رقم هاتف المريضة مطلوب لربط حجوزاتها بحسابها." }, 400);
-  if (phone.length > 40) return jsonResponse({ message: "رقم الهاتف أطول من المسموح." }, 400);
+  const patientId = typeof body.patientId === "string" ? body.patientId.trim() : "";
+  const username = normalizeUsername(body.username);
+  if (!/^[A-Za-z0-9_-]{1,150}$/.test(patientId)) return jsonResponse({ message: "اختَر ملف مريض مسجلًا من نتائج البحث." }, 400);
+  if (!validUsername(username)) return jsonResponse({ message: "اسم المستخدم يجب أن يكون من 3 إلى 40 حرفًا أو رقمًا، ويمكن أن يكون بالعربية أو رقم الهاتف." }, 400);
 
   let account, token;
   try {
@@ -212,9 +248,25 @@ export async function onRequest({ request, env }) {
     const permission = await verifyPatientsEditor(user, account, token);
     if (!permission.ok) return jsonResponse({ message: permission.message }, permission.status);
 
-    const existingUsername = await firestore(account.project_id, token, "/" + USERNAMES_COLLECTION + "/" + encodeURIComponent(username));
-    if (existingUsername) return jsonResponse({ message: "اسم المستخدم مستخدم بالفعل. اختاري اسمًا آخر." }, 409);
+    const usernameKey = normalizeUsername(username);
+    const existingUsername = await firestore(account.project_id, token, "/" + USERNAMES_COLLECTION + "/" + encodeURIComponent(usernameKey));
+    if (existingUsername) return jsonResponse({ message: "اسم المستخدم مستخدم بالفعل. اختَر اسمًا آخر." }, 409);
 
+    const medicalPatient = await firestore(account.project_id, token, "/" + MEDICAL_PATIENTS_COLLECTION + "/" + encodeURIComponent(patientId));
+    if (!medicalPatient) return jsonResponse({ message: "ملف المريض المحدد غير موجود. ابحث عنه مرة أخرى." }, 404);
+    const medicalFields = medicalPatient.fields || {};
+    const displayName = readString(medicalFields, "displayName").trim();
+    const phone = readString(medicalFields, "phone").trim();
+    if (displayName.length < 2 || !phone) return jsonResponse({ message: "ملف المريض لا يحتوي على الاسم ورقم الهاتف اللازمين لإنشاء الحساب." }, 400);
+
+    const existingPatientAccounts = await firestore(account.project_id, token, ":runQuery", {
+      method: "POST",
+      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: PATIENTS_COLLECTION }] } })
+    });
+    const alreadyLinked = (Array.isArray(existingPatientAccounts) ? existingPatientAccounts : []).some(item => item.document && readString(item.document.fields || {}, "patientId") === patientId && item.document.fields?.active?.booleanValue === true);
+    if (alreadyLinked) return jsonResponse({ message: "يوجد حساب نشط مرتبط بملف هذا المريض بالفعل." }, 409);
+
+    const email = await internalEmailFor(usernameKey);
     const password = generateTemporaryPassword();
     const signup = await fetch(FIREBASE_SIGNUP_URL + "?key=" + encodeURIComponent(env.FIREBASE_API_KEY || ""), {
       method: "POST",
@@ -237,18 +289,18 @@ export async function onRequest({ request, env }) {
     try {
       await firestore(account.project_id, token, "/" + PATIENTS_COLLECTION + "/" + encodeURIComponent(uid), {
         method: "PATCH",
-        body: JSON.stringify(encodeDocument({ uid: fsString(uid), role: fsString("patient"), active: fsBool(true), displayName: fsString(displayName), email: fsString(email), phone: fsString(phone), username: fsString(username), createdAt: fsString(now), updatedAt: fsString(now) }))
+        body: JSON.stringify(encodeDocument({ uid: fsString(uid), role: fsString("patient"), active: fsBool(true), patientId: fsString(patientId), displayName: fsString(displayName), email: fsString(email), phone: fsString(phone), username: fsString(username), usernameKey: fsString(usernameKey), createdAt: fsString(now), updatedAt: fsString(now) }))
       });
-      await firestore(account.project_id, token, "/" + USERNAMES_COLLECTION + "/" + encodeURIComponent(username), {
+      await firestore(account.project_id, token, "/" + USERNAMES_COLLECTION + "/" + encodeURIComponent(usernameKey), {
         method: "PATCH",
-        body: JSON.stringify(encodeDocument({ uid: fsString(uid), email: fsString(email), username: fsString(username), active: fsBool(true), createdAt: fsString(now) }))
+        body: JSON.stringify(encodeDocument({ uid: fsString(uid), email: fsString(email), username: fsString(username), usernameKey: fsString(usernameKey), active: fsBool(true), createdAt: fsString(now) }))
       });
     } catch (error) {
       try {
         await firestore(account.project_id, token, "/" + PATIENTS_COLLECTION + "/" + encodeURIComponent(uid), {
           method: "DELETE"
         });
-        await firestore(account.project_id, token, "/" + USERNAMES_COLLECTION + "/" + encodeURIComponent(username), {
+        await firestore(account.project_id, token, "/" + USERNAMES_COLLECTION + "/" + encodeURIComponent(usernameKey), {
           method: "DELETE"
         });
       } catch (cleanupError) {
@@ -260,9 +312,9 @@ export async function onRequest({ request, env }) {
 
     return jsonResponse({
       success: true,
-      patient: { uid, displayName, email, phone, username },
-      credentials: { username, email, temporaryPassword: password },
-      message: "تم إنشاء حساب المريضة. سلّمي بيانات الدخول لها بشكل خاص، ولا تحفظي كلمة المرور في ملف أو قاعدة البيانات."
+      patient: { uid, patientId, displayName, phone, username },
+      credentials: { username, temporaryPassword: password },
+      message: "تم إنشاء حساب المريض وربطه بملفه الطبي. سلّم بيانات الدخول له بشكل خاص."
     }, 201);
   } catch (error) {
     console.error("Patient account creation failed:", error);
