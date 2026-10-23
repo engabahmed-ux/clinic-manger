@@ -590,6 +590,13 @@ function renderBookingCard(booking) {
   badge.className = "booking-request-badge";
   badge.textContent = bookingStatusLabel(booking.status);
   summary.append(main, badge);
+  const pencil = document.createElement("button");
+  pencil.type = "button";
+  pencil.className = "booking-edit-pencil";
+  pencil.title = "تعديل بيانات الحجز";
+  pencil.setAttribute("aria-label", "تعديل بيانات حجز " + (booking.patientName || ""));
+  pencil.textContent = "✎";
+  pencil.hidden = locked || !canEditBooking;
   const details = document.createElement("div");
   details.className = "booking-request-details";
   details.hidden = true;
@@ -640,15 +647,32 @@ function renderBookingCard(booking) {
   visitPanel.hidden = true;
   details.append(visitPanel);
   summary.addEventListener("click", () => {
-    details.hidden = !details.hidden;
-    if (!details.hidden && auth.currentUser?.uid === DOCTOR_ADMIN_UID) {
+    if (canOpenMedicalVisit()) {
+      details.hidden = false;
+      visitPanel.hidden = false;
       openBookingVisitEditor(booking, card, visitPanel);
+      return;
     }
+    details.hidden = !details.hidden;
   });
-  card.append(summary, details);
+  pencil.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    details.hidden = !details.hidden;
+    visitPanel.hidden = true;
+    if (!details.hidden) details.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+  card.append(summary, pencil, details);
   return card;
 }
 function isDoctorAccount(){return auth.currentUser?.uid===DOCTOR_ADMIN_UID;}
+function canOpenMedicalVisit(){
+  return isDoctorAccount() || (
+    currentAccountAccess?.accountType === "staff" &&
+    currentAccountAccess?.permissions?.medicalRecords === "edit" &&
+    currentAccountAccess?.permissions?.bookings === "edit"
+  );
+}
 function createMedicalBookingField(labelText,field,value="",multiline=false){
   const label=document.createElement("label");
   label.className="medical-booking-field";
@@ -657,15 +681,42 @@ function createMedicalBookingField(labelText,field,value="",multiline=false){
   input.dataset.visitField=field;
   if(multiline){input.rows=field==="clinicalNotes"||field==="treatment"?3:2;input.maxLength=field==="clinicalNotes"||field==="treatment"?4000:1000;}
   else if(field==="weight"){input.type="number";input.min="0";input.max="500";input.step="0.1";}
-  else if(field==="visitDate"){input.type="date";input.required=true;}
+  else if(field==="visitDate"||field==="followUpDate"){input.type="date";if(field==="visitDate")input.required=true;}
+  else if(field==="followUpDays"){input.type="number";input.min="0";input.max="3650";input.step="1";input.inputMode="numeric";}
   else input.type="text";
   if(!multiline&&field!=="weight"&&field!=="visitDate")input.maxLength=field==="diagnosis"||field==="followUp"?1000:40;
   input.value=value??"";
   label.append(input);
   return label;
 }
+function createFollowUpFields(visit, visitDateInput) {
+  const group = document.createElement("div");
+  group.className = "medical-followup-grid";
+  const daysField = createMedicalBookingField("المتابعة بعد كام يوم؟", "followUpDays", visit.followUpDays || "");
+  const dateField = createMedicalBookingField("تاريخ المتابعة", "followUpDate", visit.followUpDate || "");
+  const daysInput = daysField.querySelector("[data-visit-field]");
+  const dateInput = dateField.querySelector("[data-visit-field]");
+  const updateDateFromDays = () => {
+    const days = Number(daysInput.value);
+    if (daysInput.value === "" || !Number.isInteger(days) || days < 0 || !visitDateInput.value) return;
+    const base = new Date(visitDateInput.value + "T12:00:00");
+    base.setDate(base.getDate() + days);
+    dateInput.value = [base.getFullYear(), String(base.getMonth()+1).padStart(2,"0"), String(base.getDate()).padStart(2,"0")].join("-");
+  };
+  const updateDaysFromDate = () => {
+    if (!dateInput.value || !visitDateInput.value) return;
+    const start = new Date(visitDateInput.value + "T12:00:00");
+    const end = new Date(dateInput.value + "T12:00:00");
+    daysInput.value = String(Math.round((end.getTime() - start.getTime()) / 86400000));
+  };
+  daysInput.addEventListener("input", updateDateFromDays);
+  dateInput.addEventListener("change", updateDaysFromDate);
+  visitDateInput.addEventListener("change", updateDateFromDays);
+  group.append(daysField, dateField);
+  return group;
+}
 async function openBookingVisitEditor(booking,card,panel){
-  if(!isDoctorAccount()||!panel)return;
+  if(!canOpenMedicalVisit()||!panel)return;
   panel.hidden=false;
   if(panel.dataset.loadedFor===booking.id)return;
   panel.dataset.loadedFor=booking.id;
@@ -703,8 +754,10 @@ async function openBookingVisitEditor(booking,card,panel){
       createMedicalBookingField("التشخيص","diagnosis",visit.diagnosis||"",true),
       createMedicalBookingField("ملاحظات الدكتور أثناء الكشف","clinicalNotes",visit.clinicalNotes||"",true),
       createMedicalBookingField("العلاج والأدوية والتوصيات","treatment",visit.treatment||"",true),
-      createMedicalBookingField("موعد المتابعة أو تعليماتها","followUp",visit.followUp||"",true)
+      createMedicalBookingField("تعليمات المتابعة","followUpNotes",visit.followUpNotes||visit.followUp||"",true)
     );
+    const visitDateInput = form.querySelector('[data-visit-field="visitDate"]');
+    form.append(createFollowUpFields(visit, visitDateInput));
     const message=document.createElement("p");
     message.className="message";
     message.setAttribute("role","status");
@@ -744,6 +797,12 @@ async function openBookingVisitEditor(booking,card,panel){
       const values={};
       form.querySelectorAll("[data-visit-field]").forEach(input=>{values[input.dataset.visitField]=input.value.trim();});
       if(!values.visitDate){showMessage(message,"حدد تاريخ الكشف.");return;}
+      if(values.followUpDays!=="" && (!/^\d{1,4}$/.test(values.followUpDays) || Number(values.followUpDays)>3650)){showMessage(message,"أدخل عدد أيام متابعة صحيحًا (من 0 إلى 3650).");return;}
+      if(values.followUpDate && !/^\d{4}-\d{2}-\d{2}$/.test(values.followUpDate)){showMessage(message,"تاريخ المتابعة غير صحيح.");return;}
+      const followUpNotes = values.followUpNotes || "";
+      values.followUp = values.followUpDate
+        ? ("موعد المتابعة: " + values.followUpDate + (values.followUpDays!=="" ? " (بعد " + values.followUpDays + " يوم)" : "") + (followUpNotes ? " — " + followUpNotes : ""))
+        : followUpNotes;
       buttons.forEach(item=>item.disabled=true);
       button.textContent=action==="complete"?"جارٍ حفظ الكشف واعتماده...":"جارٍ حفظ التعديلات...";
       hideMessage(message);
@@ -753,7 +812,8 @@ async function openBookingVisitEditor(booking,card,panel){
           queueNumber:String(queueNumberFor(booking)),
           bloodPressure:values.bloodPressure,weight:values.weight,bloodSugar:values.bloodSugar,
           preVisitNotes:values.preVisitNotes,diagnosis:values.diagnosis,
-          clinicalNotes:values.clinicalNotes,treatment:values.treatment,followUp:values.followUp
+          clinicalNotes:values.clinicalNotes,treatment:values.treatment,followUp:values.followUp,
+          followUpNotes,followUpDays:values.followUpDays,followUpDate:values.followUpDate
         });
         Object.assign(booking,values);
         if(action==="save"){
@@ -769,14 +829,8 @@ async function openBookingVisitEditor(booking,card,panel){
         }
         showMessage(message,"تم حفظ الكشف وتثبيت الحالة على «تم الكشف».","success");
         await loadBookings();
-        const refreshed=document.querySelectorAll('.booking-card[data-booking-id]');
-        for(const refreshedCard of refreshed){
-          if(refreshedCard.dataset.bookingId!==booking.id)continue;
-          const details=refreshedCard.querySelector(".booking-request-details");
-          if(details)details.hidden=false;
-          const refreshedPanel=refreshedCard.querySelector(".medical-booking-panel");
-          if(refreshedPanel&&isDoctorAccount())await openBookingVisitEditor(allBookings.find(item=>item.id===booking.id)||booking,refreshedCard,refreshedPanel);
-        }
+        showHomeSection();
+        document.querySelectorAll('.booking-card[data-booking-id="' + booking.id + '"]').forEach(completedCard=>applyStatusColor(completedCard,"completed"));
       }catch(error){
         showMessage(message,error.message||"تعذر حفظ بيانات الكشف.");
       }finally{
