@@ -213,6 +213,7 @@ function createPatientForm(){
       const result=await api("create",{patientId:selectedPatientId,username:username.value.trim(),password:password.value});
       recordRuntimeLog(auth.currentUser,{action:"patient_created",area:"patients",level:"info",message:"تم إنشاء حساب مريض."});
       showCredentials(result.credentials);showStatus("تم إنشاء الحساب وربطه بالملف الطبي.");
+      existingUsername.textContent="اسم المستخدم: "+(result.credentials?.username||username.value.trim());createPanel.hidden=true;resetPanel.hidden=false;
       password.value="";
     }catch(error){recordRuntimeLog(auth.currentUser,{action:"request_failed",area:"patients",level:"error",message:"فشل إنشاء حساب مريض."});showStatus(error.message||"تعذر إنشاء الحساب.",true)}
     finally{working=false;createButton.disabled=false}
