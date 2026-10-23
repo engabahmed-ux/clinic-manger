@@ -1666,3 +1666,27 @@ p {
 .patient-history-card h4 { margin: 0 0 10px; }
 .patient-history-card p { margin: 7px 0; line-height: 1.7; }
 .patient-request-booking form { display: grid; gap: 12px; }
+
+
+/* Medical visit editor opened directly from a booking card */
+.medical-booking-panel {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid rgba(17, 20, 26, 0.14);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--color-dark, #11141A);
+}
+.medical-booking-panel h4 { margin: 0 0 12px; color: var(--color-dark, #11141A); }
+.medical-booking-form { display: grid; gap: 12px; margin-top: 12px; }
+.medical-booking-field { display: grid; gap: 6px; color: var(--color-dark, #11141A); font-size: 13px; font-weight: 700; }
+.medical-booking-field input, .medical-booking-field textarea {
+  width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid rgba(17,20,26,.18);
+  border-radius: 10px; background: #fff; color: #11141A; font: inherit;
+}
+.medical-booking-field textarea { resize: vertical; }
+.medical-booking-form .medical-vitals-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.medical-booking-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.medical-booking-form input:disabled, .medical-booking-form textarea:disabled { background: #f2f2f2; color: #444; opacity: 1; }
+.patient-history-card h4 { color: var(--color-dark, #11141A); }
+@media (max-width: 650px) { .medical-booking-form .medical-vitals-grid { grid-template-columns: 1fr; } }
