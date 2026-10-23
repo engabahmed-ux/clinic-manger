@@ -115,6 +115,11 @@ async function verifyUser(request, env) {
 function validSettings(settings) {
   if (!settings || typeof settings !== "object" || Array.isArray(settings) || JSON.stringify(settings).length > 40000) return false;
   if (settings.clinic?.id && settings.clinic.id !== "reDa-elSherbiny-clinic") return false;
+  if (settings.branding && typeof settings.branding === "object") {
+    for (const key of ["background", "surface", "accent", "secondary"]) {
+      if (settings.branding[key] !== undefined && (typeof settings.branding[key] !== "string" || !/^#[0-9a-fA-F]{6}$/.test(settings.branding[key]))) return false;
+    }
+  }
   if (settings.services && (!Array.isArray(settings.services.items) || settings.services.items.length > 100)) return false;
   if (settings.services?.items) {
     const ids = new Set();
