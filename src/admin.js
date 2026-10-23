@@ -588,9 +588,138 @@ function renderBookingCard(booking) {
     }
     details.append(fields, actions);
   }
-  summary.addEventListener("click", () => { details.hidden = !details.hidden; });
+  const visitPanel = document.createElement("section");
+  visitPanel.className = "medical-booking-panel";
+  visitPanel.hidden = true;
+  details.append(visitPanel);
+  summary.addEventListener("click", () => {
+    details.hidden = !details.hidden;
+    if (!details.hidden && auth.currentUser?.uid === DOCTOR_ADMIN_UID) {
+      openBookingVisitEditor(booking, card, visitPanel);
+    }
+  });
   card.append(summary, details);
   return card;
+}
+function isDoctorAccount(){return auth.currentUser?.uid===DOCTOR_ADMIN_UID;}
+function createMedicalBookingField(labelText,field,value="",multiline=false){
+  const label=document.createElement("label");
+  label.className="medical-booking-field";
+  label.append(document.createTextNode(labelText));
+  const input=document.createElement(multiline?"textarea":"input");
+  input.dataset.visitField=field;
+  if(multiline){input.rows=field==="clinicalNotes"||field==="treatment"?3:2;input.maxLength=field==="clinicalNotes"||field==="treatment"?4000:1000;}
+  else if(field==="weight"){input.type="number";input.min="0";input.max="500";input.step="0.1";}
+  else if(field==="visitDate"){input.type="date";input.required=true;}
+  else input.type="text";
+  if(!multiline&&field!=="weight"&&field!=="visitDate")input.maxLength=field==="diagnosis"||field==="followUp"?1000:40;
+  input.value=value??"";
+  label.append(input);
+  return label;
+}
+async function openBookingVisitEditor(booking,card,panel){
+  if(!isDoctorAccount()||!panel)return;
+  panel.hidden=false;
+  if(panel.dataset.loadedFor===booking.id)return;
+  panel.dataset.loadedFor=booking.id;
+  panel.replaceChildren();
+  const heading=document.createElement("h4");
+  heading.textContent=booking.status==="completed"?"سجل الكشف المعتمد":"بيانات الكشف الطبي";
+  const loading=document.createElement("p");
+  loading.className="muted-text";
+  loading.textContent="جارٍ تحميل القياسات والسجل الطبي...";
+  panel.append(heading,loading);
+  try{
+    const resolved=await medicalRecordsApiRequest("resolve",{patientId:booking.patientId||"",patientName:booking.patientName||"",patientPhone:booking.patientPhone||""});
+    const patient=resolved.patient;
+    const history=await medicalRecordsApiRequest("history",{patientId:patient.id});
+    const visit=(history.visits||[]).find(item=>item.bookingId===booking.id)||{};
+    const linkedBooking=(history.bookings||[]).find(item=>item.id===booking.id)||booking;
+    panel.replaceChildren(heading);
+    const patientMeta=document.createElement("p");
+    patientMeta.className="muted-text";
+    patientMeta.textContent="المريضة: "+(patient.displayName||booking.patientName||"—")+" · الدور: "+queueNumberFor(booking);
+    panel.append(patientMeta);
+    const form=document.createElement("form");
+    form.className="medical-booking-form";
+    form.noValidate=true;
+    const vitals=document.createElement("div");
+    vitals.className="medical-vitals-grid";
+    vitals.append(
+      createMedicalBookingField("ضغط الدم","bloodPressure",visit.bloodPressure??linkedBooking.bloodPressure??""),
+      createMedicalBookingField("الوزن (كجم)","weight",visit.weight??linkedBooking.weight??""),
+      createMedicalBookingField("قياس السكر","bloodSugar",visit.bloodSugar??linkedBooking.bloodSugar??"")
+    );
+    form.append(vitals,
+      createMedicalBookingField("تاريخ الكشف","visitDate",visit.visitDate||String(booking.appointmentDate||"").slice(0,10)),
+      createMedicalBookingField("ملاحظات الموظف قبل الكشف","preVisitNotes",visit.preVisitNotes??linkedBooking.preVisitNotes??"",true),
+      createMedicalBookingField("التشخيص","diagnosis",visit.diagnosis||"",true),
+      createMedicalBookingField("ملاحظات الدكتور أثناء الكشف","clinicalNotes",visit.clinicalNotes||"",true),
+      createMedicalBookingField("العلاج والأدوية والتوصيات","treatment",visit.treatment||"",true),
+      createMedicalBookingField("موعد المتابعة أو تعليماتها","followUp",visit.followUp||"",true)
+    );
+    const message=document.createElement("p");
+    message.className="message";
+    message.setAttribute("role","status");
+    message.hidden=true;
+    const actions=document.createElement("div");
+    actions.className="medical-booking-actions";
+    if(booking.status==="completed"){
+      form.querySelectorAll("input,textarea").forEach(input=>{input.disabled=true;input.setAttribute("aria-readonly","true");});
+      const note=document.createElement("p");
+      note.className="muted-text";
+      note.textContent=visit.bookingId?"تم اعتماد هذا الكشف نهائيًا؛ بيانات الحجز والسجل الطبي للزيارة لا يمكن تعديلها.":"تم تثبيت حالة الحجز، ولا يمكن تعديل بياناته.";
+      form.append(note);
+    }else{
+      const complete=document.createElement("button");
+      complete.type="submit";
+      complete.className="primary-button";
+      complete.textContent="حفظ بيانات الكشف وتسجيل «تم الكشف»";
+      actions.append(complete);
+      form.append(actions);
+    }
+    form.append(message);
+    panel.append(form);
+    form.addEventListener("submit",async event=>{
+      event.preventDefault();
+      if(booking.status==="completed")return;
+      const button=form.querySelector('button[type="submit"]');
+      const values={};
+      form.querySelectorAll("[data-visit-field]").forEach(input=>{values[input.dataset.visitField]=input.value.trim();});
+      if(!values.visitDate){showMessage(message,"حدد تاريخ الكشف.");return;}
+      button.disabled=true;
+      button.textContent="جارٍ حفظ الكشف...";
+      hideMessage(message);
+      try{
+        await medicalRecordsApiRequest("saveVisit",{
+          patientId:patient.id,bookingId:booking.id,visitDate:values.visitDate,
+          queueNumber:String(queueNumberFor(booking)),
+          bloodPressure:values.bloodPressure,weight:values.weight,bloodSugar:values.bloodSugar,
+          preVisitNotes:values.preVisitNotes,diagnosis:values.diagnosis,
+          clinicalNotes:values.clinicalNotes,treatment:values.treatment,followUp:values.followUp
+        });
+        try{
+          await bookingApiRequest("update",{booking:{id:booking.id,status:"completed"}});
+        }catch(statusError){
+          showMessage(message,"تم حفظ السجل الطبي، لكن تعذر تثبيت حالة الحجز على «تم الكشف»: "+(statusError.message||"حاول مرة أخرى."));
+          return;
+        }
+        showMessage(message,"تم حفظ الكشف وتثبيت الحالة على «تم الكشف».","success");
+        await loadBookings();
+      }catch(error){
+        showMessage(message,error.message||"تعذر حفظ بيانات الكشف.");
+      }finally{
+        if(button.isConnected){button.disabled=false;button.textContent="حفظ بيانات الكشف وتسجيل «تم الكشف»";}
+      }
+    });
+  }catch(error){
+    panel.replaceChildren(heading);
+    const failure=document.createElement("p");
+    failure.className="message error-message";
+    failure.textContent=error.message||"تعذر تحميل بيانات الكشف.";
+    panel.append(failure);
+    delete panel.dataset.loadedFor;
+  }
 }
 function formatRequestDate(value){if(!value)return"التاريخ غير محدد";const date=new Date(`${String(value).slice(0,10)}T12:00:00`);return Number.isNaN(date.getTime())?value:new Intl.DateTimeFormat("ar-EG",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}).format(date)}
 function formatSubmittedAt(value){if(!value)return"وقت الطلب غير متاح";const date=new Date(value);return Number.isNaN(date.getTime())?"وقت الطلب غير متاح":new Intl.DateTimeFormat("ar-EG",{dateStyle:"medium",timeStyle:"short"}).format(date)}
