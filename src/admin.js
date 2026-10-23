@@ -158,7 +158,10 @@ const createPatientMessage = $("#createPatientMessage");
 const patientCredentialsPanel = $("#patientCredentialsPanel");
 const patientCredentialsMessage = $("#patientCredentialsMessage");
 const createdPatientUsername = $("#createdPatientUsername");
-const createdPatientEmail = $("#createdPatientEmail");
+const patientAccountSearch = $("#patientAccountSearch");
+const patientAccountSearchResults = $("#patientAccountSearchResults");
+const patientAccountPatientId = $("#patientAccountPatientId");
+const patientAccountSelected = $("#patientAccountSelected");
 const createdPatientPassword = $("#createdPatientPassword");
 const copyPatientCredentialsButton = $("#copyPatientCredentialsButton");
 const createEmployeeForm = $("#createEmployeeForm");
@@ -1093,7 +1096,7 @@ if (bookingDateFilter) bookingDateFilter.addEventListener("change", renderPendin
 function clearPatientCredentials() {
   if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
   if (createdPatientUsername) createdPatientUsername.textContent = "";
-  if (createdPatientEmail) createdPatientEmail.textContent = "";
+
   if (createdPatientPassword) createdPatientPassword.textContent = "";
   if (patientCredentialsMessage) patientCredentialsMessage.textContent = "";
   if (copyPatientCredentialsButton) copyPatientCredentialsButton.textContent = "نسخ بيانات الدخول";
@@ -1168,48 +1171,85 @@ if (backFromPatientsButton) {
   });
 }
 
+async function searchMedicalPatientsForAccount(query) {
+  if (!patientAccountSearchResults) return;
+  patientAccountSearchResults.replaceChildren();
+  if (query.trim().length < 2) return;
+  const loading = document.createElement("p");
+  loading.className = "muted-text";
+  loading.textContent = "جارٍ البحث في ملفات المرضى...";
+  patientAccountSearchResults.append(loading);
+  try {
+    const result = await patientApiRequest("searchMedicalPatients", { query: query.trim() });
+    patientAccountSearchResults.replaceChildren();
+    const patients = Array.isArray(result.patients) ? result.patients : [];
+    if (!patients.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted-text";
+      empty.textContent = "لا توجد ملفات مرضى مطابقة. يجب إنشاء الملف الطبي أولًا من السجلات الطبية.";
+      patientAccountSearchResults.append(empty);
+      return;
+    }
+    for (const patient of patients) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "medical-patient-result";
+      button.textContent = [patient.displayName, patient.phone ? "الهاتف: " + patient.phone : "لا يوجد رقم هاتف", patient.patientNumber ? "رقم الملف: " + patient.patientNumber : ""].filter(Boolean).join(" · ");
+      button.addEventListener("click", () => {
+        patientAccountPatientId.value = patient.patientId;
+        patientAccountSelected.textContent = "المريض المختار: " + patient.displayName + " · الهاتف المسجل: " + (patient.phone || "غير مسجل") + (patient.patientNumber ? " · رقم الملف: " + patient.patientNumber : "");
+        patientAccountSelected.hidden = false;
+        patientAccountSearch.value = patient.displayName;
+        patientAccountSearchResults.replaceChildren();
+      });
+      patientAccountSearchResults.append(button);
+    }
+  } catch (error) {
+    patientAccountSearchResults.replaceChildren();
+    const failure = document.createElement("p");
+    failure.className = "message error-message";
+    failure.textContent = error.message || "تعذر البحث في ملفات المرضى.";
+    patientAccountSearchResults.append(failure);
+  }
+}
+patientAccountSearch?.addEventListener("input", () => {
+  if (patientAccountPatientId) patientAccountPatientId.value = "";
+  if (patientAccountSelected) patientAccountSelected.hidden = true;
+  searchMedicalPatientsForAccount(patientAccountSearch.value);
+});
+
 if (createPatientForm) {
   createPatientForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (isCreatingPatient) return;
     hideMessage(createPatientMessage);
     if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
-
-    const displayName = $("#patientAccountName")?.value.trim() || "";
-    const email = $("#patientAccountEmail")?.value.trim() || "";
-    const phone = $("#patientAccountPhone")?.value.trim() || "";
-    const username = $("#patientAccountUsername")?.value.trim().toLowerCase() || "";
-
-    if (!displayName || !email || !username) {
-      showMessage(createPatientMessage, "أدخل اسم المريضة والبريد الإلكتروني واسم المستخدم.");
+    const patientId = patientAccountPatientId?.value || "";
+    const username = $("#patientAccountUsername")?.value.trim() || "";
+    if (!patientId || !username) {
+      showMessage(createPatientMessage, "اختَر ملف المريض من نتائج البحث، ثم أدخل اسم المستخدم.");
       return;
     }
-
     isCreatingPatient = true;
-    if (createPatientButton) {
-      createPatientButton.disabled = true;
-      createPatientButton.textContent = "جارٍ إنشاء الحساب...";
-    }
-
+    if (createPatientButton) { createPatientButton.disabled = true; createPatientButton.textContent = "جارٍ إنشاء الحساب..."; }
     try {
-      const result = await patientApiRequest("create", { displayName, email, phone, username });
+      const result = await patientApiRequest("create", { patientId, username });
       const credentials = result.credentials || {};
       if (createdPatientUsername) createdPatientUsername.textContent = credentials.username || "";
-      if (createdPatientEmail) createdPatientEmail.textContent = credentials.email || "";
       if (createdPatientPassword) createdPatientPassword.textContent = credentials.temporaryPassword || "";
       if (patientCredentialsMessage) patientCredentialsMessage.textContent = result.message || "تم إنشاء الحساب.";
       if (patientCredentialsPanel) patientCredentialsPanel.hidden = false;
       createPatientForm.reset();
-      showMessage(createPatientMessage, "تم إنشاء الحساب بنجاح. انسخي بيانات الدخول وسلّميها للمريضة بشكل خاص.", "success");
+      if (patientAccountSelected) patientAccountSelected.hidden = true;
+      if (patientAccountSearchResults) patientAccountSearchResults.replaceChildren();
+      if (patientAccountPatientId) patientAccountPatientId.value = "";
+      showMessage(createPatientMessage, "تم إنشاء الحساب وربطه بالملف الطبي. سلّم بيانات الدخول للمريض بشكل خاص.", "success");
     } catch (error) {
       console.error("Patient account creation failed:", error);
-      showMessage(createPatientMessage, error.message || "تعذر إنشاء حساب المريضة.");
+      showMessage(createPatientMessage, error.message || "تعذر إنشاء حساب المريض.");
     } finally {
       isCreatingPatient = false;
-      if (createPatientButton) {
-        createPatientButton.disabled = false;
-        createPatientButton.textContent = "إنشاء حساب المريضة";
-      }
+      if (createPatientButton) { createPatientButton.disabled = false; createPatientButton.textContent = "إنشاء حساب المريض"; }
     }
   });
 }
@@ -1218,14 +1258,13 @@ if (copyPatientCredentialsButton) {
   copyPatientCredentialsButton.addEventListener("click", async () => {
     const text = [
       "اسم المستخدم: " + (createdPatientUsername?.textContent || ""),
-      "البريد الإلكتروني: " + (createdPatientEmail?.textContent || ""),
       "كلمة المرور المؤقتة: " + (createdPatientPassword?.textContent || "")
     ].join("\n");
     try {
       await navigator.clipboard.writeText(text);
       copyPatientCredentialsButton.textContent = "تم النسخ";
     } catch {
-      showMessage(createPatientMessage, "تعذر النسخ تلقائيًا. انسخي البيانات يدويًا.");
+      showMessage(createPatientMessage, "تعذر النسخ تلقائيًا. انسخ البيانات يدويًا.");
     }
   });
 }
