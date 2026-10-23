@@ -1188,6 +1188,7 @@ async function loadSelectedPatientAccountStatus(patient) {
   if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
   try {
     const status = await patientApiRequest("accountStatus", { patientId: patient.patientId });
+    if (patientAccountPatientId?.value !== patient.patientId) return;
     if (status.accountExists) {
       if (patientAccountExistingUsername) patientAccountExistingUsername.textContent = status.username || "";
       if (patientAccountCreateFields) patientAccountCreateFields.hidden = true;
@@ -1254,6 +1255,8 @@ patientAccountSearch?.addEventListener("input", () => {
   if (patientAccountCreateFields) patientAccountCreateFields.hidden = true;
   if (patientAccountResetPanel) patientAccountResetPanel.hidden = true;
   if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
+  if (patientAccountPassword) patientAccountPassword.value = "";
+  if (patientAccountNewPassword) patientAccountNewPassword.value = "";
   searchMedicalPatientsForAccount(patientAccountSearch.value);
 });
 
