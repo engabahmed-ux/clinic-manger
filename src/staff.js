@@ -130,7 +130,109 @@ function renderDailyAccounts(rows){
   }
 }
 
-function createPatientForm(){patientTools.replaceChildren();const card=document.createElement("div");card.className="staff-booking-create-form";const h=document.createElement("h3");h.textContent="إنشاء حساب مريضة";const form=document.createElement("form");form.className="staff-form-grid";const fields=[["displayName","اسم المريضة","text",120],["email","البريد الإلكتروني","email",254],["phone","رقم الهاتف","tel",40],["username","اسم المستخدم","text",30]],inputs={};for(const[key,text,type,max]of fields){const label=document.createElement("label");label.textContent=text;const input=document.createElement("input");input.name=key;input.type=type;input.maxLength=max;input.required=true;input.autocomplete="off";if(key==="username"){input.minLength=3;input.pattern="[A-Za-z0-9._-]+"}inputs[key]=input;label.append(input);form.append(label)}const submit=document.createElement("button");submit.type="submit";submit.className="staff-primary";submit.textContent="إنشاء حساب المريضة";form.append(submit);card.append(h,form);patientTools.append(card);form.addEventListener("submit",async e=>{e.preventDefault();submit.disabled=true;try{const response=await fetch("/api/doctor/patients",{method:"POST",headers:{Authorization:`Bearer ${await auth.currentUser.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action:"create",displayName:inputs.displayName.value.trim(),email:inputs.email.value.trim(),phone:inputs.phone.value.trim(),username:inputs.username.value.trim().toLowerCase()}),cache:"no-store"});const result=await response.json().catch(()=>({}));if(!response.ok||result.success!==true){recordRuntimeLog(auth.currentUser,{action:"request_failed",area:"patients",level:"error",message:"فشل إنشاء حساب مريضة."});throw new Error(result.message||"تعذر إنشاء الحساب.")}recordRuntimeLog(auth.currentUser,{action:"patient_created",area:"patients",level:"info",message:"تم إنشاء حساب مريضة."});const values=[["اسم المستخدم",result.credentials?.username],["البريد الإلكتروني",result.credentials?.email],["كلمة المرور المؤقتة",result.credentials?.temporaryPassword]];const credentials=document.createElement("div");credentials.className="staff-patient-credentials";const heading=document.createElement("strong");heading.textContent="بيانات الدخول — سلّميها للمريضة بشكل خاص";credentials.append(heading);for(const[label,value]of values){const p=document.createElement("p");p.textContent=`${label}: ${value||""}`;credentials.append(p)}const copy=document.createElement("button");copy.type="button";copy.className="staff-secondary";copy.textContent="نسخ بيانات الدخول";copy.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(values.map(([l,v])=>`${l}: ${v||""}`).join("\n"));copy.textContent="تم النسخ"}catch{message(patientMessage,"تعذر النسخ التلقائي.",true)}});credentials.append(copy);card.append(credentials);form.reset();message(patientMessage,"تم إنشاء الحساب بنجاح.")}catch(e){message(patientMessage,e.message||"تعذر إنشاء الحساب.",true)}finally{submit.disabled=false}})}
+function createPatientForm(){
+  patientTools.replaceChildren();
+  const card=document.createElement("div");card.className="staff-booking-create-form";
+  const h=document.createElement("h3");h.textContent="حسابات المرضى";
+  const intro=document.createElement("p");intro.textContent="ابحث عن ملف المريض. يمكنك إنشاء حساب جديد أو إعادة تعيين كلمة مرور حساب موجود.";
+  const searchLabel=document.createElement("label");searchLabel.textContent="ابحث بالاسم أو رقم الهاتف";
+  const search=document.createElement("input");search.type="search";search.maxLength=120;search.autocomplete="off";search.placeholder="اكتب اسم المريض أو رقم الهاتف";
+  const results=document.createElement("div");results.className="medical-patient-results";results.setAttribute("aria-live","polite");
+  const selected=document.createElement("div");selected.className="security-information";selected.hidden=true;
+  const createPanel=document.createElement("div");createPanel.hidden=true;
+  const createForm=document.createElement("form");createForm.className="staff-form-grid";
+  const usernameLabel=document.createElement("label");usernameLabel.textContent="اسم المستخدم";
+  const username=document.createElement("input");username.type="text";username.minLength=3;username.maxLength=40;username.required=true;username.autocomplete="off";
+  usernameLabel.append(username);
+  const passwordLabel=document.createElement("label");passwordLabel.textContent="كلمة المرور التي تحددها للمريض";
+  const password=document.createElement("input");password.type="password";password.minLength=8;password.maxLength=128;password.required=true;password.autocomplete="new-password";
+  passwordLabel.append(password);
+  const createButton=document.createElement("button");createButton.type="submit";createButton.className="staff-primary";createButton.textContent="إنشاء حساب المريض";
+  createForm.append(usernameLabel,passwordLabel,createButton);createPanel.append(createForm);
+  const resetPanel=document.createElement("div");resetPanel.className="security-information";resetPanel.hidden=true;
+  const resetHeading=document.createElement("strong");resetHeading.textContent="هذا الملف مرتبط بحساب موجود";
+  const existingUsername=document.createElement("p");
+  const resetLabel=document.createElement("label");resetLabel.textContent="كلمة المرور الجديدة";
+  const newPassword=document.createElement("input");newPassword.type="password";newPassword.minLength=8;newPassword.maxLength=128;newPassword.autocomplete="new-password";
+  resetLabel.append(newPassword);
+  const resetButton=document.createElement("button");resetButton.type="button";resetButton.className="staff-primary";resetButton.textContent="إعادة تعيين كلمة المرور";
+  resetPanel.append(resetHeading,existingUsername,resetLabel,resetButton);
+  const status=document.createElement("p");status.className="message";status.hidden=true;status.setAttribute("role","status");
+  const credentials=document.createElement("div");credentials.className="staff-patient-credentials";credentials.hidden=true;
+  const credentialsHeading=document.createElement("strong");credentialsHeading.textContent="بيانات الدخول — سلّمها للمريض بشكل خاص";
+  const credentialsUsername=document.createElement("p"),credentialsPassword=document.createElement("p");
+  const copy=document.createElement("button");copy.type="button";copy.className="staff-secondary";copy.textContent="نسخ بيانات الدخول";
+  credentials.append(credentialsHeading,credentialsUsername,credentialsPassword,copy);
+  card.append(h,intro,searchLabel,search,results,selected,createPanel,resetPanel,status,credentials);patientTools.append(card);
+  let selectedPatientId="",sequence=0,working=false;
+  async function api(action,data={}){
+    if(!auth.currentUser)throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى.");
+    const response=await fetch("/api/doctor/patients",{method:"POST",headers:{Authorization:`Bearer ${await auth.currentUser.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(result.message||"تعذر تنفيذ طلب حساب المريض.");
+    return result;
+  }
+  function showStatus(text,isError=false){message(status,text,isError)}
+  function showCredentials(data){
+    credentialsUsername.textContent="اسم المستخدم: "+(data?.username||"");
+    credentialsPassword.textContent="كلمة المرور: "+(data?.password||"");
+    credentials.hidden=false;copy.textContent="نسخ بيانات الدخول";
+  }
+  search.addEventListener("input",async()=>{
+    const requestId=++sequence;selectedPatientId="";selected.hidden=true;createPanel.hidden=true;resetPanel.hidden=true;credentials.hidden=true;results.replaceChildren();
+    const query=search.value.trim();if(query.length<2)return;
+    const loading=document.createElement("p");loading.textContent="جارٍ البحث في ملفات المرضى...";results.append(loading);
+    try{
+      const result=await api("searchMedicalPatients",{query});
+      if(requestId!==sequence)return;
+      results.replaceChildren();
+      const patients=Array.isArray(result.patients)?result.patients:[];
+      if(!patients.length){const p=document.createElement("p");p.textContent="لا توجد ملفات مطابقة. أنشئ الملف الطبي أولًا.";results.append(p);return}
+      for(const patient of patients){
+        const button=document.createElement("button");button.type="button";button.className="medical-patient-result";
+        button.textContent=[patient.displayName,patient.phone||"الهاتف غير مسجل",patient.patientNumber?"رقم الملف: "+patient.patientNumber:""].filter(Boolean).join(" · ");
+        button.addEventListener("click",async()=>{
+          selectedPatientId=patient.patientId;search.value=patient.displayName||query;results.replaceChildren();
+          selected.textContent="المريض المختار: "+(patient.displayName||"")+" · الهاتف: "+(patient.phone||"غير مسجل");selected.hidden=false;
+          createPanel.hidden=true;resetPanel.hidden=true;credentials.hidden=true;showStatus("");
+          try{
+            const account=await api("accountStatus",{patientId:selectedPatientId});
+            if(account.accountExists){existingUsername.textContent="اسم المستخدم: "+(account.username||"");resetPanel.hidden=false}
+            else{createPanel.hidden=false;username.value="";password.value=""}
+          }catch(error){showStatus(error.message||"تعذر التحقق من حساب المريض.",true)}
+        });
+        results.append(button);
+      }
+    }catch(error){if(requestId!==sequence)return;results.replaceChildren();showStatus(error.message||"تعذر البحث في ملفات المرضى.",true)}
+  });
+  createForm.addEventListener("submit",async e=>{
+    e.preventDefault();if(working)return;showStatus("");credentials.hidden=true;
+    if(!selectedPatientId||!username.value.trim()||!password.value){showStatus("اختَر ملف المريض وحدد اسم المستخدم وكلمة المرور.",true);return}
+    working=true;createButton.disabled=true;
+    try{
+      const result=await api("create",{patientId:selectedPatientId,username:username.value.trim(),password:password.value});
+      recordRuntimeLog(auth.currentUser,{action:"patient_created",area:"patients",level:"info",message:"تم إنشاء حساب مريض."});
+      showCredentials(result.credentials);showStatus("تم إنشاء الحساب وربطه بالملف الطبي.");
+      password.value="";
+    }catch(error){recordRuntimeLog(auth.currentUser,{action:"request_failed",area:"patients",level:"error",message:"فشل إنشاء حساب مريض."});showStatus(error.message||"تعذر إنشاء الحساب.",true)}
+    finally{working=false;createButton.disabled=false}
+  });
+  resetButton.addEventListener("click",async()=>{
+    if(working)return;showStatus("");credentials.hidden=true;
+    if(!selectedPatientId||!newPassword.value){showStatus("اختَر ملف المريض واكتب كلمة المرور الجديدة.",true);return}
+    working=true;resetButton.disabled=true;
+    try{
+      const result=await api("resetPassword",{patientId:selectedPatientId,password:newPassword.value});
+      recordRuntimeLog(auth.currentUser,{action:"patient_password_reset",area:"patients",level:"info",message:"تمت إعادة تعيين كلمة مرور مريض."});
+      showCredentials(result.credentials);showStatus("تم تغيير كلمة المرور. انسخ بيانات الدخول وسلّمها للمريض بشكل خاص.");newPassword.value="";
+    }catch(error){recordRuntimeLog(auth.currentUser,{action:"request_failed",area:"patients",level:"error",message:"فشلت إعادة تعيين كلمة مرور مريض."});showStatus(error.message||"تعذر إعادة تعيين كلمة المرور.",true)}
+    finally{working=false;resetButton.disabled=false}
+  });
+  copy.addEventListener("click",async()=>{
+    try{await navigator.clipboard.writeText(credentialsUsername.textContent+"\n"+credentialsPassword.textContent);copy.textContent="تم النسخ"}
+    catch{showStatus("تعذر النسخ التلقائي؛ انسخ بيانات الدخول يدويًا.",true)}
+  });
+}
 function configure(permissions){const allowed=sections.filter(s=>["view","edit"].includes(permissions?.[s.key]));addBookingToggle.hidden=permissions?.bookings!=="edit";if(homeAddBooking)homeAddBooking.hidden=permissions?.bookings!=="edit";if(permissions?.patients==="edit")createPatientForm();else patientTools.replaceChildren(empty("لا تتوفر أدوات تعديل في هذا القسم."));noPermissionsMessage.hidden=allowed.length>0||["view","edit"].includes(permissions?.accounts);return allowed}
 async function checkAccount(){if(checkingAccount)return;checkingAccount=true;showOnly(loadingSection);try{const user=currentUser||auth.currentUser;if(!user){window.location.replace("./index.html#patient-portal");return}const account=await identifyAccount(user);if(account.accountType==="doctor"){window.location.replace("./admin.html");return}if(account.accountType==="patient"){window.location.replace("./index.html#patient-portal");return}if(account.accountType!=="staff")throw new Error("نوع الحساب غير معتمد لهذه اللوحة.");currentAccount=account;displayNameElement.textContent=account.displayName||user.displayName||(user.email?user.email.split("@")[0]:"");buildTabs(account.permissions||{});configure(account.permissions||{});showOnly(dashboardSection);logoutButton.hidden=false;openTab("home");if(["view","edit"].includes(account.permissions?.bookings))await loadBookings();else dailyList.append(empty("لا توجد مواعيد متاحة لحسابك."));if(["view","edit"].includes(account.permissions?.accounts)&&accountsDate)accountsDate.value=todayISO()}catch(e){console.error("Staff dashboard verification failed:",e);showError(e.message||"تعذر التحقق من الحساب.")}finally{checkingAccount=false}}
 homeDateFilter.value=todayISO();if(accountsDate)accountsDate.value=homeDateFilter.value;if(accountsMonth)accountsMonth.value=homeDateFilter.value.slice(0,7);if(filterDate)filterDate.value=homeDateFilter.value;homeDateFilter.addEventListener("change",()=>{renderDaily();if(accountsDate)accountsDate.value=homeDateFilter.value});accountsDate?.addEventListener("change",loadDailyAccounts);accountsMonth?.addEventListener("change",loadMonthlyExpenses);expenseForm?.addEventListener("submit",async e=>{e.preventDefault();if(currentAccount?.permissions?.accounts!=="edit")return;const data=Object.fromEntries(new FormData(expenseForm).entries());const entry={date:accountsDate.value||todayISO(),amount:String(data.amount||"").trim(),description:String(data.description||"").trim(),notes:String(data.notes||"").trim()};const button=expenseForm.querySelector('button[type="submit"]');button.disabled=true;try{const result=await dailyAccountsRequest("createDailyExpense",{entry});expenseForm.reset();message(accountsMessage,result.expense?.status==="pending"?"تم تسجيل المصروف وهو بانتظار اعتماد الدكتور؛ لم يُخصم بعد.":"تم تسجيل المصروف وخصمه من صافي اليوم.");await loadDailyAccounts()}catch(error){message(accountsMessage,error.message||"تعذر تسجيل المصروف.",true)}finally{button.disabled=false}});homeSearch.addEventListener("input",renderDaily);staffStatusLegend?.addEventListener("click",e=>{const b=e.target.closest("[data-status-filter]");if(!b)return;activeStaffStatusFilter=b.dataset.statusFilter;for(const x of staffStatusLegend.querySelectorAll("[data-status-filter]"))x.classList.toggle("is-active",x===b);renderDaily()});staffArchiveSelected?.addEventListener("click",archiveStaffDay);filterMode?.addEventListener("change",()=>{const search=filterMode.value==="search";$("#staffFilterDateLabel").hidden=search;$("#staffFilterQueryLabel").hidden=!search});$("#staffOpenFilter")?.addEventListener("click",()=>{if(filterDate)filterDate.value=homeDateFilter.value;if(filterQuery)filterQuery.value=homeSearch.value;if(filterMode)filterMode.value="date";$("#staffFilterDateLabel").hidden=false;$("#staffFilterQueryLabel").hidden=true;filterDialog?.showModal()});scheduleDateLabel?.addEventListener("click",()=>{if(filterMode)filterMode.value="date";if(filterDate)filterDate.value=homeDateFilter.value||todayISO();if(filterQuery)filterQuery.value="";$("#staffFilterDateLabel").hidden=false;$("#staffFilterQueryLabel").hidden=true;filterDialog?.showModal()});filterApply?.addEventListener("click",()=>{if(filterMode.value==="date"){homeDateFilter.value=filterDate.value||todayISO();homeSearch.value=""}else{homeSearch.value=filterQuery.value.trim()}filterDialog.close();renderDaily()});homeAddBooking?.addEventListener("click",()=>{openTab("bookings");createBookingForm.hidden=false;const dateInput=createBookingForm.querySelector('[name="appointmentDate"]');if(dateInput)dateInput.value=homeDateFilter.value||todayISO();createBookingForm.scrollIntoView({behavior:"smooth",block:"start"})});$("#staffArchiveSearch")?.addEventListener("input",renderArchive);archiveDateFilter.addEventListener("change",renderArchive);dateFilter.addEventListener("change",renderPending);bookingRequestsToggle?.addEventListener("click",()=>{const open=bookingRequestsPanel.hidden;bookingRequestsPanel.hidden=!open;bookingRequestsToggle.setAttribute("aria-expanded",String(open));bookingRequestsToggle.classList.toggle("is-open",open)});createBookingForm.querySelector(".service-quick-select")?.addEventListener("change",e=>{const input=createBookingForm.querySelector('[name="service"]');if(input&&e.target.value)input.value=e.target.value});addBookingToggle.addEventListener("click",()=>{createBookingForm.hidden=!createBookingForm.hidden});$("#cancelAddBooking").addEventListener("click",()=>{createBookingForm.reset();createBookingForm.hidden=true;message(createBookingMessage,"");document.activeElement?.blur()});createBookingForm.addEventListener("submit",async e=>{e.preventDefault();if(currentAccount?.permissions?.bookings!=="edit")return;const data=Object.fromEntries(new FormData(createBookingForm).entries());for(const k of Object.keys(data))data[k]=String(data[k]||"").trim();data.patientName=createBookingForm.querySelector('[name="patientName"]')?.value.trim()||data.patientName||"";data.patientPhone=createBookingForm.querySelector('[name="patientPhone"]')?.value.trim()||data.patientPhone||"";data.servicePrice=data.servicePrice||"0";if(data.patientName.length<2){message(createBookingMessage,"اكتب اسم المريضة بشكل صحيح.",true);return}if(data.patientPhone.length<5||data.patientPhone.length>40){message(createBookingMessage,"اكتب رقم هاتف المريضة أولًا (5 أرقام على الأقل).",true);return}const button=createBookingForm.querySelector('button[type="submit"]');button.disabled=true;try{const medicalPatient=await medicalRecordsRequest("resolve",{patientId:data.patientId||"",legacyBookingId:data.legacyBookingId||"",patientName:data.patientName,patientPhone:data.patientPhone});data.patientId=medicalPatient.patient.id;delete data.legacyBookingId;const result=await bookingsRequest("create",{booking:data});createBookingForm.reset();createBookingForm.hidden=true;homeDateFilter.value=data.appointmentDate;openTab("home");document.activeElement?.blur();await loadBookings();if(queueNumberLabel)queueNumberLabel.textContent=queueNumberFor(result.booking);const queueTitle=$("#staffQueueDialogTitle");if(queueTitle)queueTitle.textContent="تمت إضافة الحجز";if(queueDialog?.showModal)queueDialog.showModal();else message(createBookingMessage,"تمت إضافة الحجز. رقم الدور: "+queueNumberFor(result.booking))}catch(err){message(createBookingMessage,err.message,true)}finally{button.disabled=false}});
