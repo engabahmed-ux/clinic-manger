@@ -253,6 +253,7 @@ function decodeBooking(document) {
     paymentEnteredByName: readString(fields, "paymentEnteredByName"),
     paymentUpdatedAt: readString(fields, "paymentUpdatedAt"),
     rescheduleHistory: readString(fields, "rescheduleHistory"),
+    queueNumber: readString(fields, "queueNumber"),
     isArchived: readString(fields, "isArchived") === "true",
     archivedAt: readString(fields, "archivedAt"),
     archivedByUid: readString(fields, "archivedByUid"),
@@ -287,6 +288,7 @@ function encodeBooking(data) {
     "paymentEnteredByName",
     "paymentUpdatedAt",
     "rescheduleHistory",
+    "queueNumber",
     "isArchived",
     "archivedAt",
     "archivedByUid",
@@ -475,9 +477,12 @@ async function isFinancialPeriodClosed(projectId, accessToken, dateValue, employ
 
 async function createBooking(projectId, accessToken, data) {
   const now = new Date().toISOString();
+  const existingBookings = await listBookings(projectId, accessToken);
+  const queueNumber = nextQueueNumberForDate(existingBookings, String(data.appointmentDate || "").slice(0, 10));
 
   const booking = {
     ...data,
+    queueNumber: String(queueNumber),
     patientName: data.patientName.trim(),
     patientPhone: data.patientPhone.trim(),
     appointmentDate: data.appointmentDate.trim(),
@@ -499,6 +504,35 @@ async function createBooking(projectId, accessToken, data) {
   );
 
   return decodeBooking(result);
+}
+
+function historyForBooking(booking) {
+  try {
+    const history = JSON.parse(booking.rescheduleHistory || "[]");
+    return Array.isArray(history) ? history.filter(item => item && typeof item.fromDate === "string" && typeof item.toDate === "string") : [];
+  } catch { return []; }
+}
+
+function currentQueueNumberForDate(bookings, booking, date) {
+  if (String(booking.appointmentDate || "").slice(0, 10) !== date) return 0;
+  if (Number(booking.queueNumber) > 0) return Number(booking.queueNumber);
+  const rows = bookings.filter(item => String(item.appointmentDate || "").slice(0, 10) === date).sort((a, b) => (Date.parse(a.createdAt || "") || 0) - (Date.parse(b.createdAt || "") || 0));
+  return rows.findIndex(item => item.id === booking.id) + 1;
+}
+
+function nextQueueNumberForDate(bookings, date) {
+  if (!date) return 1;
+  let max = 0;
+  for (const booking of bookings) {
+    if (String(booking.appointmentDate || "").slice(0, 10) === date) {
+      max = Math.max(max, currentQueueNumberForDate(bookings, booking, date));
+    }
+    for (const entry of historyForBooking(booking)) {
+      if (entry.fromDate === date) max = Math.max(max, Number(entry.fromQueueNumber) || 0);
+      if (entry.toDate === date) max = Math.max(max, Number(entry.toQueueNumber) || 0);
+    }
+  }
+  return max + 1;
 }
 
 async function updateBooking(projectId, accessToken, data, actorUid = "", actorAccountType = "doctor", actorDisplayName = "") {
@@ -570,8 +604,16 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
   } catch {}
   const oldDate = String(existing.appointmentDate || "").slice(0, 10);
   const nextDate = String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0, 10);
+  let queueNumber = String(existing.queueNumber || "");
   if (changes.appointmentDate !== undefined && oldDate && nextDate && oldDate !== nextDate) {
-    rescheduleHistory.push({ fromDate: oldDate, toDate: nextDate, at: now });
+    const allBookings = await listBookings(projectId, accessToken);
+    const oldQueueNumber = Number(existing.queueNumber) > 0 ? Number(existing.queueNumber) : currentQueueNumberForDate(allBookings, existing, oldDate);
+    const newQueueNumber = nextQueueNumberForDate(allBookings, nextDate);
+    rescheduleHistory.push({ fromDate: oldDate, toDate: nextDate, fromQueueNumber: oldQueueNumber, toQueueNumber: newQueueNumber, at: now });
+    queueNumber = String(newQueueNumber);
+  } else if (!(Number(queueNumber) > 0) && nextDate) {
+    const allBookings = await listBookings(projectId, accessToken);
+    queueNumber = String(currentQueueNumberForDate(allBookings, existing, nextDate) || nextQueueNumberForDate(allBookings, nextDate));
   }
   let paidAmount = changes.paidAmount !== undefined ? String(changes.paidAmount).trim() : existing.paidAmount;
   let completedFee = existing.completedFee || "";
@@ -613,6 +655,7 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     paymentEnteredByName,
     paymentUpdatedAt,
     rescheduleHistory: JSON.stringify(rescheduleHistory),
+    queueNumber,
     notes: changes.notes?.trim() ?? existing.notes,
     updatedAt: now
   };
@@ -634,6 +677,7 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     "paymentEnteredByName",
     "paymentUpdatedAt",
     "rescheduleHistory",
+    "queueNumber",
     "notes",
     "status",
     "updatedAt"
