@@ -1423,14 +1423,14 @@ body:has(#dashboardSection:not([hidden])){padding:8px 18px 32px}
 .booking-edit-pencil {
   left: 7px;
   right: auto;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 8px;
+  transform: none;
   width: 27px;
   height: 27px;
 }
 .booking-edit-pencil:hover,
 .booking-edit-pencil:focus-visible {
-  transform: translateY(-50%);
+  transform: none;
 }
 @media (max-width: 760px) {
   .booking-request-summary {
