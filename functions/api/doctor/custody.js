@@ -82,6 +82,10 @@ export async function onRequestPost({request,env}) {
       const patchFields=Object.entries(closed).filter(([k])=>k!=="id").map(([k])=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");
       const updated=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+LOCK_ID+"?"+patchFields,{method:"PATCH",body:JSON.stringify(enc(closed))});
       if(updated?.__conflict)return reply({message:"تغيرت حالة العهدة بالتزامن. راجع الدكتور قبل إعادة المحاولة."},409);
+      const archived=await createRecord(ctx,id+"-session-close",{...closed,type:"custodySessionClosed",closedByUid:ctx.uid,closedByName:ctx.name});
+      if(archived?.__conflict)return reply({message:"تم إغلاق العهدة لكن تعذر حفظ نسخة الأرشيف. راجع الدكتور قبل بدء عهدة جديدة."},503);
+      const removed=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+LOCK_ID,{method:"DELETE"});
+      if(removed?.__conflict)return reply({message:"تم تسجيل التسليم لكن تعذر تحرير قفل الجلسة. راجع الدكتور."},409);
       await createRecord(ctx,"custody-last-closed",{type:"custodyHandoverSummary",nextOpeningAmount:actual.toFixed(2),previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,closedAt:now});
       return reply({closed:true,expectedAmount:expected.toFixed(2),actualAmount:actual.toFixed(2),difference:(actual-expected).toFixed(2)});
     }
