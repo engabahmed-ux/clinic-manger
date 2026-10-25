@@ -12,9 +12,9 @@ function reply(body, status = 200) {
     "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"
   }});
 }
-function b64(bytes) { let s=""; for (const b of bytes) s+=String.fromCharCode(b); return btoa(s).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/g,""); }
+function b64(bytes) { let s=""; for (const b of bytes) s+=String.fromCharCode(b); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,""); }
 function b64t(v) { return b64(new TextEncoder().encode(v)); }
-function keyBytes(pem) { const s=atob(pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\\s/g,"")); return Uint8Array.from(s,c=>c.charCodeAt(0)); }
+function keyBytes(pem) { const s=atob(pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g,"")); return Uint8Array.from(s,c=>c.charCodeAt(0)); }
 async function googleToken(a) {
   const now=Math.floor(Date.now()/1000), unsigned=[b64t(JSON.stringify({alg:"RS256",typ:"JWT"})),b64t(JSON.stringify({iss:a.client_email,scope:SCOPE,aud:TOKEN_URL,iat:now,exp:now+3600}))].join(".");
   const key=await crypto.subtle.importKey("pkcs8",keyBytes(a.private_key),{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["sign"]);
@@ -34,7 +34,7 @@ function enc(o){const fields={};for(const [k,v] of Object.entries(o)) if(v!==und
 function dec(d){const f=d?.fields||{},o={id:d?.name?.split("/").pop()};for(const[k,v]of Object.entries(f))o[k]=v.stringValue??v.integerValue??v.booleanValue??"";return o;}
 async function authenticate(request,env) {
   if(!env.FIREBASE_API_KEY||!env.FIREBASE_SERVICE_ACCOUNT_JSON) return {error:"إعدادات التحقق غير مكتملة.",status:503};
-  const m=(request.headers.get("Authorization")||"").match(/^Bearer\\s+(\\S+)$/i);if(!m||m[1].length>8192)return {error:"يلزم تسجيل الدخول.",status:401};
+  const m=(request.headers.get("Authorization")||"").match(/^Bearer\s+(\S+)$/i);if(!m||m[1].length>8192)return {error:"يلزم تسجيل الدخول.",status:401};
   const r=await fetch(LOOKUP+"?key="+encodeURIComponent(env.FIREBASE_API_KEY),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:m[1]})});
   if(!r.ok)return {error:"جلسة الدخول غير صالحة.",status:401};const user=(await r.json()).users?.[0];if(!user?.localId)return {error:"تعذر التحقق من الحساب.",status:401};
   const a=JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);if(a.project_id!==PROJECT||!a.client_email||!a.private_key)return {error:"إعدادات الخدمة غير صحيحة.",status:503};
