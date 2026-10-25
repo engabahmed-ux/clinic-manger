@@ -1189,3 +1189,10 @@ body:has(#staffDashboard:not([hidden])){background:linear-gradient(135deg,#0B243
     text-align: right !important;
   }
 }
+
+
+/* Staff custody panel: scoped styles only. */
+.staff-custody-panel{margin:20px 0;padding:18px;border:1px solid var(--staff-border);border-radius:var(--staff-radius);background:var(--staff-surface)}
+.staff-custody-panel .staff-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.staff-custody-panel .staff-accounts-summary{margin:14px 0}
+.staff-custody-panel .staff-empty{margin:12px 0 0}
