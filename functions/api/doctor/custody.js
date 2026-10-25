@@ -62,6 +62,9 @@ export async function onRequestPost({request,env}) {
       if(lock.status==="active"&&lock.employeeUid!==ctx.uid)return reply({message:"يوجد موظف آخر مسجل الدخول. يجب أن ينهي جلسته ويسلّم العهدة أولًا.",activeSession:{employeeName:lock.employeeName,expectedAmount:lock.expectedAmount||"0",notes:lock.notes||""}},409);
       if(lock.status==="active"&&lock.employeeUid===ctx.uid)return reply({active:true,session:lock,alreadyActive:true});
       const history=await readDoc(ctx,"custody-last-closed");
+      if(history.previousEmployeeUid&&history.acceptedByUid!==ctx.uid&&!data.acceptHandover){
+        return reply({message:"توجد عهدة مسلّمة من الموظف السابق وتحتاج تأكيد استلامك.",pendingHandover:{previousEmployeeName:history.previousEmployeeName||"الموظف السابق",actualAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.nextOpeningAmount||"0.00"),notes:history.notes||"",closedAt:history.closedAt||""}},409);
+      }
       const opening=Number(history.nextOpeningAmount||0);
       const record={type:"custodySession",status:"active",employeeUid:ctx.uid,employeeName:ctx.name,openingAmount:opening.toFixed(2),expectedAmount:opening.toFixed(2),notes:"",startedAt:now,updatedAt:now};
       const made=await createRecord(ctx,LOCK_ID,record);
@@ -86,7 +89,7 @@ export async function onRequestPost({request,env}) {
       if(archived?.__conflict)return reply({message:"تم إغلاق العهدة لكن تعذر حفظ نسخة الأرشيف. راجع الدكتور قبل بدء عهدة جديدة."},503);
       const removed=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+LOCK_ID,{method:"DELETE"});
       if(removed?.__conflict)return reply({message:"تم تسجيل التسليم لكن تعذر تحرير قفل الجلسة. راجع الدكتور."},409);
-      await createRecord(ctx,"custody-last-closed",{type:"custodyHandoverSummary",nextOpeningAmount:actual.toFixed(2),previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,closedAt:now});
+      await createRecord(ctx,"custody-last-closed",{type:"custodyHandoverSummary",nextOpeningAmount:actual.toFixed(2),previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,notes,closedAt:now});
       return reply({closed:true,expectedAmount:expected.toFixed(2),actualAmount:actual.toFixed(2),difference:(actual-expected).toFixed(2)});
     }
     if(action==="addCash") {
