@@ -891,7 +891,7 @@ export async function onRequest(context) {
           const otherOwner = access.accountType === "staff" && !!b.paymentEnteredByUid && b.paymentEnteredByUid !== access.uid;
           return { id:b.id, patientName:b.patientName, appointmentDate:b.appointmentDate, service:b.service,
             servicePrice:b.servicePrice, completedFee:b.completedFee, completedAt:b.completedAt,
-            paidAmount:otherOwner ? "0" : effectivePaidAmount, status:b.status,
+            paidAmount:effectivePaidAmount, status:b.status,
             paymentEnteredByUid:b.paymentEnteredByUid, paymentEnteredByName:b.paymentEnteredByName,
             paymentUpdatedAt:b.paymentUpdatedAt, paymentReadOnly:otherOwner,
             paymentAttributedToCurrentUser:access.accountType === "doctor" || b.paymentEnteredByUid === access.uid,
