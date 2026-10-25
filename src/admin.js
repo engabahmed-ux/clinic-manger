@@ -204,6 +204,7 @@ const dailyAppointmentsList = $("#dailyAppointmentsList");
 const dailyAppointmentsMessage = $("#dailyAppointmentsMessage");
 const doctorAccountsSection=$("#doctorAccountsSection"),openAccountsTabButton=$("#openAccountsTabButton"),doctorAccountsContent=$("#doctorAccountsContent"),doctorAccountsSummary=$("#doctorAccountsSummary"),accountsDateLabel=$("#accountsDateLabel"),doctorStatusLegend=$("#doctorStatusLegend"),archiveSelectedAppointments=$("#archiveSelectedAppointments");let activeStatusFilter="all";
 const accountsSubtabs=$("#doctorAccountsSubtabs"),patientDailyAccountsPanel=$("#patientDailyAccountsPanel"),salaryAccountsPanel=$("#salaryAccountsPanel"),customAccountsPanel=$("#customAccountsPanel"),salaryEntriesList=$("#salaryEntriesList"),customAccountEntriesList=$("#customAccountEntriesList"),salaryEntryForm=$("#salaryEntryForm"),customAccountEntryForm=$("#customAccountEntryForm"),accountsCategoryForm=$("#accountsCategoryForm"),doctorAccountsDate=$("#doctorAccountsDate"),doctorDailyExpenseForm=$("#doctorDailyExpenseForm"),doctorDailyExpensesList=$("#doctorDailyExpensesList"),doctorDailyExpenseMessage=$("#doctorDailyExpenseMessage"),doctorDailyNetTotal=$("#doctorDailyNetTotal"),doctorAccountsMonth=$("#doctorAccountsMonth"),doctorSettlementEmployee=$("#doctorSettlementEmployee"),finalizeDailySettlementButton=$("#finalizeDailySettlement"),finalizeMonthlySettlementButton=$("#finalizeMonthlySettlement"),doctorSettlementMessage=$("#doctorSettlementMessage"),doctorMonthlyExpensesList=$("#doctorMonthlyExpensesList"),doctorSettlementsList=$("#doctorSettlementsList");let doctorDailyExpenses=[],doctorAccountCategories=[],doctorAccountEntries=[],doctorAccountRecords=[],activeDoctorAccountSubtab="patients";
+const doctorCustodyStatus=$("#doctorCustodyStatus"),doctorCustodyMessage=$("#doctorCustodyMessage"),refreshDoctorCustodyButton=$("#refreshDoctorCustody");
 const createBookingForm = $("#createBookingForm");
 const createBookingButton = $("#createBookingButton");
 const createBookingMessage = $("#createBookingMessage");
@@ -577,6 +578,7 @@ async function bookingApiRequest(action, data = {}) {
   return result;
 }
 async function medicalRecordsApiRequest(action,data={}){const user=auth.currentUser;if(!user)throw new Error("انتهت جلسة الدخول.");const response=await fetch("/api/doctor/medical-records",{method:"POST",headers:{Authorization:`Bearer ${await user.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});const result=await response.json().catch(()=>({}));if(!response.ok){recordRuntimeLog(user,{action:"request_failed",area:"medical_records",level:"error",message:"فشل طلب السجلات الطبية."});throw new Error(result.message||"تعذر الوصول إلى السجل الطبي.")}if(/save|create|update/i.test(action))recordRuntimeLog(user,{action:"medical_record_saved",area:"medical_records",level:"info",message:"تم حفظ أو تعديل سجل طبي."});return result}
+async function custodyDoctorRequest(action,data={}){const user=auth.currentUser;if(!user)throw new Error("انتهت جلسة الدخول.");const response=await fetch("/api/doctor/custody",{method:"POST",headers:{Authorization:`Bearer ${await user.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||"تعذر تنفيذ عملية العهدة.");return result}
 async function accountsApiRequest(action,data={}){const user=auth.currentUser;if(!user)throw new Error("انتهت جلسة الدخول.");const response=await fetch("/api/doctor/accounts",{method:"POST",headers:{Authorization:`Bearer ${await user.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});const result=await response.json().catch(()=>({}));if(!response.ok){recordRuntimeLog(user,{action:"request_failed",area:"accounts",level:"error",message:"فشل طلب إدارة الحسابات."});throw new Error(result.message||"تعذر تنفيذ عملية الحسابات.")}if(["createEntry","createDailyExpense"].includes(action))recordRuntimeLog(user,{action:"expense_recorded",area:"accounts",level:"info",message:"تم تسجيل حركة مالية."});if(action==="finalizeSettlement")recordRuntimeLog(user,{action:"settlement_closed",area:"accounts",level:"info",message:"تمت تصفية فترة مالية."});return result}
 function renderAccountEntries(container,rows,kind){if(!container)return;container.replaceChildren();if(!rows.length){container.textContent="لا توجد حركات مسجلة في هذا القسم.";return}const table=document.createElement("table");table.className="accounts-table";const head=document.createElement("thead");head.innerHTML="<tr><th>التاريخ</th><th>البيان</th><th>القيمة</th><th>ملاحظات</th></tr>";table.append(head);const body=document.createElement("tbody");let total=0;for(const item of rows.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))){const amount=Number(item.amount)||0;total+=amount;const tr=document.createElement("tr");for(const value of [formatRequestDate(item.date),item.personName||"—",doctorMoney(amount),item.notes||"—"]){const td=document.createElement("td");td.textContent=value;tr.append(td)}body.append(tr)}table.append(body);const totalBox=document.createElement("div");totalBox.className="accounts-total";const label=document.createElement("span");label.textContent=kind==="expense"?"إجمالي المصروفات المسجلة":"إجمالي الدخل المسجل";const amount=document.createElement("strong");amount.textContent=doctorMoney(total);totalBox.append(label,amount);container.append(table,totalBox)}
 function setDoctorAccountsSubtab(key){activeDoctorAccountSubtab=key;for(const button of accountsSubtabs.querySelectorAll("[data-account-subtab]"))button.setAttribute("aria-selected",String(button.dataset.accountSubtab===key));patientDailyAccountsPanel.hidden=key!=="patients";salaryAccountsPanel.hidden=key!=="salaries";customAccountsPanel.hidden=!key.startsWith("custom:");if(key==="patients")renderDoctorAccounts();if(key==="salaries")renderAccountEntries(salaryEntriesList,doctorAccountEntries.filter(x=>x.type==="entry"&&x.categoryId==="employee-salaries"),"expense");if(key.startsWith("custom:")){const category=doctorAccountCategories.find(x=>x.id===key.slice(7));if(category){$("#customAccountTitle").textContent=category.name+" · "+(category.kind==="income"?"دخل":"مصروف");renderAccountEntries(customAccountEntriesList,doctorAccountEntries.filter(x=>x.type==="entry"&&x.categoryId===category.id),category.kind)}}}
@@ -1138,6 +1140,50 @@ async function loadSettlementEmployees(){
     else await previewDoctorSettlement(settlementPreviewPeriodType);
   }catch(error){showMessage(doctorSettlementMessage,error.message||"تعذر تحميل الموظفين لتصفية العهدة.")}
 }
+function showDoctorCustodyMessage(text,error=false){if(!doctorCustodyMessage)return;doctorCustodyMessage.textContent=text;doctorCustodyMessage.hidden=!text;doctorCustodyMessage.classList.toggle("error",error)}
+async function loadDoctorCustody(){
+ if(!doctorCustodyStatus)return;
+ doctorCustodyStatus.textContent="جارٍ تحميل حالة العهدة...";
+ try{
+  const result=await custodyDoctorRequest("doctorStatus");
+  doctorCustodyStatus.replaceChildren();
+  if(result.active&&result.session){
+   const card=document.createElement("article");card.className="doctor-custody-card";
+   const info=document.createElement("div"),title=document.createElement("strong"),detail=document.createElement("p");
+   title.textContent="عهدة نشطة: "+(result.session.employeeName||"الموظف");
+   detail.textContent="الرصيد الحالي "+doctorMoney(result.session.expectedAmount||0)+" · لم يسجل الموظف تسليمًا نهائيًا بعد.";
+   info.append(title,detail);card.append(info);doctorCustodyStatus.append(card);
+  }
+  const handover=result.lastHandover;
+  if(handover&&handover.previousEmployeeUid){
+   const card=document.createElement("article");card.className="doctor-custody-card";
+   const info=document.createElement("div"),title=document.createElement("strong"),detail=document.createElement("p");
+   title.textContent="الموظف: "+(handover.previousEmployeeName||"غير محدد");
+   detail.textContent=(handover.settledAt?"تمت التصفية بواسطة الدكتور في "+formatSubmittedAt(handover.settledAt):"بانتظار تصفية الدكتور")+" · تسليم الموظف: "+doctorMoney(handover.nextOpeningAmount||0);
+   info.append(title,detail);
+   const button=document.createElement("button");button.type="button";button.className="primary-button doctor-custody-settle-button";button.textContent=handover.settledAt?"تمت التصفية":"تصفية العهدة";
+   button.disabled=!!handover.settledAt||!!result.active;
+   button.addEventListener("click",async()=>{
+    if(handover.settledAt)return;
+    const amount=Number(handover.nextOpeningAmount||0),receipts=Number(handover.baselineReceipts||0),expenses=Number(handover.baselineExpenses||0);
+    const details="الموظف: "+(handover.previousEmployeeName||"غير محدد")+"\nمقبوضات اليوم: "+doctorMoney(receipts)+"\nالمصروفات المعتمدة: "+doctorMoney(expenses)+"\nالعهدة المسلّمة: "+doctorMoney(amount)+"\n\nهل تؤكد تصفية العهدة وتسجيلها في السجل؟";
+    if(!window.confirm(details))return;
+    button.disabled=true;
+    try{const saved=await custodyDoctorRequest("doctorSettle");showDoctorCustodyMessage("تمت تصفية عهدة "+(saved.settlement?.employeeName||handover.previousEmployeeName||"الموظف")+" بمبلغ "+doctorMoney(saved.settlement?.amount||amount)+". المقبوضات: "+doctorMoney(receipts)+"، المصروفات المعتمدة: "+doctorMoney(expenses)+"، والعهدة المتروكة: "+doctorMoney(amount)+".");await loadDoctorCustody();await loadDoctorSettlements()}
+    catch(error){showDoctorCustodyMessage(error.message||"تعذر تصفية العهدة.",true);button.disabled=false}
+   });
+   card.append(info,button);
+   const breakdown=document.createElement("div");breakdown.className="doctor-custody-breakdown";
+   for(const [label,value] of [["مقبوضات اليوم",handover.baselineReceipts||0],["المصروفات المعتمدة",handover.baselineExpenses||0],["العهدة المسلّمة",handover.nextOpeningAmount||0]]){
+    const item=document.createElement("div"),caption=document.createElement("span"),amount=document.createElement("strong");caption.textContent=label;amount.textContent=doctorMoney(value);item.append(caption,amount);breakdown.append(item)
+   }
+   const wrap=document.createElement("div");wrap.append(card,breakdown);doctorCustodyStatus.append(wrap);
+  }
+  if(!result.active&&!handover){const empty=document.createElement("p");empty.className="muted-text";empty.textContent="لا توجد عهدة نشطة أو عهدة مسلّمة تنتظر التصفية.";doctorCustodyStatus.append(empty)}
+  showDoctorCustodyMessage("");
+ }catch(error){doctorCustodyStatus.textContent=error.message||"تعذر تحميل العهدة.";showDoctorCustodyMessage(error.message||"تعذر تحميل العهدة.",true)}
+}
+refreshDoctorCustodyButton?.addEventListener("click",loadDoctorCustody);
 async function loadDoctorSettlements(){
   try{
     const result=await accountsApiRequest("listSettlements");
