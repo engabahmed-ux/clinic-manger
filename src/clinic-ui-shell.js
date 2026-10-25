@@ -62,10 +62,12 @@
       closeMenu(sidebar, backdrop, toggle);
       toggle.focus({ preventScroll: true });
     }));
-    sidebar.querySelectorAll(".dashboard-tab, .staff-tab").forEach(button => button.addEventListener("click", () => {
+    sidebar.addEventListener("click", event => {
+      const tab = event.target.closest(".dashboard-tab, .staff-tab");
+      if (!tab || !sidebar.contains(tab)) return;
       playTapSound();
       closeMenu(sidebar, backdrop, toggle);
-    }));
+    });
     sidebar.querySelectorAll("a, button").forEach(element => {
       if (element.matches(".dashboard-tab, .staff-tab, [data-clinic-menu-close]")) return;
       element.addEventListener("click", () => {
