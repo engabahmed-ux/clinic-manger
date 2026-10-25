@@ -1130,3 +1130,27 @@ body:has(#staffDashboard:not([hidden])){background:linear-gradient(135deg,#0B243
 .staff-appointment-card.status-postponed::before{background:#1E7EB8}
 @media(max-width:640px){.staff-shell:has(#staffDashboard:not([hidden])){width:calc(100% - 20px);padding:12px 0 26px}.staff-welcome{min-height:94px;gap:11px!important;padding:16px 14px!important;border-radius:18px!important}.staff-dashboard-header-symbol{display:none}.staff-welcome .clinic-menu-toggle{flex-basis:42px;width:42px;height:42px}.staff-dashboard-stats{gap:9px}.staff-dashboard-stat-card{gap:9px;padding:13px 11px;border-radius:15px}.staff-dashboard-stat-icon{flex-basis:36px;width:36px;height:36px;border-radius:11px;font-size:19px}.staff-dashboard-stat-card p{font-size:11px}.staff-dashboard-stat-card strong{font-size:25px}.staff-dashboard-stat-card small{font-size:10px}.staff-section:not([hidden]){padding:16px 12px;border-radius:17px}}
 @media(max-width:380px){.staff-dashboard-stats{grid-template-columns:1fr}.staff-dashboard-stat-card{padding:12px 14px}}
+
+/* إصلاح الترويسة وتوزيع قياسات المريض في صف المواعيد */
+.staff-shell:has(#staffDashboard:not([hidden])){padding-top:8px}
+.staff-welcome{display:flex;align-items:center;justify-content:flex-start!important;gap:14px!important;min-height:76px;margin:0 0 18px!important;padding:14px 18px!important}
+.staff-welcome .clinic-menu-toggle{position:relative;z-index:1;flex:0 0 44px;width:44px;height:44px}
+.staff-dashboard-brand-copy{display:flex;align-items:center;flex:1;min-width:0;margin:0}
+.staff-welcome .staff-compact-welcome{margin:0!important;color:#fff!important;font-size:clamp(17px,2vw,23px)!important;font-weight:800!important;line-height:1.5!important;overflow-wrap:anywhere}
+.staff-appointment-card{grid-template-columns:minmax(150px,1fr) minmax(210px,1.6fr) auto;gap:12px}
+.staff-appointment-main{min-width:0}
+.staff-appointment-main h3{overflow-wrap:anywhere}
+.staff-appointment-main p{line-height:1.6;overflow-wrap:anywhere}
+.staff-appointment-vitals{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:6px;min-width:0}
+.staff-vital-badge{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:6px 9px;border:1px solid #D7E7F0;border-radius:10px;background:#F1F8FC;color:#17455D;font-size:12px;font-weight:800;line-height:1.45;white-space:normal}
+@media(max-width:640px){
+ .staff-shell:has(#staffDashboard:not([hidden])){padding-top:6px}
+ .staff-welcome{min-height:66px;gap:10px!important;padding:10px 12px!important;margin-bottom:14px!important;border-radius:16px!important}
+ .staff-welcome .clinic-menu-toggle{flex-basis:40px;width:40px;height:40px}
+ .staff-welcome .staff-compact-welcome{font-size:17px!important}
+ .staff-appointment-card{grid-template-columns:minmax(0,1fr) auto;gap:9px;padding:13px 13px 13px 15px}
+ .staff-appointment-main{grid-column:1/-1;grid-row:1}
+ .staff-appointment-vitals{grid-column:1/-1;grid-row:2;justify-content:flex-start}
+ .staff-vital-badge{padding:5px 7px;font-size:11px}
+}
+@media(max-width:380px){.staff-appointment-card{grid-template-columns:minmax(0,1fr)}.staff-appointment-main,.staff-appointment-vitals{grid-column:1;grid-row:auto}}
