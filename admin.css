@@ -1141,3 +1141,78 @@ button:disabled {
   .booking-edit-pencil { width: 24px; height: 24px; left: 6px; right: auto; top: 6px; font-size: 15px; }
   .booking-request-summary { padding-inline-start: 8px; padding-left: 34px; }
 }
+
+
+/* Refined clinic dashboard: soft corners, calm motion, and clearer focus states. */
+:root {
+  --radius-control: 12px;
+  --radius-card: 18px;
+  --motion-fast: 180ms;
+  --motion-normal: 240ms;
+  --motion-ease: cubic-bezier(.2, .75, .25, 1);
+}
+.admin-shell button,
+.admin-shell input,
+.admin-shell select,
+.admin-shell textarea,
+.admin-shell .admin-card,
+.admin-shell .stat-card,
+.admin-shell .booking-card,
+.admin-shell .staff-tab,
+.admin-shell .admin-tab,
+.admin-shell .nav-item,
+.admin-shell dialog,
+.admin-shell .modal {
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease);
+}
+.admin-shell input:not([type="checkbox"]):not([type="radio"]),
+.admin-shell select,
+.admin-shell textarea,
+.admin-shell button,
+.admin-shell .staff-tab,
+.admin-shell .admin-tab,
+.admin-shell .nav-item {
+  border-radius: var(--radius-control);
+}
+.admin-shell .booking-card,
+.admin-shell .admin-card,
+.admin-shell .stat-card,
+.admin-shell .staff-expense-row,
+.admin-shell .patient-history-card,
+.admin-shell .medical-booking-panel {
+  border-radius: var(--radius-card);
+}
+.admin-shell button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.admin-shell button:active:not(:disabled) {
+  transform: translateY(0) scale(.985);
+}
+.admin-shell input:focus-visible,
+.admin-shell select:focus-visible,
+.admin-shell textarea:focus-visible,
+.admin-shell button:focus-visible,
+.admin-shell a:focus-visible {
+  outline: 2px solid var(--color-secondary, #BFD2AF);
+  outline-offset: 2px;
+}
+.admin-shell .staff-tab[aria-selected="true"],
+.admin-shell .admin-tab[aria-selected="true"],
+.admin-shell .nav-item[aria-current="page"] {
+  border-radius: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell *,
+  .admin-shell *::before,
+  .admin-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
