@@ -1547,3 +1547,11 @@ dialog.booking-create-dialog .booking-create-card {
 .doctor-custody-breakdown{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:10px}
 .doctor-custody-breakdown>div{padding:10px;border-radius:9px;background:#f9f5f1;display:grid;gap:5px}
 @media(max-width:600px){.doctor-custody-panel{padding:12px}.doctor-custody-heading{align-items:stretch;flex-direction:column}.doctor-custody-heading button{width:100%}.doctor-custody-card{align-items:stretch;flex-direction:column}}
+
+.doctor-settlement-history-card{display:grid;gap:10px;padding:14px;margin:10px 0;border:1px solid var(--color-border,#ddd);border-radius:12px;background:#fff}
+.doctor-settlement-history-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.doctor-settlement-history-card p{margin:0}
+.doctor-settlement-history-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.doctor-settlement-history-totals>div{display:grid;gap:5px;padding:10px;border-radius:9px;background:#f9f5f1}
+.doctor-settlement-history-totals span{font-size:.9rem;color:var(--color-muted,#666)}
+@media(max-width:560px){.doctor-settlement-history-totals{grid-template-columns:1fr}}
