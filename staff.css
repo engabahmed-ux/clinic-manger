@@ -1154,3 +1154,38 @@ body:has(#staffDashboard:not([hidden])){background:linear-gradient(135deg,#0B243
  .staff-vital-badge{padding:5px 7px;font-size:11px}
 }
 @media(max-width:380px){.staff-appointment-card{grid-template-columns:minmax(0,1fr)}.staff-appointment-main,.staff-appointment-vitals{grid-column:1;grid-row:auto}}
+
+
+/* Mobile staff header: remove the empty legacy header space and balance the welcome row. */
+@media (max-width: 640px) {
+  .staff-shell:has(#staffDashboard:not([hidden])) > .staff-header {
+    display: none !important;
+  }
+  .staff-shell:has(#staffDashboard:not([hidden])) {
+    padding-top: 12px !important;
+  }
+  #staffDashboard > .staff-welcome {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 14px !important;
+    min-height: 60px !important;
+    margin: 0 0 14px !important;
+    padding: 10px 12px !important;
+  }
+  #staffDashboard > .staff-welcome > .clinic-menu-toggle {
+    flex: 0 0 42px !important;
+    width: 42px !important;
+    height: 42px !important;
+  }
+  #staffDashboard > .staff-welcome > .staff-dashboard-brand-copy {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+  #staffDashboard > .staff-welcome > .staff-dashboard-brand-copy > .staff-compact-welcome {
+    width: auto !important;
+    margin: 0 !important;
+    text-align: right !important;
+  }
+}
