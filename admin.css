@@ -1340,3 +1340,6 @@ body:has(#dashboardSection:not([hidden])){padding:8px 18px 32px}
  .booking-vital-badge{padding:5px 7px;font-size:11px}
 }
 @media(max-width:380px){.booking-request-summary{grid-template-columns:minmax(0,1fr)}.booking-request-main,.booking-vitals,.booking-request-badge{grid-column:1;grid-row:auto}.booking-request-badge{justify-self:start}}
+
+@media(max-width:640px){.booking-request-main{grid-column:1;grid-row:1}.booking-request-badge{grid-column:2;grid-row:1}}
+@media(max-width:380px){.booking-request-main,.booking-vitals,.booking-request-badge{grid-column:1;grid-row:auto}}
