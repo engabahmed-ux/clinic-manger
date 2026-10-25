@@ -66,7 +66,8 @@ export async function onRequestPost({request,env}) {
       if(history.previousEmployeeUid&&history.previousEmployeeUid!==ctx.uid&&history.acceptedByUid!==ctx.uid&&!data.acceptHandover){
         return reply({message:"توجد عهدة مسلّمة من الموظف السابق وتحتاج تأكيد استلامك.",pendingHandover:{previousEmployeeName:history.previousEmployeeName||"الموظف السابق",actualAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.nextOpeningAmount||"0.00"),notes:history.notes||"",closedAt:history.closedAt||""}},409);
       }
-      const opening=Number(history.nextOpeningAmount||0);
+      // Start at zero unless the employee explicitly accepts an incoming handover.
+      const opening=data.acceptHandover?Number(history.nextOpeningAmount||0):0;
       const record={type:"custodySession",status:"active",employeeUid:ctx.uid,employeeName:ctx.name,openingAmount:opening.toFixed(2),expectedAmount:opening.toFixed(2),notes:"",startedAt:now,updatedAt:now};
       const made=await createRecord(ctx,LOCK_ID,record);
       if(made?.__conflict)return reply({message:"بدأ موظف آخر جلسة في نفس اللحظة. حدّث الصفحة وحاول مرة أخرى."},409);
