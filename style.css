@@ -1690,3 +1690,67 @@ p {
 .medical-booking-form input:disabled, .medical-booking-form textarea:disabled { background: #f2f2f2; color: #444; opacity: 1; }
 .patient-history-card h4 { color: var(--color-dark, #11141A); }
 @media (max-width: 650px) { .medical-booking-form .medical-vitals-grid { grid-template-columns: 1fr; } }
+
+
+/* Smooth, accessible interactions for the public clinic website. */
+:root {
+  --motion-fast: 180ms;
+  --motion-normal: 240ms;
+  --motion-ease: cubic-bezier(.2, .75, .25, 1);
+}
+button,
+input,
+select,
+textarea,
+a,
+.service-card,
+.patient-appointment-card,
+.medical-booking-panel,
+.patient-history-card,
+.booking-card,
+dialog {
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease);
+}
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea,
+button {
+  border-radius: 12px;
+}
+.service-card,
+.patient-appointment-card,
+.patient-history-card,
+.medical-booking-panel,
+.booking-card {
+  border-radius: 18px;
+}
+button:hover:not(:disabled),
+a:hover {
+  transform: translateY(-1px);
+}
+button:active:not(:disabled) {
+  transform: translateY(0) scale(.985);
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-secondary, #BFD2AF);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
