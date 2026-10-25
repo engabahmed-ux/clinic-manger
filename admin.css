@@ -1507,3 +1507,29 @@ body:has(#dashboardSection:not([hidden])){padding:8px 18px 32px}
   .booking-vitals { grid-column: 1; }
   .booking-request-badge { grid-column: 2; }
 }
+
+
+/* Manual booking form is shared by the home shortcut and Booking Management. */
+dialog.booking-create-dialog {
+  width: min(680px, calc(100% - 28px));
+  max-width: 680px;
+  max-height: min(88vh, 900px);
+  margin: auto;
+  padding: 18px;
+  border: 1px solid var(--border-color, rgba(17, 20, 26, .14));
+  border-radius: 18px;
+  background: var(--color-light, #F9F5F1);
+  color: var(--color-dark, #11141A);
+  overflow: auto;
+  box-sizing: border-box;
+}
+dialog.booking-create-dialog::backdrop {
+  background: rgba(17, 20, 26, .48);
+  backdrop-filter: blur(2px);
+}
+dialog.booking-create-dialog .booking-create-card {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  box-sizing: border-box;
+}
