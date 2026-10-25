@@ -1205,7 +1205,7 @@ async function loadDoctorSettlements(){
   }catch(error){showMessage(doctorSettlementMessage,error.message||"تعذر تحميل سجل التصفيات.")}
 }
 async function archiveDoctorDay(){const day=doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());if((doctorFilterMode?.value||"date")!=="date"){showMessage(dailyAppointmentsMessage,"اختر عرض مواعيد يوم محدد قبل الأرشفة.");return}if(!window.confirm("هل تريد أرشفة حجوزات يوم "+formatRequestDate(day)+" وسجلات المواعيد التي نُقلت من هذا اليوم؟ سيظل الموعد الجديد لكل حجز مؤجل فعالًا في يومه الحالي."))return;const originalLabel=archiveSelectedAppointments.textContent;archiveSelectedAppointments.disabled=true;archiveSelectedAppointments.textContent="جارٍ أرشفة حجوزات اليوم…";try{const result=await bookingApiRequest("archiveDay",{date:day});await loadBookings();showMessage(dailyAppointmentsMessage,"تمت أرشفة "+(result.archivedCount||0)+" حجز أو موعد مؤجل مع الحفاظ على حالته وتفاصيله.","success")}catch(e){showMessage(dailyAppointmentsMessage,e.message||"تعذر أرشفة مواعيد اليوم.")}finally{archiveSelectedAppointments.textContent=originalLabel;renderDailyAppointments();}}
-function showDoctorAccounts(){if(doctorAccountsSection)doctorAccountsSection.hidden=false;homeAppointmentsSection.hidden=true;doctorArchiveSection.hidden=true;bookingManagementSection.hidden=true;patientManagementSection.hidden=true;employeeManagementSection.hidden=true;setActiveTab(openAccountsTabButton);if(doctorAccountsDate)doctorAccountsDate.value=doctorHomeDateFilter?.value||doctorAccountsDate.value;renderDoctorAccounts();loadDoctorAccountRecords();loadSettlementEmployees()}
+function showDoctorAccounts(){if(doctorAccountsSection)doctorAccountsSection.hidden=false;homeAppointmentsSection.hidden=true;doctorArchiveSection.hidden=true;bookingManagementSection.hidden=true;patientManagementSection.hidden=true;employeeManagementSection.hidden=true;setActiveTab(openAccountsTabButton);if(doctorAccountsDate)doctorAccountsDate.value=doctorHomeDateFilter?.value||doctorAccountsDate.value;renderDoctorAccounts();loadDoctorAccountRecords();loadSettlementEmployees();loadDoctorCustody()}
 function renderPendingBookings(){bookingList.replaceChildren();const query=(bookingSearchInput?.value||"").trim().toLocaleLowerCase("ar");const rows=allBookings.filter(b=>!b.isArchived&&b.status==="pending").filter(b=>(!query||`${b.patientName||""} ${b.patientPhone||""}`.toLocaleLowerCase("ar").includes(query))).sort((a,b)=>String(a.appointmentDate||"9999-99-99").slice(0,10).localeCompare(String(b.appointmentDate||"9999-99-99").slice(0,10))||String(a.createdAt||"").localeCompare(String(b.createdAt||""))||String(a.patientName||"").localeCompare(String(b.patientName||""),"ar"));if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد طلبات حجز معلقة.";bookingList.append(empty);return}rows.forEach(b=>bookingList.append(renderBookingCard(b)))}
 let lastPendingBookingCount = null;
 function updatePendingBookingBadge(){const count=allBookings.filter(b=>!b.isArchived&&b.status==="pending").length;if(lastPendingBookingCount!==null&&count>lastPendingBookingCount)playClinicUiSound("notification");lastPendingBookingCount=count;if(pendingBookingBadge){pendingBookingBadge.textContent=count>99?"99+":String(count);pendingBookingBadge.hidden=count===0;pendingBookingBadge.setAttribute("aria-label",count?`${count} طلب حجز جديد`:"لا توجد طلبات حجز جديدة");}if(openBookingsButton){openBookingsButton.classList.toggle("has-pending-bookings",count>0);openBookingsButton.setAttribute("aria-label",count?`إدارة الحجوزات، ${count} طلب حجز جديد`:"إدارة الحجوزات");openBookingsButton.title=count?`${count} طلب حجز جديد`: "إدارة الحجوزات";}}
@@ -1245,6 +1245,7 @@ setInterval(() => {
     if (!doctorAccountsSection?.hidden) {
       loadDoctorAccountRecords();
       loadSettlementEmployees();
+      loadDoctorCustody();
     }
     if (!employeeManagementSection?.hidden && !isStaff) loadEmployees();
   }
@@ -1254,7 +1255,7 @@ document.addEventListener("visibilitychange", () => {
     const isStaff = currentAccountAccess?.accountType === "staff";
     if ((!isStaff || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings)) && !hasOpenBookingCard()) loadBookings();
     lastDashboardRefreshAt = Date.now();
-    if (!doctorAccountsSection?.hidden) { loadDoctorAccountRecords(); loadSettlementEmployees(); }
+    if (!doctorAccountsSection?.hidden) { loadDoctorAccountRecords(); loadSettlementEmployees(); loadDoctorCustody(); }
     if (!employeeManagementSection?.hidden && !isStaff) loadEmployees();
   }
 });
