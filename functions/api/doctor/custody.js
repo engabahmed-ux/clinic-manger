@@ -76,7 +76,7 @@ export async function onRequestPost({request,env}) {
       if(made?.__conflict)return reply({message:"تعذر حفظ التصفية بسبب طلب متزامن. حدّث الصفحة وحاول مرة أخرى."},409);
       const updated={...history,settledAt:now,settledByUid:ctx.uid,settledByName:"الدكتور",settlementId:id};
       const masks=["settledAt","settledByUid","settledByName","settlementId"].map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");
-      const saved=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/custody-last-closed+"?"+masks,{method:"PATCH",body:JSON.stringify(enc(updated))});
+      const saved=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/custody-last-closed?""+masks,{method:"PATCH",body:JSON.stringify(enc(updated))});
       if(saved?.__conflict)return reply({message:"تم تسجيل التصفية لكن تعذر تحديث حالتها. راجع سجل التصفيات قبل إعادة المحاولة."},503);
       return reply({settlement});
     }
