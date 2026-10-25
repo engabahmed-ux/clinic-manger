@@ -588,6 +588,7 @@ function createBookingInput(labelText, value, field, type = "text") {
     }
   } else {
     input.value = value || "";
+    if (field === "bloodPressure") input.placeholder = "مثال: 120 / 80";
     if (field === "patientName") input.maxLength = 120;
     if (field === "patientPhone") input.maxLength = 40;
     if (field === "service") { input.maxLength = 120; input.setAttribute("list", "clinicServiceOptions"); }
@@ -603,6 +604,21 @@ function createBookingInput(labelText, value, field, type = "text") {
   return wrapper;
 }
 
+function createBookingVitalIcon(kind) {
+  const icon = document.createElement("span");
+  icon.className = "booking-vital-icon booking-vital-icon-" + kind;
+  icon.setAttribute("aria-hidden", "true");
+  const icons = {
+    pressure: '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 2.5C10.2 5.8 5.5 10.6 5.5 15a6.5 6.5 0 0 0 13 0c0-4.4-4.7-9.2-6.5-12.5Z" fill="currentColor"/><path d="M9 16.2c.3 1.4 1.3 2.2 2.7 2.4" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    weight: '<svg viewBox="0 0 24 24" focusable="false"><rect x="3.5" y="3" width="17" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="7" y="6" width="10" height="5" rx="1.5" fill="currentColor" opacity=".18"/><path d="M12 8.5l2-1.2M12 8.5l-1.3-1.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    sugar: '<svg viewBox="0 0 24 24" focusable="false"><rect x="2.5" y="5" width="19" height="14" rx="7" fill="#1976D2"/><rect x="6" y="8" width="8" height="5" rx="1.2" fill="#fff"/><path d="M8 10.5h4" stroke="#1976D2" stroke-width="1.2" stroke-linecap="round"/><circle cx="17.2" cy="12" r="1.7" fill="#fff"/><path d="M16.7 12h1" stroke="#1976D2" stroke-width="1" stroke-linecap="round"/></svg>'
+  };
+  icon.innerHTML = icons[kind] || "";
+  return icon;
+}
+function formatBloodPressure(value) {
+  return String(value ?? "").trim().replace(/\\s*\\/\\s*/, " / ");
+}
 function renderBookingCard(booking) {
   const card = document.createElement("article");
   card.className = "employee-card booking-card";
@@ -617,29 +633,24 @@ function renderBookingCard(booking) {
   main.className = "booking-request-main";
   const title = document.createElement("strong");
   title.className = "booking-patient-name";
-  title.textContent = booking.patientName || "طلب حجز جديد";
-  const queueBadge = document.createElement("span");
-  queueBadge.className = "booking-queue-number";
-  queueBadge.textContent = "الدور " + queueNumberFor(booking);
+  title.textContent = queueNumberFor(booking) + ". " + (booking.patientName || "طلب حجز جديد");
   const meta = document.createElement("small");
   meta.textContent = `${bookingStatusLabel(booking.status)} · تاريخ الطلب: ${formatSubmittedAt(booking.createdAt)} · الموعد: ${formatRequestDate(booking.appointmentDate)} · ${booking.patientPhone || "الهاتف غير مسجل"} · ${booking.service || "الخدمة غير المحددة"}`;
-  main.append(title, queueBadge, meta);
+  main.append(title, meta);
   const vitals = document.createElement("span");
   vitals.className = "booking-vitals";
   const vitalItems = [
-    ["🩺", "الضغط", booking.bloodPressure],
-    ["🩸", "السكر", booking.bloodSugar],
-    ["⚖️", "الوزن", booking.weight ? booking.weight + " كجم" : ""]
+    ["pressure", "الضغط", booking.bloodPressure],
+    ["sugar", "السكر", booking.bloodSugar],
+    ["weight", "الوزن", booking.weight ? booking.weight + " كجم" : ""]
   ];
-  vitalItems.filter(item => item[2] !== undefined && item[2] !== null && String(item[2]).trim() !== "").forEach(([icon, label, value]) => {
+  vitalItems.filter(item => item[2] !== undefined && item[2] !== null && String(item[2]).trim() !== "").forEach(([kind, label, value]) => {
     const vital = document.createElement("span");
-    vital.className = "booking-vital-badge";
+    vital.className = "booking-vital-badge booking-vital-" + kind;
     vital.title = label;
-    const symbol = document.createElement("span");
-    symbol.setAttribute("aria-hidden", "true");
-    symbol.textContent = icon;
+    const symbol = createBookingVitalIcon(kind);
     const text = document.createElement("span");
-    text.textContent = label + " " + value;
+    text.textContent = label + " " + (kind === "pressure" ? formatBloodPressure(value) : value);
     vital.append(symbol, text);
     vitals.append(vital);
   });
@@ -910,17 +921,15 @@ function updateBookingVitalBadges(card, booking) {
   const vitals = card?.querySelector(".booking-vitals");
   if (!vitals) return;
   vitals.replaceChildren();
-  const items = [["🩺", "الضغط", booking.bloodPressure], ["🩸", "السكر", booking.bloodSugar], ["⚖️", "الوزن", booking.weight ? booking.weight + " كجم" : ""]];
-  for (const [icon, label, value] of items) {
+  const items = [["pressure", "الضغط", booking.bloodPressure], ["sugar", "السكر", booking.bloodSugar], ["weight", "الوزن", booking.weight ? booking.weight + " كجم" : ""]];
+  for (const [kind, label, value] of items) {
     if (value === undefined || value === null || String(value).trim() === "") continue;
     const vital = document.createElement("span");
-    vital.className = "booking-vital-badge";
+    vital.className = "booking-vital-badge booking-vital-" + kind;
     vital.title = label;
-    const symbol = document.createElement("span");
-    symbol.setAttribute("aria-hidden", "true");
-    symbol.textContent = icon;
+    const symbol = createBookingVitalIcon(kind);
     const text = document.createElement("span");
-    text.textContent = label + " " + value;
+    text.textContent = label + " " + (kind === "pressure" ? formatBloodPressure(value) : value);
     vital.append(symbol, text);
     vitals.append(vital);
   }
