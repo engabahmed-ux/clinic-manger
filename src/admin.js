@@ -15,6 +15,41 @@ import {
   signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+
+/* Soft UI feedback sounds. Web Audio is created only after a user interaction. */
+let clinicUiAudioContext = null;
+function playClinicUiSound(kind = "success") {
+  try {
+    if (localStorage.getItem("clinicUiSounds") === "off") return;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    clinicUiAudioContext ||= new AudioContextClass();
+    const context = clinicUiAudioContext;
+    if (context.state === "suspended") context.resume().catch(() => {});
+    const presets = {
+      success: [{ f: 660, t: 0, d: 0.075 }, { f: 880, t: 0.07, d: 0.09 }],
+      archive: [{ f: 520, t: 0, d: 0.065 }],
+      expense: [{ f: 587, t: 0, d: 0.06 }, { f: 740, t: 0.055, d: 0.065 }],
+      notification: [{ f: 740, t: 0, d: 0.075 }, { f: 880, t: 0.085, d: 0.085 }]
+    };
+    for (const tone of (presets[kind] || presets.success)) {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(tone.f, context.currentTime + tone.t);
+      gain.gain.setValueAtTime(0.0001, context.currentTime + tone.t);
+      gain.gain.exponentialRampToValueAtTime(0.035, context.currentTime + tone.t + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + tone.t + tone.d);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(context.currentTime + tone.t);
+      oscillator.stop(context.currentTime + tone.t + tone.d + 0.015);
+    }
+  } catch (_) {
+    // Sound is optional and must never interrupt clinic workflows.
+  }
+}
+
 /*
  * Doctor Admin Page
  *
@@ -863,7 +898,7 @@ const BOOKING_STATUS_OPTIONS=[["waiting",statusLabel(RUNTIME_SETTINGS,"waiting",
 const ARCHIVE_STATUSES=new Set(["archived","cancelled"]);
 function normalizedStatus(status){return status==="confirmed"?"waiting":status}
 function bookingStatusLabel(status){return statusLabel(RUNTIME_SETTINGS,status,({pending:"قيد المراجعة",confirmed:"في الانتظار",waiting:"في الانتظار",completed:"تم الكشف",postponed:"تم التأجيل",no_show:"لم يأتِ",apologized:"اعتذر",cancelled:"ملغي",archived:"مؤرشف"})[status]||"غير محدد")}
-async function changeBookingStatus(booking,status,control){if(!["waiting","completed","postponed","no_show","apologized"].includes(status))return;if(control)control.disabled=true;try{await bookingApiRequest("update",{booking:{id:booking.id,status}});showMessage(bookingListMessage,"تم تحديث حالة الحجز.","success");await loadBookings()}catch(error){showMessage(bookingListMessage,error.message||"تعذر تحديث حالة الحجز.");if(control)control.value=normalizedStatus(booking.status)}finally{if(control)control.disabled=false}}
+async function changeBookingStatus(booking,status,control){if(!["waiting","completed","postponed","no_show","apologized"].includes(status))return;if(control)control.disabled=true;try{await bookingApiRequest("update",{booking:{id:booking.id,status}});playClinicUiSound(status==="completed"?"success":"archive");showMessage(bookingListMessage,"تم تحديث حالة الحجز.","success");await loadBookings()}catch(error){showMessage(bookingListMessage,error.message||"تعذر تحديث حالة الحجز.");if(control)control.value=normalizedStatus(booking.status)}finally{if(control)control.disabled=false}}
 function applyStatusColor(el,status){for(const name of ["waiting","completed","postponed","no_show","apologized","pending","archived","cancelled","confirmed"])el.classList.remove(`status-${name}`);el.classList.add(`status-${status||"waiting"}`);applyRuntimeStatusColor(el,RUNTIME_SETTINGS,status||"waiting")}function makeStatusSelect(booking){const select=document.createElement("select");select.className="booking-status-select";select.setAttribute("aria-label",`حالة حجز ${booking.patientName||""}`);for(const[value,label]of BOOKING_STATUS_OPTIONS){const option=document.createElement("option");option.value=value;option.textContent=label;option.className=`status-option-${value}`;select.append(option)}select.value=normalizedStatus(booking.status)||"waiting";if(booking.status==="completed"){select.disabled=true;select.title="حالة تم الكشف نهائية ولا يمكن تغييرها";select.setAttribute("aria-label",`حالة نهائية: تم الكشف عن ${booking.patientName||"المريضة"}`)}else if(currentAccountAccess?.accountType==="staff"&&currentAccountAccess?.permissions?.bookings!=="edit"){select.disabled=true;select.title="صلاحية المشاهدة فقط"}applyStatusColor(select,select.value);select.addEventListener("change",()=>{applyStatusColor(select,select.value);changeBookingStatus(booking,select.value,select)});return select}
 function renderScheduleCard(booking,archived=false){const card=renderBookingCard(booking);card.classList.add("schedule-booking-card");applyStatusColor(card,normalizedStatus(booking.status));const meta=card.querySelector(".booking-request-main small");if(meta)meta.textContent="الموعد: "+formatRequestDate(booking.appointmentDate)+" · "+(booking.patientPhone||"الهاتف غير مسجل")+" · "+(booking.service||"الخدمة غير محددة")+" · الضغط: "+(booking.bloodPressure||"—")+" · الوزن: "+(booking.weight?booking.weight+" كجم":"—")+" · السكر: "+(booking.bloodSugar||"—")+(booking.preVisitNotes?" · ملاحظة قبل الكشف: "+booking.preVisitNotes:"");if(!archived){card.querySelector(".booking-request-badge")?.remove();const controls=document.createElement("div");controls.className="schedule-card-controls";controls.append(makeStatusSelect(booking));card.prepend(controls)}return card}
 
@@ -1361,7 +1396,7 @@ if (openBookingsButton) {
 if (addBookingToggleButton && bookingCreateCard) addBookingToggleButton.addEventListener("click", () => { bookingCreateCard.hidden = !bookingCreateCard.hidden; });
 createBookingForm?.querySelector(".service-quick-select")?.addEventListener("change",e=>{const input=createBookingForm.querySelector('[name="service"]');if(input&&e.target.value)input.value=e.target.value});
 if (bookingSearchInput) bookingSearchInput.addEventListener("input", renderPendingBookings);
-doctorDailyExpenseForm?.addEventListener("submit",async e=>{e.preventDefault();const values=Object.fromEntries(new FormData(doctorDailyExpenseForm).entries());const date=doctorAccountsDate?.value||doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());const entry={date,amount:String(values.amount||"").trim(),description:String(values.description||"").trim(),notes:String(values.notes||"").trim()};const button=doctorDailyExpenseForm.querySelector('button[type="submit"]');button.disabled=true;try{const result=await accountsApiRequest("createDailyExpense",{entry});doctorDailyExpenseForm.reset();showMessage(doctorDailyExpenseMessage,result.expense?.status==="pending"?"تم تسجيل المصروف وهو بانتظار اعتماد الدكتور.":"تم تسجيل المصروف واحتسابه ضمن المصروفات المعتمدة.","success");renderDoctorAccounts()}catch(error){showMessage(doctorDailyExpenseMessage,error.message||"تعذر تسجيل المصروف.")}finally{button.disabled=false}});
+doctorDailyExpenseForm?.addEventListener("submit",async e=>{e.preventDefault();const values=Object.fromEntries(new FormData(doctorDailyExpenseForm).entries());const date=doctorAccountsDate?.value||doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());const entry={date,amount:String(values.amount||"").trim(),description:String(values.description||"").trim(),notes:String(values.notes||"").trim()};const button=doctorDailyExpenseForm.querySelector('button[type="submit"]');button.disabled=true;try{const result=await accountsApiRequest("createDailyExpense",{entry});doctorDailyExpenseForm.reset();playClinicUiSound("expense");showMessage(doctorDailyExpenseMessage,result.expense?.status==="pending"?"تم تسجيل المصروف وهو بانتظار اعتماد الدكتور.":"تم تسجيل المصروف واحتسابه ضمن المصروفات المعتمدة.","success");renderDoctorAccounts()}catch(error){showMessage(doctorDailyExpenseMessage,error.message||"تعذر تسجيل المصروف.")}finally{button.disabled=false}});
 if (bookingRequestsToggle && bookingRequestsPanel) bookingRequestsToggle.addEventListener("click",()=>{const open=bookingRequestsPanel.hidden;bookingRequestsPanel.hidden=!open;bookingRequestsToggle.setAttribute("aria-expanded",String(open));bookingRequestsToggle.classList.toggle("is-open",open)});
 doctorQueueDialogDone?.addEventListener("click",()=>doctorQueueDialog?.close());
 $("#cancelCreateBookingButton")?.addEventListener("click",()=>{createBookingForm?.reset();if(bookingCreateCard)bookingCreateCard.hidden=true;document.activeElement?.blur()});
@@ -1411,6 +1446,7 @@ if (createBookingForm) {
       const medicalPatient = await medicalRecordsApiRequest("resolve", { patientId: $("#newBookingPatientId")?.value || "", patientName: booking.patientName, patientPhone: booking.patientPhone });
       booking.patientId = medicalPatient.patient.id;
       const result = await bookingApiRequest("create", { booking });
+      playClinicUiSound("success");
       createBookingForm.reset();
       if (bookingCreateCard) bookingCreateCard.hidden = true;
       document.activeElement?.blur();
