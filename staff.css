@@ -1196,3 +1196,27 @@ body:has(#staffDashboard:not([hidden])){background:linear-gradient(135deg,#0B243
 .staff-custody-panel .staff-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .staff-custody-panel .staff-accounts-summary{margin:14px 0}
 .staff-custody-panel .staff-empty{margin:12px 0 0}
+
+
+/* واجهة عهدة مختصرة بجوار ملخص حسابات اليوم */
+.staff-accounts-summary-four{grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch}
+.staff-custody-quick-card{display:flex;flex-direction:row!important;align-items:center;justify-content:space-between;gap:8px!important;padding:10px 12px!important;border:1px solid #d5e2d5!important;background:#f5faf3!important}
+.staff-custody-quick-card>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.staff-custody-quick-card strong{font-size:16px!important}
+.staff-custody-quick-card button{flex:0 0 34px;width:34px;height:34px;border:0;border-radius:10px;background:var(--staff-green);color:#fff;font-size:24px;line-height:1;cursor:pointer}
+.staff-custody-dialog{width:min(92vw,440px);max-width:440px;max-height:88vh;overflow:auto;padding:0;border:1px solid var(--staff-border);border-radius:18px;background:#fff;color:var(--staff-text);box-shadow:0 24px 80px #11141a33}
+.staff-custody-dialog::backdrop{background:#11141a66;backdrop-filter:blur(3px)}
+.staff-custody-dialog-content{display:grid;gap:14px;padding:20px;margin:0}
+.staff-custody-dialog-content .staff-section-heading{padding-bottom:10px;margin:0}
+.staff-custody-dialog-content .staff-section-heading h3{margin:0;font-size:17px}
+.staff-custody-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.staff-custody-detail-grid>div{display:grid;gap:5px;padding:11px;border:1px solid var(--staff-border);border-radius:10px;background:#f8fafb;min-width:0}
+.staff-custody-detail-grid span,.staff-custody-dialog-content label{font-size:12px;color:var(--staff-muted)}
+.staff-custody-detail-grid strong{font-size:15px;overflow-wrap:anywhere}
+.staff-custody-add-form{display:grid;gap:10px}
+.staff-custody-add-form label,.staff-custody-dialog-content>label{display:grid;gap:6px;font-weight:700}
+.staff-custody-dialog input,.staff-custody-dialog textarea{width:100%;min-height:42px;padding:9px 11px;border:1px solid var(--staff-border);border-radius:9px;background:#fff;color:var(--staff-text);font:inherit;font-size:14px}
+.staff-custody-dialog textarea{resize:vertical}
+.staff-custody-dialog .staff-booking-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:760px){.staff-accounts-summary-four{grid-template-columns:repeat(2,minmax(0,1fr))}.staff-custody-quick-card{min-height:82px}}
+@media(max-width:480px){.staff-custody-dialog{width:calc(100vw - 20px)}.staff-custody-dialog-content{padding:15px;gap:12px}}
