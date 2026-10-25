@@ -1090,3 +1090,43 @@ a {
 .clinic-sidebar-logout{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:46px;border-radius:13px}
 .clinic-sidebar-site-link{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 12px;border:1px solid rgba(30,126,184,.16);border-radius:13px;background:#fff;color:#1E7EB8;text-decoration:none;font-weight:800;transition:background .2s ease,transform .2s ease}
 .clinic-sidebar-site-link:hover{background:#EAF4FA;transform:translateY(-1px)}
+
+
+/* تطبيق الهوية البصرية الموحدة على لوحة الموظف */
+body:has(#staffDashboard:not([hidden])){background:linear-gradient(135deg,#0B2433 0%,#102B3B 58%,#173E52 100%)}
+.staff-shell:has(#staffDashboard:not([hidden])){width:min(1360px,calc(100% - 36px));padding:24px 0 36px}
+#staffDashboard{padding-bottom:1px}
+.staff-welcome{position:relative;justify-content:flex-start!important;gap:18px!important;min-height:116px;margin:0 0 22px!important;padding:22px 26px!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:24px!important;background:linear-gradient(115deg,#102B3B 0%,#17455D 72%,#1E7EB8 150%)!important;box-shadow:0 18px 40px rgba(3,18,27,.2);color:#fff;overflow:hidden}
+.staff-dashboard-brand-copy{display:grid;gap:2px;min-width:0;flex:1}
+.staff-dashboard-brand-title{display:flex;align-items:center;gap:9px;color:#fff;font-size:clamp(19px,2.5vw,26px);font-weight:800;line-height:1.4}
+.staff-dashboard-brand-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,.14);color:#BFE7FF;font-size:20px}
+.staff-dashboard-brand-subtitle{color:#BFE7FF;font-size:13px;font-weight:700}
+.staff-welcome .staff-compact-welcome{margin:5px 0 0!important;color:rgba(255,255,255,.8)!important;font-size:12px!important;font-weight:500;line-height:1.6}
+.staff-welcome .staff-compact-welcome span{color:#fff;font-weight:800}
+.staff-dashboard-header-symbol{display:grid;place-items:center;margin-inline-start:auto;flex:0 0 62px;width:62px;height:62px;border:1px solid rgba(255,255,255,.18);border-radius:20px;background:rgba(255,255,255,.08);color:#BFE7FF;font-size:34px;transform:rotate(-8deg)}
+.staff-welcome .clinic-menu-toggle{border-color:rgba(255,255,255,.18);background:#fff;color:#102B3B}
+.staff-section:not([hidden]){margin:0 0 22px!important;padding:clamp(18px,3vw,30px);border:1px solid #D7E1E8;border-radius:22px;background:#fff;box-shadow:0 14px 34px rgba(3,18,27,.12);color:#263746}
+.staff-section-heading{padding-bottom:14px;border-bottom:1px solid #E3EBF0}
+.staff-section-heading h2,.staff-section-heading h3{color:#102B3B}
+.staff-schedule-heading h2{font-size:clamp(18px,2vw,23px)}
+.staff-schedule-date{background:#EAF4FA!important;color:#17455D!important;border-radius:8px}
+.staff-primary{background:#1E7EB8!important;color:#fff!important;border-color:#1E7EB8!important}
+.staff-primary:hover{background:#176A9D!important}
+.staff-dashboard-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 24px}
+.staff-dashboard-stat-card{display:flex;align-items:center;gap:15px;min-width:0;padding:19px 20px;border:1px solid #D7E7F0;border-radius:18px;background:linear-gradient(135deg,#fff 0%,#F7FBFD 100%);box-shadow:0 8px 22px rgba(16,43,59,.045)}
+.staff-dashboard-stat-icon{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border-radius:15px;background:#EAF4FA;color:#1E7EB8;font-size:25px;font-weight:800}
+.staff-stat-completed .staff-dashboard-stat-icon{background:#E7F6EC;color:#21834A}
+.staff-dashboard-stat-card p{margin:0;color:#526674;font-size:13px;font-weight:700}
+.staff-dashboard-stat-card strong{display:block;margin:0;color:#102B3B;font-size:clamp(27px,3vw,34px);font-weight:800;line-height:1.35;font-variant-numeric:tabular-nums}
+.staff-dashboard-stat-card small{color:#1E7EB8;font-size:11px;font-weight:700}
+.staff-stat-completed small{color:#21834A}
+.staff-status-legend button{border-color:#D7E1E8!important;color:#304654!important}
+.staff-status-legend button.is-active{outline:2px solid #1E7EB8;outline-offset:1px}
+.staff-appointment-card,.staff-booking-card,.staff-account-booking,.medical-visit-card{border-color:#D7E1E8!important;border-radius:16px!important;box-shadow:0 5px 16px rgba(16,43,59,.045)}
+.staff-appointment-card{position:relative;overflow:hidden}
+.staff-appointment-card::before{content:"";position:absolute;inset-block:12px;inset-inline-start:0;width:4px;border-radius:0 5px 5px 0;background:#1E7EB8}
+.staff-appointment-card.status-completed::before{background:#21834A}
+.staff-appointment-card.status-waiting::before{background:#D99223}
+.staff-appointment-card.status-postponed::before{background:#1E7EB8}
+@media(max-width:640px){.staff-shell:has(#staffDashboard:not([hidden])){width:calc(100% - 20px);padding:12px 0 26px}.staff-welcome{min-height:94px;gap:11px!important;padding:16px 14px!important;border-radius:18px!important}.staff-dashboard-header-symbol{display:none}.staff-welcome .clinic-menu-toggle{flex-basis:42px;width:42px;height:42px}.staff-dashboard-stats{gap:9px}.staff-dashboard-stat-card{gap:9px;padding:13px 11px;border-radius:15px}.staff-dashboard-stat-icon{flex-basis:36px;width:36px;height:36px;border-radius:11px;font-size:19px}.staff-dashboard-stat-card p{font-size:11px}.staff-dashboard-stat-card strong{font-size:25px}.staff-dashboard-stat-card small{font-size:10px}.staff-section:not([hidden]){padding:16px 12px;border-radius:17px}}
+@media(max-width:380px){.staff-dashboard-stats{grid-template-columns:1fr}.staff-dashboard-stat-card{padding:12px 14px}}
