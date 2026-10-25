@@ -1,13 +1,13 @@
 :root {
-  --staff-background: #F9F5F1;
+  --staff-background: #F7F9FB;
   --staff-surface: #FFFFFF;
-  --staff-dark: #11141A;
-  --staff-text: #252830;
-  --staff-muted: #727782;
-  --staff-green: #BFD2AF;
-  --staff-yellow: #FFF25C;
-  --staff-border: #E7E2DC;
-  --staff-danger: #A53636;
+  --staff-dark: #102B3B;
+  --staff-text: #263746;
+  --staff-muted: #616161;
+  --staff-green: #1E7EB8;
+  --staff-yellow: #1E7EB8;
+  --staff-border: #D7E1E8;
+  --staff-danger: #B94A48;
   --staff-radius: 18px;
 }
 
@@ -29,7 +29,7 @@ body {
   margin: 0;
   color: var(--staff-text);
   background: var(--staff-background);
-  font-family: "Cairo", Tahoma, Arial, sans-serif;
+  font-family: "Cairo", "Poppins", Tahoma, Arial, sans-serif;
   line-height: 1.7;
 }
 
@@ -1014,3 +1014,27 @@ a {
 
 /* أيام التقويم دائرية، وعدد الحجوزات يظهر داخل شارة حمراء صغيرة */
 .staff-calendar-day{position:relative;display:flex;align-items:center;justify-content:center;width:100%;aspect-ratio:1/1;min-height:0;border-radius:50%;line-height:1}.staff-calendar-count{position:absolute;top:-3px;right:-2px;z-index:1;display:flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 3px;border:1px solid #fff;border-radius:999px;background:#d93036;color:#fff;font-size:10px;font-weight:800;line-height:1;direction:ltr}.staff-calendar-day.is-selected .staff-calendar-count{border-color:var(--staff-yellow);background:#c9232b;color:#fff}.staff-calendar-day.is-today:not(.is-selected){background:#edf4e8}.staff-calendar-empty{aspect-ratio:1/1;min-height:0}@media(max-width:480px){.staff-calendar-day{min-height:0;aspect-ratio:1/1}.staff-calendar-count{top:-2px;right:-2px;min-width:17px;height:17px;font-size:10px}}
+
+
+/* Match staff workspace to the shared clinic palette. */
+.staff-brand-mark {
+  color: #FFFFFF;
+  background: var(--staff-dark);
+}
+.staff-primary,
+.staff-tab[aria-selected="true"] {
+  color: #FFFFFF;
+  background: var(--staff-green);
+}
+.staff-tab[aria-selected="true"] {
+  border-color: var(--staff-green);
+}
+.staff-filter-button:focus-visible,
+.staff-shell button:focus-visible,
+.staff-shell a:focus-visible,
+.staff-shell input:focus-visible,
+.staff-shell select:focus-visible,
+.staff-shell textarea:focus-visible {
+  outline: 3px solid var(--staff-green);
+  outline-offset: 2px;
+}
