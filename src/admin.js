@@ -633,7 +633,8 @@ function renderBookingCard(booking) {
   main.className = "booking-request-main";
   const title = document.createElement("strong");
   title.className = "booking-patient-name";
-  title.textContent = queueNumberFor(booking) + ". " + (booking.patientName || "طلب حجز جديد");
+  const queueNumber = queueNumberFor(booking);
+  title.textContent = (queueNumber === "—" ? "" : queueNumber + ". ") + (booking.patientName || "طلب حجز جديد");
   const meta = document.createElement("small");
   meta.textContent = `${bookingStatusLabel(booking.status)} · تاريخ الطلب: ${formatSubmittedAt(booking.createdAt)} · الموعد: ${formatRequestDate(booking.appointmentDate)} · ${booking.patientPhone || "الهاتف غير مسجل"} · ${booking.service || "الخدمة غير المحددة"}`;
   main.append(title, meta);
