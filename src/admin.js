@@ -716,6 +716,10 @@ function renderBookingCard(booking) {
   visitPanel.hidden = true;
   details.append(visitPanel);
   summary.addEventListener("click", () => {
+    if (!details.hidden) {
+      details.hidden = true;
+      return;
+    }
     if (canOpenMedicalVisit()) {
       details.hidden = false;
       details.classList.add("medical-only-view");
@@ -723,7 +727,7 @@ function renderBookingCard(booking) {
       openBookingVisitEditor(booking, card, visitPanel);
       return;
     }
-    details.hidden = !details.hidden;
+    details.hidden = false;
   });
   pencil.addEventListener("click", (event) => {
     event.preventDefault();
@@ -819,15 +823,17 @@ async function openBookingVisitEditor(booking,card,panel){
       createMedicalBookingField("الوزن (كجم)","weight",visit.weight||linkedBooking.weight||""),
       createMedicalBookingField("قياس السكر","bloodSugar",visit.bloodSugar||linkedBooking.bloodSugar||"")
     );
-    form.append(vitals,
-      createMedicalBookingField("تاريخ الكشف","visitDate",visit.visitDate||String(booking.appointmentDate||"").slice(0,10)),
+    const visitDateInput = document.createElement("input");
+    visitDateInput.type = "hidden";
+    visitDateInput.dataset.visitField = "visitDate";
+    visitDateInput.value = visit.visitDate || String(booking.appointmentDate || "").slice(0, 10);
+    form.append(visitDateInput, vitals,
       createMedicalBookingField("ملاحظات الموظف قبل الكشف","preVisitNotes",visit.preVisitNotes||linkedBooking.preVisitNotes||"",true),
       createMedicalBookingField("التشخيص","diagnosis",visit.diagnosis||"",true),
       createMedicalBookingField("ملاحظات الدكتور أثناء الكشف","clinicalNotes",visit.clinicalNotes||"",true),
       createMedicalBookingField("العلاج والأدوية والتوصيات","treatment",visit.treatment||"",true),
       createMedicalBookingField("تعليمات المتابعة","followUpNotes",visit.followUpNotes||visit.followUp||"",true)
     );
-    const visitDateInput = form.querySelector('[data-visit-field="visitDate"]');
     form.append(createFollowUpFields(visit, visitDateInput));
     const message=document.createElement("p");
     message.className="message";
