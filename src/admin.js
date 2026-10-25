@@ -82,7 +82,7 @@ window.addEventListener("clinic-settings-updated", (event) => {
     const key = button.dataset.statusFilter;
     if (key !== "all" && RUNTIME_SETTINGS.statuses?.[key]) {
       const prefix = button.textContent.trim().startsWith("✓") ? "✓ " : "";
-      button.textContent = prefix + statusLabel(RUNTIME_SETTINGS, key);
+      button.textContent = prefix + (key === "postponed" ? "تم التأجيل" : statusLabel(RUNTIME_SETTINGS, key));
       applyRuntimeStatusColor(button, RUNTIME_SETTINGS, key);
     }
   });
@@ -1101,16 +1101,20 @@ setInterval(() => {
   const isStaff = currentAccountAccess?.accountType === "staff";
   if (isStaff && !["view", "edit"].includes(currentAccountAccess?.permissions?.bookings)) return;
   loadBookings();
-  if (!doctorAccountsSection?.hidden) {
-    loadDoctorAccountRecords();
-    loadSettlementEmployees();
+  if (Date.now() - lastDashboardRefreshAt >= 15000) {
+    lastDashboardRefreshAt = Date.now();
+    if (!doctorAccountsSection?.hidden) {
+      loadDoctorAccountRecords();
+      loadSettlementEmployees();
+    }
+    if (!employeeManagementSection?.hidden && !isStaff) loadEmployees();
   }
-  if (!employeeManagementSection?.hidden && !isStaff) loadEmployees();
 }, 5000);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && auth.currentUser) {
     const isStaff = currentAccountAccess?.accountType === "staff";
     if (!isStaff || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings)) loadBookings();
+    lastDashboardRefreshAt = Date.now();
     if (!doctorAccountsSection?.hidden) { loadDoctorAccountRecords(); loadSettlementEmployees(); }
     if (!employeeManagementSection?.hidden && !isStaff) loadEmployees();
   }
