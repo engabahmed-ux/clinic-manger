@@ -62,7 +62,7 @@ export async function onRequestPost({request,env}) {
       if(lock.status==="active"&&lock.employeeUid!==ctx.uid)return reply({message:"يوجد موظف آخر مسجل الدخول. يجب أن ينهي جلسته ويسلّم العهدة أولًا.",activeSession:{employeeName:lock.employeeName,expectedAmount:lock.expectedAmount||"0",notes:lock.notes||""}},409);
       if(lock.status==="active"&&lock.employeeUid===ctx.uid)return reply({active:true,session:lock,alreadyActive:true});
       const history=await readDoc(ctx,"custody-last-closed");
-      if(history.previousEmployeeUid&&history.acceptedByUid!==ctx.uid&&!data.acceptHandover){
+      if(history.previousEmployeeUid&&history.previousEmployeeUid!==ctx.uid&&history.acceptedByUid!==ctx.uid&&!data.acceptHandover){
         return reply({message:"توجد عهدة مسلّمة من الموظف السابق وتحتاج تأكيد استلامك.",pendingHandover:{previousEmployeeName:history.previousEmployeeName||"الموظف السابق",actualAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.nextOpeningAmount||"0.00"),notes:history.notes||"",closedAt:history.closedAt||""}},409);
       }
       const opening=Number(history.nextOpeningAmount||0);
