@@ -1273,3 +1273,45 @@ button:disabled {
 @keyframes clinic-panel-enter{from{opacity:0;transform:perspective(1000px) rotateX(-4deg) translateY(13px) scale(.99);filter:blur(2px)}to{opacity:1;transform:perspective(1000px) rotateX(0) translateY(0) scale(1);filter:blur(0)}}
 @media(max-width:600px){.admin-shell .dashboard-top{align-items:center}.clinic-sidebar{width:min(330px,90vw);padding:18px 13px 13px}.clinic-menu-toggle{width:43px;height:43px;flex-basis:43px}}
 @media(prefers-reduced-motion:reduce){.clinic-sidebar,.clinic-menu-toggle,.clinic-sidebar *,.clinic-menu-backdrop,.admin-shell .employee-section:not([hidden]){animation:none!important;transition:none!important;filter:none!important;transform:none!important}}
+
+
+/* تطبيق الهوية البصرية الموحدة على لوحة الدكتور */
+body:has(#dashboardSection:not([hidden])){background:linear-gradient(135deg,#0B2433 0%,#102B3B 58%,#173E52 100%);padding:24px 18px 40px}
+.admin-shell:has(#dashboardSection:not([hidden])){width:min(1360px,100%)}
+.admin-shell .dashboard-panel{padding:0;border:0;background:transparent;box-shadow:none;overflow:visible}
+.admin-shell .dashboard-top{position:relative;display:flex;align-items:center;justify-content:flex-start;gap:18px;min-height:116px;margin:0 0 22px;padding:22px 26px;border:1px solid rgba(255,255,255,.12);border-radius:24px;background:linear-gradient(115deg,#102B3B 0%,#17455D 72%,#1E7EB8 150%);box-shadow:0 18px 40px rgba(3,18,27,.2);color:#fff;overflow:hidden}
+.admin-shell .dashboard-brand-copy{display:grid;gap:2px;min-width:0}
+.admin-shell .dashboard-brand-title{display:flex;align-items:center;gap:9px;color:#fff;font-size:clamp(19px,2.5vw,26px);font-weight:800;line-height:1.4}
+.admin-shell .dashboard-brand-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,.14);color:#BFE7FF;font-size:20px}
+.admin-shell .dashboard-brand-subtitle{color:#BFE7FF;font-size:13px;font-weight:700}
+.admin-shell .dashboard-welcome{margin:5px 0 0;color:rgba(255,255,255,.78);font-size:12px}
+.admin-shell .dashboard-welcome span{color:#fff;font-weight:800}
+.admin-shell .dashboard-header-symbol{display:grid;place-items:center;margin-inline-start:auto;flex:0 0 62px;width:62px;height:62px;border:1px solid rgba(255,255,255,.18);border-radius:20px;background:rgba(255,255,255,.08);color:#BFE7FF;font-size:34px;transform:rotate(-8deg)}
+.admin-shell .dashboard-top .clinic-menu-toggle{border-color:rgba(255,255,255,.18);background:#fff;color:#102B3B}
+.admin-shell .employee-section:not([hidden]){margin:0 0 22px;padding:clamp(18px,3vw,30px);border:1px solid #D7E1E8;border-top:1px solid #D7E1E8;border-radius:22px;background:#fff;box-shadow:0 14px 34px rgba(3,18,27,.12);color:#263746}
+.admin-shell .employee-section-heading h3,.admin-shell .employee-section-heading h4,.admin-shell .employee-list-heading h4{color:#102B3B}
+.admin-shell .employee-section-heading{padding-bottom:14px;border-bottom:1px solid #E3EBF0}
+.admin-shell .employee-section-heading h3{font-size:clamp(18px,2vw,23px)}
+.admin-shell .schedule-date-label{background:#EAF4FA;color:#17455D}
+.admin-shell .schedule-filter-button{border-color:#D7E1E8;color:#102B3B;background:#F7F9FB}
+.admin-shell .home-add-booking-button,.admin-shell .primary-button{background:#1E7EB8;color:#fff}
+.admin-shell .home-add-booking-button:hover,.admin-shell .primary-button:hover{background:#176A9D}
+.admin-shell .dashboard-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 24px}
+.admin-shell .dashboard-stat-card{display:flex;align-items:center;gap:15px;min-width:0;padding:19px 20px;border:1px solid #D7E7F0;border-radius:18px;background:linear-gradient(135deg,#fff 0%,#F7FBFD 100%);box-shadow:0 8px 22px rgba(16,43,59,.045)}
+.admin-shell .dashboard-stat-icon{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border-radius:15px;background:#EAF4FA;color:#1E7EB8;font-size:25px;font-weight:800}
+.admin-shell .dashboard-stat-completed .dashboard-stat-icon{background:#E7F6EC;color:#21834A}
+.admin-shell .dashboard-stat-card p{margin:0;color:#526674;font-size:13px;font-weight:700}
+.admin-shell .dashboard-stat-card strong{display:block;margin:0;color:#102B3B;font-size:clamp(27px,3vw,34px);font-weight:800;line-height:1.35;font-variant-numeric:tabular-nums}
+.admin-shell .dashboard-stat-card small{color:#1E7EB8;font-size:11px;font-weight:700}
+.admin-shell .dashboard-stat-completed small{color:#21834A}
+.admin-shell .schedule-status-legend button{border-color:#D7E1E8;color:#304654}
+.admin-shell .schedule-status-legend button.is-active{outline:2px solid #1E7EB8;outline-offset:1px}
+.admin-shell .schedule-card,.admin-shell .employee-card,.admin-shell .booking-card{border-color:#D7E1E8;border-radius:16px;box-shadow:0 5px 16px rgba(16,43,59,.045)}
+.admin-shell .schedule-card{position:relative;overflow:hidden}
+.admin-shell .schedule-card::before{content:"";position:absolute;inset-block:12px;inset-inline-start:0;width:4px;border-radius:0 5px 5px 0;background:#1E7EB8}
+.admin-shell .schedule-card.status-completed::before{background:#21834A}
+.admin-shell .schedule-card.status-waiting::before{background:#D99223}
+.admin-shell .schedule-card.status-postponed::before{background:#1E7EB8}
+.admin-shell .employee-form-card,.admin-shell .security-information,.admin-shell .accounts-content,.admin-shell .medical-patient-profile{border-radius:16px}
+@media(max-width:640px){body:has(#dashboardSection:not([hidden])){padding:12px 10px 26px}.admin-shell .dashboard-top{min-height:94px;gap:11px;padding:16px 14px;border-radius:18px}.admin-shell .dashboard-header-symbol{display:none}.admin-shell .dashboard-top .clinic-menu-toggle{flex-basis:42px;width:42px;height:42px}.admin-shell .dashboard-stats{gap:9px}.admin-shell .dashboard-stat-card{gap:9px;padding:13px 11px;border-radius:15px}.admin-shell .dashboard-stat-icon{flex-basis:36px;width:36px;height:36px;border-radius:11px;font-size:19px}.admin-shell .dashboard-stat-card p{font-size:11px}.admin-shell .dashboard-stat-card strong{font-size:25px}.admin-shell .dashboard-stat-card small{font-size:10px}.admin-shell .employee-section:not([hidden]){padding:16px 12px;border-radius:17px}}
+@media(max-width:380px){.admin-shell .dashboard-stats{grid-template-columns:1fr}.admin-shell .dashboard-stat-card{padding:12px 14px}}
