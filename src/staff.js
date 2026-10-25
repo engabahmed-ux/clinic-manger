@@ -145,12 +145,12 @@ function renderDailyAccounts(rows){
     // Older completed bookings may have a fee but no stored receipt amount.
     const recordedAmount=Number(booking.paidAmount)||0;
     const received=recordedAmount>0?recordedAmount:(booking.status==="completed"?fee:0);
-    if(booking.status==="completed"&&completionDay===selectedDate&&booking.isArchived!==true&&!["archived","cancelled"].includes(booking.status))completedTotal+=received;
+    if(booking.status==="completed"&&completionDay===selectedDate&&booking.isArchived!==true&&!["archived","cancelled"].includes(booking.status)&&(booking.paymentAttributedToCurrentUser||booking.paymentUnassigned))completedTotal+=received;
     const card=document.createElement("article");
     card.className="staff-account-booking";
     const details=document.createElement("div"),title=document.createElement("h4"),meta=document.createElement("p");
     title.textContent=booking.patientName||"مريضة";
-    meta.textContent=[booking.service||"الخدمة غير محددة",booking.status==="completed"?"قيمة الكشف: "+money(fee):"",received>0?"المبلغ المقبوض: "+money(received):booking.status==="completed"?"لم يُسجّل مبلغ قبض لهذا الحجز":"",bookingStatusLabel(booking.status)].filter(Boolean).join(" · ");
+    meta.textContent=[booking.service||"الخدمة غير محددة",booking.status==="completed"?"قيمة الكشف: "+money(fee):"",received>0?"المبلغ المقبوض: "+money(received):booking.status==="completed"?"لم يُسجّل مبلغ قبض لهذا الحجز":"",booking.paymentReadOnly&&booking.paymentEnteredByName?"تم تسجيل المبلغ بواسطة: "+booking.paymentEnteredByName:"",bookingStatusLabel(booking.status)].filter(Boolean).join(" · ");
     details.append(title,meta);
     card.append(details);
     accountsBookings.append(card);
