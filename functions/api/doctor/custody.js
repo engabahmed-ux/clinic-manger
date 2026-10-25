@@ -61,7 +61,7 @@ export async function onRequestPost({request,env}) {
       if(ctx.role!=="doctor")return reply({message:"هذه الوظيفة متاحة للدكتور فقط."},403);
       const lock=await readDoc(ctx,LOCK_ID);
       const history=await readDoc(ctx,"custody-last-closed");
-      return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,lastHandover:history.previousEmployeeUid?history:null});
+      return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,lastHandover:history.previousEmployeeUid&&!history.settledAt?history:null,previousSettlement:history.settledAt?{employeeUid:history.previousEmployeeUid,employeeName:history.previousEmployeeName||"الموظف",settledAt:history.settledAt,settledByName:history.settledByName||"الدكتور"}:null});
     }
     if(action==="doctorSettle") {
       if(ctx.role!=="doctor")return reply({message:"تصفية العهدة متاحة للدكتور فقط."},403);
@@ -93,7 +93,7 @@ export async function onRequestPost({request,env}) {
       if(lock.status==="active"&&lock.employeeUid!==ctx.uid)return reply({message:"يوجد موظف آخر مسجل الدخول. يجب أن ينهي جلسته ويسلّم العهدة أولًا.",activeSession:{employeeName:lock.employeeName,expectedAmount:lock.expectedAmount||"0",notes:lock.notes||""}},409);
       if(lock.status==="active"&&lock.employeeUid===ctx.uid){let current=lock;const opening=Number(lock.openingAmount||0),expected=Number(lock.expectedAmount||0);if(opening>0&&Math.abs(opening-expected)<0.009&&!lock.handoverAccepted){const reset={...lock,openingAmount:"0.00",expectedAmount:"0.00",updatedAt:now};const masks=["openingAmount","expectedAmount","updatedAt"].map(k=>"updateMask.fieldPaths="+k).join("&");const saved=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+LOCK_ID+"?"+masks,{method:"PATCH",body:JSON.stringify(enc(reset))});if(saved?.__conflict)return reply({message:"تعذر تصفير رصيد العهدة القديمة بسبب تحديث متزامن. حدّث الصفحة وحاول مرة أخرى."},409);current={...reset};}return reply({active:true,session:current,alreadyActive:true});}
       const history=await readDoc(ctx,"custody-last-closed");
-      if(history.previousEmployeeUid&&history.previousEmployeeUid!==ctx.uid&&history.acceptedByUid!==ctx.uid&&!data.acceptHandover){
+      if(!history.settledAt&&history.previousEmployeeUid&&history.previousEmployeeUid!==ctx.uid&&history.acceptedByUid!==ctx.uid&&!data.acceptHandover){
         return reply({message:"توجد عهدة مسلّمة من الموظف السابق وتحتاج تأكيد استلامك.",pendingHandover:{previousEmployeeName:history.previousEmployeeName||"الموظف السابق",actualAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.nextOpeningAmount||"0.00"),notes:history.notes||"",closedAt:history.closedAt||""}},409);
       }
       // Start at zero unless the employee explicitly accepts an incoming handover.
