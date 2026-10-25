@@ -724,10 +724,15 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
 
   for (const key of [
     "patientName",
+    "patientId",
     "patientPhone",
     "appointmentDate",
     "service",
     "servicePrice",
+    "bloodPressure",
+    "weight",
+    "bloodSugar",
+    "preVisitNotes",
     "paidAmount",
     "completedFee",
     "completedAt",
