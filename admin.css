@@ -1315,3 +1315,28 @@ body:has(#dashboardSection:not([hidden])){background:linear-gradient(135deg,#0B2
 .admin-shell .employee-form-card,.admin-shell .security-information,.admin-shell .accounts-content,.admin-shell .medical-patient-profile{border-radius:16px}
 @media(max-width:640px){body:has(#dashboardSection:not([hidden])){padding:12px 10px 26px}.admin-shell .dashboard-top{min-height:94px;gap:11px;padding:16px 14px;border-radius:18px}.admin-shell .dashboard-header-symbol{display:none}.admin-shell .dashboard-top .clinic-menu-toggle{flex-basis:42px;width:42px;height:42px}.admin-shell .dashboard-stats{gap:9px}.admin-shell .dashboard-stat-card{gap:9px;padding:13px 11px;border-radius:15px}.admin-shell .dashboard-stat-icon{flex-basis:36px;width:36px;height:36px;border-radius:11px;font-size:19px}.admin-shell .dashboard-stat-card p{font-size:11px}.admin-shell .dashboard-stat-card strong{font-size:25px}.admin-shell .dashboard-stat-card small{font-size:10px}.admin-shell .employee-section:not([hidden]){padding:16px 12px;border-radius:17px}}
 @media(max-width:380px){.admin-shell .dashboard-stats{grid-template-columns:1fr}.admin-shell .dashboard-stat-card{padding:12px 14px}}
+
+/* إصلاح الترويسة وتوزيع قياسات المريض في صف المواعيد */
+body:has(#dashboardSection:not([hidden])){padding:8px 18px 32px}
+.admin-shell .dashboard-top{display:flex;align-items:center;justify-content:flex-start;gap:16px;min-height:76px;margin:0 0 18px;padding:14px 18px}
+.admin-shell .dashboard-top .clinic-menu-toggle{position:relative;z-index:1;flex:0 0 44px;width:44px;height:44px}
+.admin-shell .dashboard-brand-copy{display:flex;align-items:center;min-width:0;flex:1;margin:0}
+.admin-shell .dashboard-welcome{margin:0!important;color:#fff;font-size:clamp(17px,2vw,23px);font-weight:800;line-height:1.5;overflow-wrap:anywhere}
+.booking-request-summary{display:grid;grid-template-columns:minmax(150px,1fr) minmax(210px,1.6fr) auto;align-items:center;gap:12px;padding:0 12px 0 38px!important;text-align:right}
+.booking-request-main{min-width:0;align-content:center}
+.booking-request-main small{line-height:1.6;overflow-wrap:anywhere}
+.booking-vitals{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:6px;min-width:0}
+.booking-vital-badge{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:6px 9px;border:1px solid #D7E7F0;border-radius:10px;background:#F1F8FC;color:#17455D;font-size:12px;font-weight:800;line-height:1.45;white-space:normal}
+.booking-vital-badge>span:first-child{font-size:14px}
+@media(max-width:640px){
+ body:has(#dashboardSection:not([hidden])){padding:6px 10px 24px}
+ .admin-shell .dashboard-top{min-height:66px;gap:10px;padding:10px 12px;margin-bottom:14px;border-radius:16px}
+ .admin-shell .dashboard-top .clinic-menu-toggle{flex-basis:40px;width:40px;height:40px}
+ .admin-shell .dashboard-welcome{font-size:17px}
+ .booking-request-summary{grid-template-columns:minmax(0,1fr) auto;gap:9px;padding:0 8px 0 34px!important}
+ .booking-request-main{grid-column:1/-1;grid-row:1}
+ .booking-vitals{grid-column:1/-1;grid-row:2;justify-content:flex-start}
+ .booking-request-badge{grid-column:2;grid-row:1;align-self:start}
+ .booking-vital-badge{padding:5px 7px;font-size:11px}
+}
+@media(max-width:380px){.booking-request-summary{grid-template-columns:minmax(0,1fr)}.booking-request-main,.booking-vitals,.booking-request-badge{grid-column:1;grid-row:auto}.booking-request-badge{justify-self:start}}
