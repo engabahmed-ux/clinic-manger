@@ -1122,6 +1122,12 @@ function showDoctorAccounts(){if(doctorAccountsSection)doctorAccountsSection.hid
 function renderPendingBookings(){bookingList.replaceChildren();const query=(bookingSearchInput?.value||"").trim().toLocaleLowerCase("ar"),date=bookingDateFilter?.value||"";const rows=allBookings.filter(b=>!b.isArchived&&b.status==="pending"&&(!date||String(b.appointmentDate||"").slice(0,10)===date)).filter(b=>(!query||`${b.patientName||""} ${b.patientPhone||""}`.toLocaleLowerCase("ar").includes(query)));if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد طلبات مراجعة مطابقة.";bookingList.append(empty);return}rows.forEach(b=>bookingList.append(renderBookingCard(b)))}
 let lastPendingBookingCount = null;
 function updatePendingBookingBadge(){const count=allBookings.filter(b=>!b.isArchived&&b.status==="pending").length;if(lastPendingBookingCount!==null&&count>lastPendingBookingCount)playClinicUiSound("notification");lastPendingBookingCount=count;if(pendingBookingBadge){pendingBookingBadge.textContent=count>99?"99+":String(count);pendingBookingBadge.hidden=count===0;pendingBookingBadge.setAttribute("aria-label",count?`${count} طلب حجز جديد`:"لا توجد طلبات حجز جديدة");}if(openBookingsButton){openBookingsButton.classList.toggle("has-pending-bookings",count>0);openBookingsButton.setAttribute("aria-label",count?`إدارة الحجوزات، ${count} طلب حجز جديد`:"إدارة الحجوزات");openBookingsButton.title=count?`${count} طلب حجز جديد`: "إدارة الحجوزات";}}
+function hasOpenBookingCard() {
+  return [bookingList, dailyAppointmentsList].some(container =>
+    container && [...container.querySelectorAll(".booking-request-details")].some(details => !details.hidden)
+  );
+}
+
 async function loadBookings() {
   if (isLoadingBookings || !bookingList) return;
   isLoadingBookings = true;
@@ -1146,7 +1152,7 @@ setInterval(() => {
   if (document.hidden || !auth.currentUser) return;
   const isStaff = currentAccountAccess?.accountType === "staff";
   if (isStaff && !["view", "edit"].includes(currentAccountAccess?.permissions?.bookings)) return;
-  loadBookings();
+  if (!hasOpenBookingCard()) loadBookings();
   if (Date.now() - lastDashboardRefreshAt >= 15000) {
     lastDashboardRefreshAt = Date.now();
     if (!doctorAccountsSection?.hidden) {
@@ -1159,7 +1165,7 @@ setInterval(() => {
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && auth.currentUser) {
     const isStaff = currentAccountAccess?.accountType === "staff";
-    if (!isStaff || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings)) loadBookings();
+    if ((!isStaff || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings)) && !hasOpenBookingCard()) loadBookings();
     lastDashboardRefreshAt = Date.now();
     if (!doctorAccountsSection?.hidden) { loadDoctorAccountRecords(); loadSettlementEmployees(); }
     if (!employeeManagementSection?.hidden && !isStaff) loadEmployees();
