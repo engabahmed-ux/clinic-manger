@@ -1155,7 +1155,7 @@ async function loadDoctorCustody(){
    info.append(title,detail);card.append(info);doctorCustodyStatus.append(card);
   }
   const handover=result.lastHandover;
-  if(handover&&handover.previousEmployeeUid){
+  if(handover&&handover.previousEmployeeUid&&!handover.settledAt){
    const card=document.createElement("article");card.className="doctor-custody-card";
    const info=document.createElement("div"),title=document.createElement("strong"),detail=document.createElement("p");
    title.textContent="الموظف: "+(handover.previousEmployeeName||"غير محدد");
