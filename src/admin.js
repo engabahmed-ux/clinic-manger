@@ -256,7 +256,8 @@ function showDashboard(user, access = {}) {
   const brandPanel = $(".brand-panel"); if (brandPanel) brandPanel.hidden = true;
 
   if (doctorAccountLabel) {
-    doctorAccountLabel.textContent = "أحمد";
+    const doctorName = String(RUNTIME_SETTINGS.clinic?.doctorName || APP_CONFIG.clinic?.doctorName || "الدكتور").replace(/^د\.?\s*/i, "").trim();
+    doctorAccountLabel.textContent = "دكتور " + doctorName;
   }
 
   const canBookings = !isStaff || ["view", "edit"].includes(access.permissions?.bookings);
@@ -874,6 +875,7 @@ async function openBookingVisitEditor(booking,card,panel){
           followUpNotes,followUpDays:values.followUpDays,followUpDate:values.followUpDate
         });
         Object.assign(booking,values);
+        updateBookingVitalBadges(card, booking);
         if(action==="save"){
           showMessage(message,"تم حفظ التعديلات بنجاح، والكارت ما زال مفتوحًا.","success");
           buttons.forEach(item=>{item.disabled=false;item.textContent=item.value==="complete"?"تم الكشف":"حفظ التعديلات";});
@@ -902,6 +904,25 @@ async function openBookingVisitEditor(booking,card,panel){
     failure.textContent=error.message||"تعذر تحميل بيانات الكشف.";
     panel.append(failure);
     delete panel.dataset.loadedFor;
+  }
+}
+function updateBookingVitalBadges(card, booking) {
+  const vitals = card?.querySelector(".booking-vitals");
+  if (!vitals) return;
+  vitals.replaceChildren();
+  const items = [["🩺", "الضغط", booking.bloodPressure], ["🩸", "السكر", booking.bloodSugar], ["⚖️", "الوزن", booking.weight ? booking.weight + " كجم" : ""]];
+  for (const [icon, label, value] of items) {
+    if (value === undefined || value === null || String(value).trim() === "") continue;
+    const vital = document.createElement("span");
+    vital.className = "booking-vital-badge";
+    vital.title = label;
+    const symbol = document.createElement("span");
+    symbol.setAttribute("aria-hidden", "true");
+    symbol.textContent = icon;
+    const text = document.createElement("span");
+    text.textContent = label + " " + value;
+    vital.append(symbol, text);
+    vitals.append(vital);
   }
 }
 function formatRequestDate(value){if(!value)return"التاريخ غير محدد";const date=new Date(`${String(value).slice(0,10)}T12:00:00`);return Number.isNaN(date.getTime())?value:new Intl.DateTimeFormat("ar-EG",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}).format(date)}
@@ -1743,6 +1764,7 @@ async function handleBookingCardAction(event, container) {
       await bookingApiRequest("update", { booking });
       const nextDate = String(booking.appointmentDate || "").slice(0, 10);
       if (container === dailyAppointmentsList && nextDate && nextDate !== previousDate) {
+        if (doctorHomeDateFilter) doctorHomeDateFilter.value = nextDate;
         if (doctorFilterMode) doctorFilterMode.value = "date";
         if (doctorHomeSearch) doctorHomeSearch.value = "";
       }
