@@ -41,8 +41,9 @@ async function authenticate(request,env) {
   const token=await googleToken(a);if(user.localId===DOCTOR_UID)return {uid:user.localId,name:"الدكتور",role:"doctor",token,project:PROJECT};
   const doc=await fs(PROJECT,token,"/clinicStaff/"+encodeURIComponent(user.localId));const f=doc?.fields||{};
   const read=k=>f[k]?.stringValue||"";
-  if(f.active?.booleanValue!==true||read("role")!=="staff"||!["view","edit"].includes(f.permissions?.mapValue?.fields?.accounts?.stringValue||"none"))return {error:"لا تملك صلاحية الوصول إلى العهدة.",status:403};
-  return {uid:user.localId,name:read("displayName")||"الموظف",role:"staff",token,project:PROJECT};
+  if(f.active?.booleanValue!==true||read("role")!=="staff")return {error:"حساب الموظف غير نشط أو غير معتمد.",status:403};
+  const accountPermission=f.permissions?.mapValue?.fields?.accounts?.stringValue||"none";
+  return {uid:user.localId,name:read("displayName")||"الموظف",role:"staff",accountPermission,token,project:PROJECT};
 }
 async function readDoc(ctx,id){return dec(await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+encodeURIComponent(id)));}
 async function createRecord(ctx,id,record){return fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+encodeURIComponent(id)+"?currentDocument.exists=false",{method:"PATCH",body:JSON.stringify(enc(record))});}
@@ -93,7 +94,7 @@ export async function onRequestPost({request,env}) {
       return reply({closed:true,expectedAmount:expected.toFixed(2),actualAmount:actual.toFixed(2),difference:(actual-expected).toFixed(2)});
     }
     if(action==="addCash") {
-      if(ctx.role!=="staff")return reply({message:"هذه العملية متاحة للموظف فقط."},403);
+      if(ctx.role!=="staff"||ctx.accountPermission!=="edit")return reply({message:"تحتاج إلى صلاحية تعديل الحسابات لإضافة مبلغ للعهدة."},403);
       const amount=Number(data.amount),notes=String(data.notes||"").trim();if(!Number.isFinite(amount)||amount<=0||amount>99999999||notes.length>500)return reply({message:"راجع المبلغ والملاحظات."},400);
       const lock=await readDoc(ctx,LOCK_ID);if(lock.status!=="active"||lock.employeeUid!==ctx.uid)return reply({message:"لا توجد عهدة نشطة باسمك."},409);
       const expected=Number(lock.expectedAmount||0)+amount;
