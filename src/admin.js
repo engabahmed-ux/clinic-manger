@@ -154,10 +154,35 @@ const doctorQueueNumber = $("#doctorQueueNumber");
 const doctorQueueDialogDone = $("#doctorQueueDialogDone");
 const addBookingToggleButton = $("#addBookingToggleButton");
 const bookingCreateCard = $(".booking-create-card");
+const bookingCreateDialog = document.createElement("dialog");
+bookingCreateDialog.className = "booking-create-dialog";
+bookingCreateDialog.setAttribute("aria-label", "إضافة حجز جديد");
+if (bookingCreateCard) {
+  bookingCreateCard.hidden = false;
+  bookingCreateDialog.append(bookingCreateCard);
+  document.body.append(bookingCreateDialog);
+  bookingCreateCard.hidden = true;
+}
+function openBookingCreateDialog() {
+  if (!bookingCreateDialog || !bookingCreateCard) return;
+  bookingCreateCard.hidden = false;
+  if (bookingCreateDialog.showModal) bookingCreateDialog.showModal();
+  else bookingCreateDialog.setAttribute("open", "");
+}
+function closeBookingCreateDialog() {
+  if (bookingCreateDialog?.open && bookingCreateDialog.close) bookingCreateDialog.close();
+  else bookingCreateDialog?.removeAttribute("open");
+  if (bookingCreateCard) bookingCreateCard.hidden = true;
+}
+bookingCreateDialog.addEventListener("click", (event) => {
+  if (event.target === bookingCreateDialog) closeBookingCreateDialog();
+});
+bookingCreateDialog.addEventListener("close", () => {
+  if (bookingCreateCard) bookingCreateCard.hidden = true;
+});
 const bookingSearchInput = $("#bookingSearchInput");
 const bookingRequestsToggle = $("#openBookingRequestsButton");
 const bookingRequestsPanel = $("#bookingRequestsPanel");
-const bookingDateFilter = $("#bookingDateFilter");
 const homeAppointmentsSection = $("#homeAppointmentsSection");
 const doctorArchiveSection = $("#doctorArchiveSection");
 const openArchiveTabButton = $("#openArchiveTabButton");
@@ -1135,7 +1160,7 @@ async function loadDoctorSettlements(){
 }
 async function archiveDoctorDay(){const day=doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());if((doctorFilterMode?.value||"date")!=="date"){showMessage(dailyAppointmentsMessage,"اختر عرض مواعيد يوم محدد قبل الأرشفة.");return}if(!window.confirm("هل تريد أرشفة حجوزات يوم "+formatRequestDate(day)+" وسجلات المواعيد التي نُقلت من هذا اليوم؟ سيظل الموعد الجديد لكل حجز مؤجل فعالًا في يومه الحالي."))return;const originalLabel=archiveSelectedAppointments.textContent;archiveSelectedAppointments.disabled=true;archiveSelectedAppointments.textContent="جارٍ أرشفة حجوزات اليوم…";try{const result=await bookingApiRequest("archiveDay",{date:day});await loadBookings();showMessage(dailyAppointmentsMessage,"تمت أرشفة "+(result.archivedCount||0)+" حجز أو موعد مؤجل مع الحفاظ على حالته وتفاصيله.","success")}catch(e){showMessage(dailyAppointmentsMessage,e.message||"تعذر أرشفة مواعيد اليوم.")}finally{archiveSelectedAppointments.textContent=originalLabel;renderDailyAppointments();}}
 function showDoctorAccounts(){if(doctorAccountsSection)doctorAccountsSection.hidden=false;homeAppointmentsSection.hidden=true;doctorArchiveSection.hidden=true;bookingManagementSection.hidden=true;patientManagementSection.hidden=true;employeeManagementSection.hidden=true;setActiveTab(openAccountsTabButton);if(doctorAccountsDate)doctorAccountsDate.value=doctorHomeDateFilter?.value||doctorAccountsDate.value;renderDoctorAccounts();loadDoctorAccountRecords();loadSettlementEmployees()}
-function renderPendingBookings(){bookingList.replaceChildren();const query=(bookingSearchInput?.value||"").trim().toLocaleLowerCase("ar"),date=bookingDateFilter?.value||"";const rows=allBookings.filter(b=>!b.isArchived&&b.status==="pending"&&(!date||String(b.appointmentDate||"").slice(0,10)===date)).filter(b=>(!query||`${b.patientName||""} ${b.patientPhone||""}`.toLocaleLowerCase("ar").includes(query)));if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد طلبات مراجعة مطابقة.";bookingList.append(empty);return}rows.forEach(b=>bookingList.append(renderBookingCard(b)))}
+function renderPendingBookings(){bookingList.replaceChildren();const query=(bookingSearchInput?.value||"").trim().toLocaleLowerCase("ar");const rows=allBookings.filter(b=>!b.isArchived&&b.status==="pending").filter(b=>(!query||`${b.patientName||""} ${b.patientPhone||""}`.toLocaleLowerCase("ar").includes(query))).sort((a,b)=>String(a.appointmentDate||"9999-99-99").slice(0,10).localeCompare(String(b.appointmentDate||"9999-99-99").slice(0,10))||String(a.createdAt||"").localeCompare(String(b.createdAt||""))||String(a.patientName||"").localeCompare(String(b.patientName||""),"ar"));if(!rows.length){const empty=document.createElement("div");empty.className="empty-employees";empty.textContent="لا توجد طلبات حجز معلقة.";bookingList.append(empty);return}rows.forEach(b=>bookingList.append(renderBookingCard(b)))}
 let lastPendingBookingCount = null;
 function updatePendingBookingBadge(){const count=allBookings.filter(b=>!b.isArchived&&b.status==="pending").length;if(lastPendingBookingCount!==null&&count>lastPendingBookingCount)playClinicUiSound("notification");lastPendingBookingCount=count;if(pendingBookingBadge){pendingBookingBadge.textContent=count>99?"99+":String(count);pendingBookingBadge.hidden=count===0;pendingBookingBadge.setAttribute("aria-label",count?`${count} طلب حجز جديد`:"لا توجد طلبات حجز جديدة");}if(openBookingsButton){openBookingsButton.classList.toggle("has-pending-bookings",count>0);openBookingsButton.setAttribute("aria-label",count?`إدارة الحجوزات، ${count} طلب حجز جديد`:"إدارة الحجوزات");openBookingsButton.title=count?`${count} طلب حجز جديد`: "إدارة الحجوزات";}}
 function hasOpenBookingCard() {
@@ -1488,14 +1513,14 @@ if (openBookingsButton) {
 }
 
 
-if (addBookingToggleButton && bookingCreateCard) addBookingToggleButton.addEventListener("click", () => { bookingCreateCard.hidden = !bookingCreateCard.hidden; });
+if (addBookingToggleButton && bookingCreateCard) addBookingToggleButton.addEventListener("click", openBookingCreateDialog);
 createBookingForm?.querySelector(".service-quick-select")?.addEventListener("change",e=>{const input=createBookingForm.querySelector('[name="service"]');if(input&&e.target.value)input.value=e.target.value});
 if (bookingSearchInput) bookingSearchInput.addEventListener("input", renderPendingBookings);
 doctorDailyExpenseForm?.addEventListener("submit",async e=>{e.preventDefault();const values=Object.fromEntries(new FormData(doctorDailyExpenseForm).entries());const date=doctorAccountsDate?.value||doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());const entry={date,amount:String(values.amount||"").trim(),description:String(values.description||"").trim(),notes:String(values.notes||"").trim()};const button=doctorDailyExpenseForm.querySelector('button[type="submit"]');button.disabled=true;try{const result=await accountsApiRequest("createDailyExpense",{entry});doctorDailyExpenseForm.reset();playClinicUiSound("expense");showMessage(doctorDailyExpenseMessage,result.expense?.status==="pending"?"تم تسجيل المصروف وهو بانتظار اعتماد الدكتور.":"تم تسجيل المصروف واحتسابه ضمن المصروفات المعتمدة.","success");renderDoctorAccounts()}catch(error){showMessage(doctorDailyExpenseMessage,error.message||"تعذر تسجيل المصروف.")}finally{button.disabled=false}});
 if (bookingRequestsToggle && bookingRequestsPanel) bookingRequestsToggle.addEventListener("click",()=>{const open=bookingRequestsPanel.hidden;bookingRequestsPanel.hidden=!open;bookingRequestsToggle.setAttribute("aria-expanded",String(open));bookingRequestsToggle.classList.toggle("is-open",open)});
 doctorQueueDialogDone?.addEventListener("click",()=>doctorQueueDialog?.close());
-$("#cancelCreateBookingButton")?.addEventListener("click",()=>{createBookingForm?.reset();if(bookingCreateCard)bookingCreateCard.hidden=true;document.activeElement?.blur()});
-if (bookingDateFilter) bookingDateFilter.addEventListener("change", renderPendingBookings);
+$("#cancelCreateBookingButton")?.addEventListener("click",()=>{createBookingForm?.reset();closeBookingCreateDialog();document.activeElement?.blur()});
+
 
 function clearPatientCredentials() {
   if (patientCredentialsPanel) patientCredentialsPanel.hidden = true;
@@ -1543,7 +1568,7 @@ if (createBookingForm) {
       const result = await bookingApiRequest("create", { booking });
       playClinicUiSound("success");
       createBookingForm.reset();
-      if (bookingCreateCard) bookingCreateCard.hidden = true;
+      closeBookingCreateDialog();
       document.activeElement?.blur();
       await loadBookings();
       if (doctorQueueNumber) doctorQueueNumber.textContent = queueNumberFor(result.booking);
@@ -2008,7 +2033,7 @@ finalizeMonthlySettlementButton?.addEventListener("click",async()=>{
   finally{await previewDoctorSettlement("month")}
 });
 doctorArchiveDateFilter?.addEventListener("change",renderDoctorArchive);doctorArchiveToDateFilter?.addEventListener("change",renderDoctorArchive);doctorArchiveSearch?.addEventListener("input",renderDoctorArchive);exportClinicExcelButton?.addEventListener("click",exportClinicExcel);
-$("#openDoctorScheduleFilter")?.addEventListener("click",openDoctorScheduleCalendar);homeAddBookingButton?.addEventListener("click",()=>{showBookingSection(true);if(bookingCreateCard)bookingCreateCard.hidden=false;const date=$("#newBookingDate");if(date)date.value=doctorHomeDateFilter.value;bookingCreateCard?.scrollIntoView({behavior:"smooth",block:"start"})});function showDoctorArchive(){if(medicalRecordsSection)medicalRecordsSection.hidden=true;if(doctorAccountsSection)doctorAccountsSection.hidden=true;homeAppointmentsSection.hidden=true;bookingManagementSection.hidden=true;patientManagementSection.hidden=true;employeeManagementSection.hidden=true;doctorArchiveSection.hidden=false;for(const b of document.querySelectorAll(".dashboard-tab"))b.setAttribute("aria-selected",String(b===openArchiveTabButton));renderDoctorArchive()}openArchiveTabButton?.addEventListener("click",showDoctorArchive);setInterval(()=>{const editing=!!document.querySelector(".booking-request-details:not([hidden]),.booking-create-card:not([hidden])")||document.activeElement?.matches("input,select,textarea");if(auth.currentUser&&!document.hidden&&!isLoadingBookings&&!editing)loadBookings()},20000);document.addEventListener("visibilitychange",()=>{const editing=!!document.querySelector(".booking-request-details:not([hidden]),.booking-create-card:not([hidden])")||document.activeElement?.matches("input,select,textarea");if(!document.hidden&&auth.currentUser&&!editing)loadBookings()});
+$("#openDoctorScheduleFilter")?.addEventListener("click",openDoctorScheduleCalendar);homeAddBookingButton?.addEventListener("click",()=>{const date=$("#newBookingDate");if(date)date.value=doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());openBookingCreateDialog()});function showDoctorArchive(){if(medicalRecordsSection)medicalRecordsSection.hidden=true;if(doctorAccountsSection)doctorAccountsSection.hidden=true;homeAppointmentsSection.hidden=true;bookingManagementSection.hidden=true;patientManagementSection.hidden=true;employeeManagementSection.hidden=true;doctorArchiveSection.hidden=false;for(const b of document.querySelectorAll(".dashboard-tab"))b.setAttribute("aria-selected",String(b===openArchiveTabButton));renderDoctorArchive()}openArchiveTabButton?.addEventListener("click",showDoctorArchive);setInterval(()=>{const editing=!!document.querySelector(".booking-request-details:not([hidden]),.booking-create-card:not([hidden])")||document.activeElement?.matches("input,select,textarea");if(auth.currentUser&&!document.hidden&&!isLoadingBookings&&!editing)loadBookings()},20000);document.addEventListener("visibilitychange",()=>{const editing=!!document.querySelector(".booking-request-details:not([hidden]),.booking-create-card:not([hidden])")||document.activeElement?.matches("input,select,textarea");if(!document.hidden&&auth.currentUser&&!editing)loadBookings()});
 showLogin();
 
 
