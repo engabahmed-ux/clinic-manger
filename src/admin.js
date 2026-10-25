@@ -256,9 +256,7 @@ function showDashboard(user, access = {}) {
   const brandPanel = $(".brand-panel"); if (brandPanel) brandPanel.hidden = true;
 
   if (doctorAccountLabel) {
-    doctorAccountLabel.textContent = isStaff
-      ? (access.displayName || "الموظف")
-      : (user.displayName || APP_CONFIG.clinic.doctorName || (user.email ? user.email.split("@")[0] : "الدكتور"));
+    doctorAccountLabel.textContent = "أحمد";
   }
 
   const canBookings = !isStaff || ["view", "edit"].includes(access.permissions?.bookings);
@@ -625,10 +623,29 @@ function renderBookingCard(booking) {
   const meta = document.createElement("small");
   meta.textContent = `${bookingStatusLabel(booking.status)} · تاريخ الطلب: ${formatSubmittedAt(booking.createdAt)} · الموعد: ${formatRequestDate(booking.appointmentDate)} · ${booking.patientPhone || "الهاتف غير مسجل"} · ${booking.service || "الخدمة غير المحددة"}`;
   main.append(title, queueBadge, meta);
+  const vitals = document.createElement("span");
+  vitals.className = "booking-vitals";
+  const vitalItems = [
+    ["🩺", "الضغط", booking.bloodPressure],
+    ["🩸", "السكر", booking.bloodSugar],
+    ["⚖️", "الوزن", booking.weight ? booking.weight + " كجم" : ""]
+  ];
+  vitalItems.filter(item => item[2] !== undefined && item[2] !== null && String(item[2]).trim() !== "").forEach(([icon, label, value]) => {
+    const vital = document.createElement("span");
+    vital.className = "booking-vital-badge";
+    vital.title = label;
+    const symbol = document.createElement("span");
+    symbol.setAttribute("aria-hidden", "true");
+    symbol.textContent = icon;
+    const text = document.createElement("span");
+    text.textContent = label + " " + value;
+    vital.append(symbol, text);
+    vitals.append(vital);
+  });
   const badge = document.createElement("span");
   badge.className = "booking-request-badge";
   badge.textContent = bookingStatusLabel(booking.status);
-  summary.append(main, badge);
+  summary.append(main, vitals, badge);
   const pencil = document.createElement("button");
   pencil.type = "button";
   pencil.className = "booking-edit-pencil";
@@ -900,7 +917,7 @@ function normalizedStatus(status){return status==="confirmed"?"waiting":status}
 function bookingStatusLabel(status){return statusLabel(RUNTIME_SETTINGS,status,({pending:"قيد المراجعة",confirmed:"في الانتظار",waiting:"في الانتظار",completed:"تم الكشف",postponed:"تم التأجيل",no_show:"لم يأتِ",apologized:"اعتذر",cancelled:"ملغي",archived:"مؤرشف"})[status]||"غير محدد")}
 async function changeBookingStatus(booking,status,control){if(!["waiting","completed","postponed","no_show","apologized"].includes(status))return;if(control)control.disabled=true;try{await bookingApiRequest("update",{booking:{id:booking.id,status}});playClinicUiSound(status==="completed"?"success":"archive");showMessage(bookingListMessage,"تم تحديث حالة الحجز.","success");await loadBookings()}catch(error){showMessage(bookingListMessage,error.message||"تعذر تحديث حالة الحجز.");if(control)control.value=normalizedStatus(booking.status)}finally{if(control)control.disabled=false}}
 function applyStatusColor(el,status){for(const name of ["waiting","completed","postponed","no_show","apologized","pending","archived","cancelled","confirmed"])el.classList.remove(`status-${name}`);el.classList.add(`status-${status||"waiting"}`);applyRuntimeStatusColor(el,RUNTIME_SETTINGS,status||"waiting")}function makeStatusSelect(booking){const select=document.createElement("select");select.className="booking-status-select";select.setAttribute("aria-label",`حالة حجز ${booking.patientName||""}`);for(const[value,label]of BOOKING_STATUS_OPTIONS){const option=document.createElement("option");option.value=value;option.textContent=label;option.className=`status-option-${value}`;select.append(option)}select.value=normalizedStatus(booking.status)||"waiting";if(booking.status==="completed"){select.disabled=true;select.title="حالة تم الكشف نهائية ولا يمكن تغييرها";select.setAttribute("aria-label",`حالة نهائية: تم الكشف عن ${booking.patientName||"المريضة"}`)}else if(currentAccountAccess?.accountType==="staff"&&currentAccountAccess?.permissions?.bookings!=="edit"){select.disabled=true;select.title="صلاحية المشاهدة فقط"}applyStatusColor(select,select.value);select.addEventListener("change",()=>{applyStatusColor(select,select.value);changeBookingStatus(booking,select.value,select)});return select}
-function renderScheduleCard(booking,archived=false){const card=renderBookingCard(booking);card.classList.add("schedule-booking-card");applyStatusColor(card,normalizedStatus(booking.status));const meta=card.querySelector(".booking-request-main small");if(meta)meta.textContent="الموعد: "+formatRequestDate(booking.appointmentDate)+" · "+(booking.patientPhone||"الهاتف غير مسجل")+" · "+(booking.service||"الخدمة غير محددة")+" · الضغط: "+(booking.bloodPressure||"—")+" · الوزن: "+(booking.weight?booking.weight+" كجم":"—")+" · السكر: "+(booking.bloodSugar||"—")+(booking.preVisitNotes?" · ملاحظة قبل الكشف: "+booking.preVisitNotes:"");if(!archived){card.querySelector(".booking-request-badge")?.remove();const controls=document.createElement("div");controls.className="schedule-card-controls";controls.append(makeStatusSelect(booking));card.prepend(controls)}return card}
+function renderScheduleCard(booking,archived=false){const card=renderBookingCard(booking);card.classList.add("schedule-booking-card");applyStatusColor(card,normalizedStatus(booking.status));const meta=card.querySelector(".booking-request-main small");if(meta)meta.textContent="الموعد: "+formatRequestDate(booking.appointmentDate)+" · "+(booking.patientPhone||"الهاتف غير مسجل")+" · "+(booking.service||"الخدمة غير محددة")+(booking.preVisitNotes?" · ملاحظة قبل الكشف: "+booking.preVisitNotes:"");if(!archived){card.querySelector(".booking-request-badge")?.remove();const controls=document.createElement("div");controls.className="schedule-card-controls";controls.append(makeStatusSelect(booking));card.prepend(controls)}return card}
 
 function updateDashboardStats(day){
   const appointments=allBookings.filter(booking=>!booking.isArchived&&!["pending","archived","cancelled"].includes(booking.status)&&String(booking.appointmentDate||"").slice(0,10)===day);
