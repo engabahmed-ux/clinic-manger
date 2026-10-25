@@ -68,26 +68,32 @@
     </section>
 
     <section id="dashboardSection" class="panel dashboard-panel" hidden>
-      <div class="dashboard-top">
-        <div>
-          <h2 class="compact-welcome">أهلاً بك يا <span id="doctorAccountLabel">الدكتور</span></h2>
+      <div id="adminMenuBackdrop" class="clinic-menu-backdrop" hidden></div>
+      <aside id="adminSidebar" class="clinic-sidebar admin-sidebar" aria-label="القائمة الرئيسية" aria-hidden="true">
+        <div class="clinic-sidebar-heading">
+          <span class="clinic-sidebar-mark" aria-hidden="true">ط</span>
+          <div><strong>إدارة العيادة</strong><small>القائمة الرئيسية</small></div>
+          <button class="clinic-menu-close" type="button" data-clinic-menu-close aria-label="إغلاق القائمة">×</button>
         </div>
-
-        <button id="logoutButton" class="secondary-button" type="button">
-          تسجيل الخروج
-        </button>
+        <nav class="dashboard-tabs" aria-label="أقسام إدارة العيادة">
+          <button id="openHomeTabButton" class="dashboard-tab" type="button" aria-selected="true">الرئيسية</button>
+          <button id="openArchiveTabButton" class="dashboard-tab" type="button" aria-selected="false">أرشيف الحجوزات</button>
+          <button id="openAccountsTabButton" class="dashboard-tab" type="button" aria-selected="false">حسابات</button>
+          <button id="openBookingsButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الحجوزات <span id="pendingBookingBadge" class="booking-notification-badge" aria-live="polite" hidden></span></button>
+          <button id="openPatientsButton" class="dashboard-tab" type="button" aria-selected="false">حسابات المريضات</button>
+          <button id="openMedicalRecordsButton" class="dashboard-tab" type="button" aria-selected="false">السجلات الطبية</button>
+          <button id="openEmployeesButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الموظفين</button>
+          <button id="openClinicManagementButton" class="dashboard-tab" type="button" aria-selected="false">إدارة العيادة</button>
+        </nav>
+        <div class="clinic-sidebar-footer">
+          <button id="logoutButton" class="secondary-button clinic-sidebar-logout" type="button"><span aria-hidden="true">↪</span> تسجيل الخروج</button>
+          <a class="clinic-sidebar-site-link" href="./index.html"><span aria-hidden="true">⌂</span> العودة إلى الموقع الرئيسي</a>
+        </div>
+      </aside>
+      <div class="dashboard-top">
+        <button id="adminMenuToggle" class="clinic-menu-toggle" type="button" aria-controls="adminSidebar" aria-expanded="false" aria-label="فتح قائمة التبويبات"><span aria-hidden="true">☰</span></button>
+        <h2 class="compact-welcome">أهلاً بك يا <span id="doctorAccountLabel">الدكتور</span></h2>
       </div>
-
-      <nav class="dashboard-tabs" aria-label="أقسام إدارة العيادة">
-        <button id="openHomeTabButton" class="dashboard-tab" type="button" aria-selected="true">الرئيسية</button>
-        <button id="openArchiveTabButton" class="dashboard-tab" type="button" aria-selected="false">أرشيف الحجوزات</button>
-        <button id="openAccountsTabButton" class="dashboard-tab" type="button" aria-selected="false">حسابات</button>
-        <button id="openBookingsButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الحجوزات <span id="pendingBookingBadge" class="booking-notification-badge" aria-live="polite" hidden></span></button>
-        <button id="openPatientsButton" class="dashboard-tab" type="button" aria-selected="false">حسابات المريضات</button>
-        <button id="openMedicalRecordsButton" class="dashboard-tab" type="button" aria-selected="false">السجلات الطبية</button>
-        <button id="openEmployeesButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الموظفين</button>
-        <button id="openClinicManagementButton" class="dashboard-tab" type="button" aria-selected="false">إدارة العيادة</button>
-      </nav>
       <section id="homeAppointmentsSection" class="employee-section home-appointments-section">
         <div class="employee-section-heading doctor-schedule-heading"><h3>جدول المواعيد <button id="doctorScheduleDateLabel" class="schedule-date-label" type="button" aria-label="اضغط لتغيير تاريخ المواعيد"></button><button id="openDoctorScheduleFilter" class="schedule-filter-button" type="button" aria-label="فلترة جدول المواعيد" title="فلترة جدول المواعيد">☷</button></h3><div class="doctor-home-actions"><button id="homeAddBookingButton" class="primary-button home-add-booking-button" type="button">＋ إضافة حجز</button></div></div><input id="doctorHomeDateFilter" type="date" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1"><input id="doctorHomeSearch" type="search" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1">
         <div class="schedule-status-legend" id="doctorStatusLegend" aria-label="فلترة حسب حالة الحجز"><button type="button" data-status-filter="all" class="is-active">✓ الكل</button><button type="button" data-status-filter="waiting">✓ في الانتظار</button><button type="button" data-status-filter="completed">✓ تم الكشف</button><button type="button" data-status-filter="postponed">✓ تم التأجيل</button><button type="button" data-status-filter="no_show">✓ لم يأتِ</button><button type="button" data-status-filter="apologized">✓ اعتذر</button></div>
@@ -402,12 +408,10 @@
     </section>
 
     <dialog id="doctorScheduleFilterDialog" class="schedule-filter-dialog schedule-calendar-dialog"><form method="dialog" id="doctorScheduleFilterForm"><div class="employee-section-heading schedule-calendar-top"><h4>اختيار تاريخ المواعيد</h4><button class="schedule-filter-close" value="cancel" aria-label="إغلاق التقويم" type="submit">×</button></div><div class="schedule-calendar-shortcuts"><button type="button" data-calendar-offset="-1">أمس</button><button type="button" data-calendar-offset="0">اليوم</button><button type="button" data-calendar-offset="1">غدًا</button></div><div class="schedule-calendar-month-controls"><button type="button" id="doctorCalendarPrev" aria-label="الشهر السابق">‹</button><select id="doctorCalendarMonth" aria-label="الشهر"></select><select id="doctorCalendarYear" aria-label="السنة"></select><button type="button" id="doctorCalendarNext" aria-label="الشهر التالي">›</button></div><div class="schedule-calendar-weekdays" aria-hidden="true"><span>الأحد</span><span>الإثنين</span><span>الثلاثاء</span><span>الأربعاء</span><span>الخميس</span><span>الجمعة</span><span>السبت</span></div><div id="doctorCalendarDays" class="schedule-calendar-days" role="group" aria-label="أيام الشهر"></div><input id="doctorFilterDate" type="date" hidden><div class="schedule-calendar-footer"><span>اختر اليوم لعرض مواعيده مباشرة</span><button class="secondary-button" value="cancel" type="submit">إغلاق</button></div></form></dialog>
-      <footer class="admin-footer">
-      <a href="./index.html">العودة إلى الموقع العام</a>
-    </footer>
   </main>
 
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="./src/clinic-ui-shell.js"></script>
   <script type="module" src="./src/admin.js"></script>
   <script type="module" src="./src/clinic-management.js"></script>
 </body>
