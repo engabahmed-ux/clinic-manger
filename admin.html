@@ -92,9 +92,24 @@
       </aside>
       <div class="dashboard-top">
         <button id="adminMenuToggle" class="clinic-menu-toggle" type="button" aria-controls="adminSidebar" aria-expanded="false" aria-label="فتح قائمة التبويبات"><span aria-hidden="true">☰</span></button>
-        <h2 class="compact-welcome">أهلاً بك يا <span id="doctorAccountLabel">الدكتور</span></h2>
+        <div class="dashboard-brand-copy">
+          <strong class="dashboard-brand-title"><span class="dashboard-brand-icon" aria-hidden="true">✚</span> إدارة العيادة</strong>
+          <span class="dashboard-brand-subtitle">لوحة الدكتور</span>
+          <p class="dashboard-welcome">أهلاً بك يا <span id="doctorAccountLabel">الدكتور</span></p>
+        </div>
+        <span class="dashboard-header-symbol" aria-hidden="true">✚</span>
       </div>
       <section id="homeAppointmentsSection" class="employee-section home-appointments-section">
+        <div class="dashboard-stats" aria-label="ملخص مواعيد اليوم">
+          <article class="dashboard-stat-card dashboard-stat-bookings">
+            <span class="dashboard-stat-icon" aria-hidden="true">▦</span>
+            <div><p>حجوزات اليوم</p><strong id="doctorTodayBookingsCount">—</strong><small>موعدًا مسجلًا</small></div>
+          </article>
+          <article class="dashboard-stat-card dashboard-stat-completed">
+            <span class="dashboard-stat-icon" aria-hidden="true">✓</span>
+            <div><p>تم الكشف</p><strong id="doctorTodayCompletedCount">—</strong><small>كشف مكتمل</small></div>
+          </article>
+        </div>
         <div class="employee-section-heading doctor-schedule-heading"><h3>جدول المواعيد <button id="doctorScheduleDateLabel" class="schedule-date-label" type="button" aria-label="اضغط لتغيير تاريخ المواعيد"></button><button id="openDoctorScheduleFilter" class="schedule-filter-button" type="button" aria-label="فلترة جدول المواعيد" title="فلترة جدول المواعيد">☷</button></h3><div class="doctor-home-actions"><button id="homeAddBookingButton" class="primary-button home-add-booking-button" type="button">＋ إضافة حجز</button></div></div><input id="doctorHomeDateFilter" type="date" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1"><input id="doctorHomeSearch" type="search" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1">
         <div class="schedule-status-legend" id="doctorStatusLegend" aria-label="فلترة حسب حالة الحجز"><button type="button" data-status-filter="all" class="is-active">✓ الكل</button><button type="button" data-status-filter="waiting">✓ في الانتظار</button><button type="button" data-status-filter="completed">✓ تم الكشف</button><button type="button" data-status-filter="postponed">✓ تم التأجيل</button><button type="button" data-status-filter="no_show">✓ لم يأتِ</button><button type="button" data-status-filter="apologized">✓ اعتذر</button></div>
         <p id="dailyAppointmentsMessage" class="message" role="status" hidden></p>
