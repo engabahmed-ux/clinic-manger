@@ -617,7 +617,7 @@ function createBookingVitalIcon(kind) {
   return icon;
 }
 function formatBloodPressure(value) {
-  return String(value ?? "").trim().replace(/\\s*\\/\\s*/, " / ");
+  return String(value ?? "").trim().replace(/\s*\/\s*/, " / ");
 }
 function renderBookingCard(booking) {
   const card = document.createElement("article");
