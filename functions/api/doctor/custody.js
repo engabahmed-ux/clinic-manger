@@ -57,6 +57,29 @@ export async function onRequestPost({request,env}) {
       const lock=await readDoc(ctx,LOCK_ID);
       return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,uid:ctx.uid,role:ctx.role});
     }
+    if(action==="doctorStatus") {
+      if(ctx.role!=="doctor")return reply({message:"هذه الوظيفة متاحة للدكتور فقط."},403);
+      const lock=await readDoc(ctx,LOCK_ID);
+      const history=await readDoc(ctx,"custody-last-closed");
+      return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,lastHandover:history.previousEmployeeUid?history:null});
+    }
+    if(action==="doctorSettle") {
+      if(ctx.role!=="doctor")return reply({message:"تصفية العهدة متاحة للدكتور فقط."},403);
+      const history=await readDoc(ctx,"custody-last-closed");
+      if(!history.previousEmployeeUid||!history.closedAt)return reply({message:"لا توجد عهدة مسلّمة تنتظر التصفية."},409);
+      if(history.settledAt)return reply({message:"تمت تصفية هذه العهدة بالفعل.",settlement:history},409);
+      const amount=Number(history.nextOpeningAmount||0);
+      const now=new Date().toISOString();
+      const settlement={type:"custodyDoctorSettlement",employeeUid:history.previousEmployeeUid,employeeName:history.previousEmployeeName||"الموظف",amount:amount.toFixed(2),status:"settled",settledByUid:ctx.uid,settledByName:"الدكتور",settledAt:now,previousHandoverAt:history.closedAt,baselineReceipts:String(history.baselineReceipts||"0"),baselineExpenses:String(history.baselineExpenses||"0"),createdAt:now};
+      const id="custody-doctor-settlement-"+Date.now()+"-"+crypto.randomUUID().replace(/-/g,"").slice(0,8);
+      const made=await createRecord(ctx,id,settlement);
+      if(made?.__conflict)return reply({message:"تعذر حفظ التصفية بسبب طلب متزامن. حدّث الصفحة وحاول مرة أخرى."},409);
+      const updated={...history,settledAt:now,settledByUid:ctx.uid,settledByName:"الدكتور",settlementId:id};
+      const masks=["settledAt","settledByUid","settledByName","settlementId"].map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");
+      const saved=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/custody-last-closed+"?"+masks,{method:"PATCH",body:JSON.stringify(enc(updated))});
+      if(saved?.__conflict)return reply({message:"تم تسجيل التصفية لكن تعذر تحديث حالتها. راجع سجل التصفيات قبل إعادة المحاولة."},503);
+      return reply({settlement});
+    }
     if(action==="start") {
       if(ctx.role!=="staff")return reply({message:"هذه العملية متاحة للموظف فقط."},403);
       const lock=await readDoc(ctx,LOCK_ID);
