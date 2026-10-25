@@ -1,15 +1,15 @@
 
 :root {
-  --color-dark: #11141A;
-  --color-light: #F9F5F1;
-  --color-accent: #FFF25C;
-  --color-secondary: #BFD2AF;
-  --color-muted: #77766F;
-  --color-border: rgba(17, 20, 26, 0.10);
-  --radius-large: 28px;
+  --color-dark: #102B3B;
+  --color-light: #F7F9FB;
+  --color-accent: #1E7EB8;
+  --color-secondary: #D5E8F3;
+  --color-muted: #616161;
+  --color-border: rgba(16, 43, 59, 0.12);
+  --radius-large: 24px;
   --radius-medium: 16px;
-  --font-heading: "Stack Sans Headline", "Cairo", sans-serif;
-  --font-body: "Cairo", "Stack Sans Headline", sans-serif;
+  --font-heading: "Cairo", "Poppins", sans-serif;
+  --font-body: "Cairo", "Poppins", sans-serif;
 }
 
 * {
@@ -72,7 +72,7 @@ select:focus-visible {
   margin-bottom: 18px;
   border-radius: 17px;
   background: var(--color-dark);
-  color: var(--color-accent);
+  color: #FFFFFF;
   font-family: var(--font-heading);
   font-size: 28px;
   font-weight: 800;
@@ -190,7 +190,7 @@ select:focus-visible {
 .primary-button {
   margin-top: 14px;
   background: var(--color-dark);
-  color: var(--color-accent);
+  color: #FFFFFF;
 }
 
 .secondary-button {
@@ -1222,3 +1222,23 @@ button:disabled {
 
 /* أيام التقويم دائرية، وعدد الحجوزات يظهر داخل شارة حمراء صغيرة */
 .schedule-calendar-day{position:relative;display:flex;align-items:center;justify-content:center;width:100%;aspect-ratio:1/1;min-height:0;border-radius:50%;line-height:1}.schedule-calendar-count{position:absolute;top:-3px;right:-2px;z-index:1;display:flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 3px;border:1px solid #fff;border-radius:999px;background:#d93036;color:#fff;font-size:10px;font-weight:800;line-height:1;direction:ltr}.schedule-calendar-day.is-selected .schedule-calendar-count{border-color:var(--color-accent);background:#c9232b;color:#fff}.schedule-calendar-day.is-today:not(.is-selected){background:#edf4e8}.schedule-calendar-empty{aspect-ratio:1/1;min-height:0}@media(max-width:480px){.schedule-calendar-day{min-height:0;aspect-ratio:1/1}.schedule-calendar-count{top:-2px;right:-2px;min-width:17px;height:17px;font-size:10px}}
+
+
+/* Clinic dashboard palette: navy, clean surfaces, and calm medical blue. */
+.admin-shell .primary-button,
+.admin-shell .brand-mark {
+  background: var(--color-dark);
+  color: #FFFFFF;
+}
+.admin-shell .panel,
+.admin-shell .modal,
+.admin-shell dialog {
+  border-color: var(--color-border);
+}
+.admin-shell button:focus-visible,
+.admin-shell a:focus-visible,
+.admin-shell input:focus-visible,
+.admin-shell select:focus-visible,
+.admin-shell textarea:focus-visible {
+  outline-color: var(--color-accent);
+}
