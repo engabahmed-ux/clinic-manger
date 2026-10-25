@@ -65,9 +65,16 @@ export async function onRequestPost({request,env}) {
     }
     if(action==="doctorSettle") {
       if(ctx.role!=="doctor")return reply({message:"تصفية العهدة متاحة للدكتور فقط."},403);
+      const lock=await readDoc(ctx,LOCK_ID);
+      if(lock.status==="active")return reply({message:"يجب أن يسجل الموظف خروجًا ويسلّم العهدة أولًا قبل تصفيتها."},409);
       const history=await readDoc(ctx,"custody-last-closed");
       if(!history.previousEmployeeUid||!history.closedAt)return reply({message:"لا توجد عهدة مسلّمة تنتظر التصفية."},409);
       if(history.settledAt)return reply({message:"تمت تصفية هذه العهدة بالفعل.",settlement:history},409);
+      const handoverDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(history.closedAt));
+      const expenseQuery=await fs(ctx.project,ctx.token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:COLLECTION}]}})});
+      const custodyRecords=(Array.isArray(expenseQuery)?expenseQuery:[]).filter(x=>x.document).map(x=>dec(x.document));
+      const pending=custodyRecords.filter(x=>x.type==="dailyExpense"&&x.enteredBy===history.previousEmployeeUid&&x.date===handoverDate&&(x.status||"approved")==="pending");
+      if(pending.length)return reply({message:"لا يمكن تصفية العهدة قبل معالجة المصروفات المعلقة للموظف."},409);
       const amount=Number(history.nextOpeningAmount||0);
       const now=new Date().toISOString();
       const settlement={type:"custodyDoctorSettlement",employeeUid:history.previousEmployeeUid,employeeName:history.previousEmployeeName||"الموظف",amount:amount.toFixed(2),status:"settled",settledByUid:ctx.uid,settledByName:"الدكتور",settledAt:now,previousHandoverAt:history.closedAt,baselineReceipts:String(history.baselineReceipts||"0"),baselineExpenses:String(history.baselineExpenses||"0"),createdAt:now};
