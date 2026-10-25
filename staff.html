@@ -58,9 +58,24 @@
       </aside>
       <div class="staff-welcome">
         <button id="staffMenuToggle" class="clinic-menu-toggle" type="button" aria-controls="staffSidebar" aria-expanded="false" aria-label="فتح قائمة التبويبات"><span aria-hidden="true">☰</span></button>
-        <h1 class="staff-compact-welcome">أهلًا بك يا <span id="staffDisplayName">...</span></h1>
+        <div class="staff-dashboard-brand-copy">
+          <strong class="staff-dashboard-brand-title"><span class="staff-dashboard-brand-icon" aria-hidden="true">✚</span> إدارة العيادة</strong>
+          <span class="staff-dashboard-brand-subtitle">لوحة الموظف</span>
+          <h1 class="staff-compact-welcome">أهلًا بك يا <span id="staffDisplayName">...</span></h1>
+        </div>
+        <span class="staff-dashboard-header-symbol" aria-hidden="true">✚</span>
       </div>
       <section id="staffHomeSection" class="staff-section staff-tab-panel">
+        <div class="staff-dashboard-stats" aria-label="ملخص مواعيد اليوم">
+          <article class="staff-dashboard-stat-card staff-stat-bookings">
+            <span class="staff-dashboard-stat-icon" aria-hidden="true">▦</span>
+            <div><p>حجوزات اليوم</p><strong id="staffTodayBookingsCount">—</strong><small>موعدًا مسجلًا</small></div>
+          </article>
+          <article class="staff-dashboard-stat-card staff-stat-completed">
+            <span class="staff-dashboard-stat-icon" aria-hidden="true">✓</span>
+            <div><p>تم الكشف</p><strong id="staffTodayCompletedCount">—</strong><small>كشف مكتمل</small></div>
+          </article>
+        </div>
         <div class="staff-section-heading staff-schedule-heading"><h2>جدول المواعيد <button id="staffScheduleDateLabel" class="staff-schedule-date" type="button" aria-label="اضغط لتغيير تاريخ المواعيد"></button><button id="staffOpenFilter" class="staff-filter-button" type="button" aria-label="فلترة جدول المواعيد" title="فلترة جدول المواعيد">☷</button></h2><div class="staff-home-actions"><button id="staffHomeAddBooking" class="staff-primary staff-compact-add" type="button">＋ إضافة حجز</button></div></div><input id="staffHomeDateFilter" type="date" class="staff-hidden-filter" aria-hidden="true" tabindex="-1"><input id="staffHomeSearch" type="search" class="staff-hidden-filter" aria-hidden="true" tabindex="-1">
         <div class="schedule-status-legend staff-status-legend" id="staffStatusLegend" aria-label="فلترة حسب حالة الحجز"><button type="button" data-status-filter="all" class="is-active">✓ الكل</button><button type="button" data-status-filter="waiting">✓ في الانتظار</button><button type="button" data-status-filter="completed">✓ تم الكشف</button><button type="button" data-status-filter="postponed">✓ تم التأجيل</button><button type="button" data-status-filter="no_show">✓ لم يأتِ</button><button type="button" data-status-filter="apologized">✓ اعتذر</button></div>
         <p id="dailyAppointmentsMessage" class="staff-message" hidden></p>
