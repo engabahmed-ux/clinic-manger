@@ -1,3 +1,5 @@
+import { publishClinicRealtime } from "../../_shared/realtime.js";
+
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const EXPECTED_PROJECT_ID = "clinics-manger";
 const COLLECTION = "clinicAccountRecords";
@@ -276,5 +278,14 @@ export async function onRequestPost({ request, env }) {
 }
 export async function onRequest(context) {
   if (context.request.method !== "POST") return new Response(null, { status:405, headers:{ Allow:"POST", "Cache-Control":"no-store" } });
-  return onRequestPost(context);
+  let input = {};
+  try { input = await context.request.clone().json(); } catch {}
+  const result = await onRequestPost(context);
+  const readOnly = new Set(["list", "listDailyExpenses", "listMonthlyExpenses", "listSettlements", "previewSettlement"]);
+  if (result.ok && input.action && !readOnly.has(input.action)) {
+    const notification = publishClinicRealtime(context.env, "accounts_changed");
+    if (typeof context.waitUntil === "function") context.waitUntil(notification);
+    else void notification;
+  }
+  return result;
 }
