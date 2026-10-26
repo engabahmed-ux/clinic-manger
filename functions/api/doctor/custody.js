@@ -58,7 +58,7 @@ export async function onRequestPost({request,env}) {
       const history=await readDoc(ctx,"custody-last-closed");
       const selectedDate=String(data.date||"");
       const handoverDate=String(history.date||String(history.closedAt||"").slice(0,10));
-      const handover=ctx.role==="staff"&&history.previousEmployeeUid===ctx.uid&&handoverDate===(selectedDate||cairoDate(now))?{actualAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.expectedAmount||history.nextOpeningAmount||"0.00"),previousEmployeeName:history.previousEmployeeName||ctx.name,closedAt:history.closedAt||"",settledAt:history.settledAt||"",notes:history.notes||"",date:handoverDate}:null;
+      const handover=ctx.role==="staff"&&history.previousEmployeeUid===ctx.uid&&handoverDate===(selectedDate||cairoDate(now))?{actualAmount:String(history.totalHandedOverAmount??history.nextOpeningAmount??"0.00"),lastHandoverAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.expectedAmount||history.nextOpeningAmount||"0.00"),previousEmployeeName:history.previousEmployeeName||ctx.name,closedAt:history.closedAt||"",settledAt:history.settledAt||"",notes:history.notes||"",date:handoverDate}:null;
       return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,uid:ctx.uid,role:ctx.role,handover});
     }
     if(action==="doctorStatus") {
@@ -116,8 +116,11 @@ export async function onRequestPost({request,env}) {
       if(lock.employeeUid!==ctx.uid)return reply({message:"هذه العهدة تخص موظفًا آخر."},403);
       const actual=Number(data.actualAmount),sessionExpected=Number(lock.expectedAmount||0),expected=Number(data.expectedAmount??sessionExpected),baselineReceipts=Number(data.baselineReceipts||0),baselineExpenses=Number(data.baselineExpenses||0),notes=String(data.notes||"").trim();
       if(!Number.isFinite(actual)||actual<0||actual>99999999||!Number.isFinite(expected)||expected<0||expected>99999999||!Number.isFinite(baselineReceipts)||baselineReceipts<0||!Number.isFinite(baselineExpenses)||baselineExpenses<0||notes.length>1000||(Math.abs(actual-expected)>0.009&&!notes))return reply({message:"أدخل المبلغ الفعلي، وأضف ملاحظة توضح أي فرق بين المتوقع والفعلي."},400);
+      const previousSummary=await readDoc(ctx,"custody-last-closed");
+      const sameDayPrevious=previousSummary.previousEmployeeUid===ctx.uid&&String(previousSummary.date||String(previousSummary.closedAt||"").slice(0,10))===cairoDate(now);
+      const totalHandedOver=(sameDayPrevious?Number(previousSummary.totalHandedOverAmount??previousSummary.nextOpeningAmount??0):0)+actual;
       const id="custody-handover-"+Date.now()+"-"+crypto.randomUUID().replace(/-/g,"").slice(0,8);
-      const record={type:"custodyHandover",previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,sessionExpectedAmount:sessionExpected.toFixed(2),expectedAmount:expected.toFixed(2),actualAmount:actual.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),difference:(actual-expected).toFixed(2),notes,createdAt:now};
+      const record={type:"custodyHandover",previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,sessionExpectedAmount:sessionExpected.toFixed(2),expectedAmount:expected.toFixed(2),actualAmount:actual.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),difference:(actual-expected).toFixed(2),notes,date:cairoDate(now),createdAt:now};
       const made=await createRecord(ctx,id,record);if(made?.__conflict)return reply({message:"تعذر تسجيل التسليم. حاول مرة أخرى."},409);
       const closed={...lock,status:"closed",actualAmount:actual.toFixed(2),difference:(actual-expected).toFixed(2),notes,closedAt:now,updatedAt:now};
       const patchFields=Object.entries(closed).filter(([k])=>k!=="id").map(([k])=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");
@@ -127,7 +130,7 @@ export async function onRequestPost({request,env}) {
       if(archived?.__conflict)return reply({message:"تم إغلاق العهدة لكن تعذر حفظ نسخة الأرشيف. راجع الدكتور قبل بدء عهدة جديدة."},503);
       const removed=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+LOCK_ID,{method:"DELETE"});
       if(removed?.__conflict)return reply({message:"تم تسجيل التسليم لكن تعذر تحرير قفل الجلسة. راجع الدكتور."},409);
-      const summary={type:"custodyHandoverSummary",nextOpeningAmount:actual.toFixed(2),expectedAmount:expected.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,notes,closedAt:now,date:cairoDate(now),settledAt:"",settledByUid:"",settledByName:"",settlementId:""};const summaryMask=Object.keys(summary).map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");await fs(ctx.project,ctx.token,"/"+COLLECTION+"/custody-last-closed?"+summaryMask,{method:"PATCH",body:JSON.stringify(enc(summary))});
+      const summary={type:"custodyHandoverSummary",nextOpeningAmount:actual.toFixed(2),totalHandedOverAmount:totalHandedOver.toFixed(2),expectedAmount:expected.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,notes,closedAt:now,date:cairoDate(now),settledAt:"",settledByUid:"",settledByName:"",settlementId:""};const summaryMask=Object.keys(summary).map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");await fs(ctx.project,ctx.token,"/"+COLLECTION+"/custody-last-closed?"+summaryMask,{method:"PATCH",body:JSON.stringify(enc(summary))});
       return reply({closed:true,expectedAmount:expected.toFixed(2),actualAmount:actual.toFixed(2),difference:(actual-expected).toFixed(2)});
     }
     if(action==="addCash") {
