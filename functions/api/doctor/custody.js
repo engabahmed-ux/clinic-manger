@@ -70,7 +70,9 @@ export async function onRequestPost({request,env}) {
       if(ctx.role!=="doctor")return reply({message:"هذه الوظيفة متاحة للدكتور فقط."},403);
       const lock=await readDoc(ctx,LOCK_ID);
       const history=await readDoc(ctx,"custody-last-closed");
-      return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,lastHandover:history.previousEmployeeUid&&!history.settledAt?history:null,previousSettlement:history.settledAt?{employeeUid:history.previousEmployeeUid,employeeName:history.previousEmployeeName||"الموظف",settledAt:history.settledAt,settledByName:history.settledByName||"الدكتور"}:null});
+      const records=await listCustodyRecords(ctx);
+      const handovers=records.filter(x=>x.type==="custodyHandover").sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+      return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,lastHandover:history.previousEmployeeUid&&!history.settledAt?history:null,previousSettlement:history.settledAt?{employeeUid:history.previousEmployeeUid,employeeName:history.previousEmployeeName||"الموظف",settledAt:history.settledAt,settledByName:history.settledByName||"الدكتور"}:null,handovers});
     }
     if(action==="doctorSettle") {
       if(ctx.role!=="doctor")return reply({message:"تصفية العهدة متاحة للدكتور فقط."},403);
