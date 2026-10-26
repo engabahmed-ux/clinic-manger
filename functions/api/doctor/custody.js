@@ -1,3 +1,5 @@
+import { publishClinicRealtime } from "../../_shared/realtime.js";
+
 const DOCTOR_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const PROJECT = "clinics-manger";
 const LOOKUP = "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
@@ -49,7 +51,7 @@ async function authenticate(request,env) {
 async function readDoc(ctx,id){return dec(await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+encodeURIComponent(id)));}
 async function createRecord(ctx,id,record){return fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+encodeURIComponent(id)+"?currentDocument.exists=false",{method:"PATCH",body:JSON.stringify(enc(record))});}
 async function listCustodyRecords(ctx){const result=await fs(ctx.project,ctx.token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:COLLECTION}]}})});return (Array.isArray(result)?result:[]).filter(x=>x.document).map(x=>dec(x.document));}
-export async function onRequestPost({request,env}) {
+async function onRequestPostInternal({request,env}) {
   let data;try{const raw=await request.text();if(raw.length>12000)return reply({message:"حجم الطلب أكبر من المسموح."},413);data=JSON.parse(raw);}catch{return reply({message:"صيغة الطلب غير صحيحة."},400);}
   let ctx;try{ctx=await authenticate(request,env);}catch(e){console.error("Custody auth error",e);return reply({message:"تعذر التحقق من الجلسة."},503);}
   if(ctx.error)return reply({message:ctx.error},ctx.status);
@@ -178,4 +180,17 @@ export async function onRequestPost({request,env}) {
     }
     return reply({message:"العملية غير معروفة."},400);
   } catch(e) { console.error("Custody API error",e);return reply({message:"تعذر تنفيذ عملية العهدة حاليًا."},503); }
+}
+
+
+export async function onRequestPost(context) {
+  let input = {};
+  try { input = await context.request.clone().json(); } catch {}
+  const result = await onRequestPostInternal(context);
+  if (result.ok && input.action && input.action !== "status") {
+    const notification = publishClinicRealtime(context.env, "custody_changed");
+    if (typeof context.waitUntil === "function") context.waitUntil(notification);
+    else void notification;
+  }
+  return result;
 }
