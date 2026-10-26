@@ -55,7 +55,11 @@ export async function onRequestPost({request,env}) {
   try {
     if(action==="status") {
       const lock=await readDoc(ctx,LOCK_ID);
-      return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,uid:ctx.uid,role:ctx.role});
+      const history=await readDoc(ctx,"custody-last-closed");
+      const selectedDate=String(data.date||"");
+      const handoverDate=String(history.date||String(history.closedAt||"").slice(0,10));
+      const handover=ctx.role==="staff"&&history.previousEmployeeUid===ctx.uid&&handoverDate===(selectedDate||cairoDate(now))?{actualAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.expectedAmount||history.nextOpeningAmount||"0.00"),previousEmployeeName:history.previousEmployeeName||ctx.name,closedAt:history.closedAt||"",settledAt:history.settledAt||"",notes:history.notes||"",date:handoverDate}:null;
+      return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,uid:ctx.uid,role:ctx.role,handover});
     }
     if(action==="doctorStatus") {
       if(ctx.role!=="doctor")return reply({message:"هذه الوظيفة متاحة للدكتور فقط."},403);
@@ -123,7 +127,7 @@ export async function onRequestPost({request,env}) {
       if(archived?.__conflict)return reply({message:"تم إغلاق العهدة لكن تعذر حفظ نسخة الأرشيف. راجع الدكتور قبل بدء عهدة جديدة."},503);
       const removed=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+LOCK_ID,{method:"DELETE"});
       if(removed?.__conflict)return reply({message:"تم تسجيل التسليم لكن تعذر تحرير قفل الجلسة. راجع الدكتور."},409);
-      const summary={type:"custodyHandoverSummary",nextOpeningAmount:actual.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,notes,closedAt:now,settledAt:"",settledByUid:"",settledByName:"",settlementId:""};const summaryMask=Object.keys(summary).map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");await fs(ctx.project,ctx.token,"/"+COLLECTION+"/custody-last-closed?"+summaryMask,{method:"PATCH",body:JSON.stringify(enc(summary))});
+      const summary={type:"custodyHandoverSummary",nextOpeningAmount:actual.toFixed(2),expectedAmount:expected.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,notes,closedAt:now,date:cairoDate(now),settledAt:"",settledByUid:"",settledByName:"",settlementId:""};const summaryMask=Object.keys(summary).map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");await fs(ctx.project,ctx.token,"/"+COLLECTION+"/custody-last-closed?"+summaryMask,{method:"PATCH",body:JSON.stringify(enc(summary))});
       return reply({closed:true,expectedAmount:expected.toFixed(2),actualAmount:actual.toFixed(2),difference:(actual-expected).toFixed(2)});
     }
     if(action==="addCash") {
