@@ -868,6 +868,13 @@ export async function onRequest(context) {
       }
     });
   }
-
-  return onRequestPost(context);
+  let input = {};
+  try { input = await context.request.clone().json(); } catch {}
+  const result = await onRequestPost(context);
+  if (result.ok && input.action && input.action !== "list") {
+    const notification = publishClinicRealtime(context.env, "clinic_settings_changed");
+    if (typeof context.waitUntil === "function") context.waitUntil(notification);
+    else void notification;
+  }
+  return result;
 }
