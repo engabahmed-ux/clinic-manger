@@ -1189,8 +1189,10 @@ async function loadDoctorCustody(){
    for(const item of visibleHandovers){
     const row=document.createElement("article");row.className="doctor-custody-card";
     const info=document.createElement("div"),title=document.createElement("strong"),detail=document.createElement("p");
+    const custodyAmount=Math.max(0,Number(item.sessionExpectedAmount)||0);
+    const netReceipts=Math.max(0,(Number(item.expectedAmount)||0)-custodyAmount);
     title.textContent=(item.previousEmployeeName||"الموظف")+" · "+doctorMoney(item.actualAmount||0);
-    detail.textContent="التاريخ: "+String(item.date||item.createdAt||"").slice(0,10)+" · المتوقع: "+doctorMoney(item.expectedAmount||item.sessionExpectedAmount||0)+(item.notes?" · ملاحظة: "+item.notes:"");
+    detail.textContent="التاريخ: "+String(item.date||item.createdAt||"").slice(0,10)+" · العهدة: "+doctorMoney(custodyAmount)+" · صافي الكشوفات بعد المصروفات: "+doctorMoney(netReceipts)+" · المتوقع: "+doctorMoney(item.expectedAmount||item.sessionExpectedAmount||0)+(item.notes?" · ملاحظة: "+item.notes:"");
     info.append(title,detail);row.append(info);historySection.append(row);
    }
    doctorCustodyStatus.append(historySection);
