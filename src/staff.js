@@ -93,6 +93,9 @@ const clinicRealtime = createClinicRealtime(auth, event => {
       loadStaffCustody();
       if (event === "accounts_changed" && typeof loadMonthlyExpenses === "function") loadMonthlyExpenses();
     }
+  } else if (event === "patient_changed" || event === "medical_record_changed") {
+    if (staffMedicalPatient && !recordsSection.hidden) loadStaffMedicalPatient(staffMedicalPatient);
+    if (staffMedicalSearch?.value.trim()) staffMedicalSearch.dispatchEvent(new Event("input"));
   } else if (event === "clinic_settings_changed" && !settingsSection.hidden) {
     fetch("/api/clinic-management", { cache: "no-store" })
       .then(response => response.ok ? response.json() : null)
