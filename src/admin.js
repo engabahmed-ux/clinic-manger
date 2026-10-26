@@ -1180,6 +1180,21 @@ async function loadDoctorCustody(){
    const wrap=document.createElement("div");wrap.append(card,breakdown);doctorCustodyStatus.append(wrap);
   }
   if(!result.active&&!handover){const empty=document.createElement("p");empty.className="muted-text";empty.textContent="لا توجد عهدة نشطة أو عهدة مسلّمة تنتظر التصفية.";doctorCustodyStatus.append(empty)}
+  const handoverRows=Array.isArray(result.handovers)?result.handovers:[];
+  const selectedHandoverDate=doctorAccountsDate?.value||"";
+  const visibleHandovers=handoverRows.filter(item=>!selectedHandoverDate||String(item.date||item.createdAt||"").slice(0,10)===selectedHandoverDate);
+  if(visibleHandovers.length){
+   const historySection=document.createElement("section");historySection.className="doctor-custody-history";
+   const historyTitle=document.createElement("h3");historyTitle.textContent="سجل تسليمات العهدة"+(selectedHandoverDate?" · "+selectedHandoverDate:"");historySection.append(historyTitle);
+   for(const item of visibleHandovers){
+    const row=document.createElement("article");row.className="doctor-custody-card";
+    const info=document.createElement("div"),title=document.createElement("strong"),detail=document.createElement("p");
+    title.textContent=(item.previousEmployeeName||"الموظف")+" · "+doctorMoney(item.actualAmount||0);
+    detail.textContent="التاريخ: "+String(item.date||item.createdAt||"").slice(0,10)+" · المتوقع: "+doctorMoney(item.expectedAmount||item.sessionExpectedAmount||0)+(item.notes?" · ملاحظة: "+item.notes:"");
+    info.append(title,detail);row.append(info);historySection.append(row);
+   }
+   doctorCustodyStatus.append(historySection);
+  }
   showDoctorCustodyMessage("");
  }catch(error){doctorCustodyStatus.textContent=error.message||"تعذر تحميل العهدة.";showDoctorCustodyMessage(error.message||"تعذر تحميل العهدة.",true)}
 }
