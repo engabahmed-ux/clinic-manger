@@ -1,4 +1,4 @@
-import { publishClinicRealtime } from "../../../_shared/realtime.js";
+import { publishClinicRealtime } from "../../_shared/realtime.js";
 const EXPECTED_PROJECT_ID = "clinics-manger";
 const BOOKINGS_COLLECTION = "clinicBookings";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
