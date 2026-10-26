@@ -1,3 +1,4 @@
+import { publishClinicRealtime } from "../../../_shared/realtime.js";
 const EXPECTED_PROJECT_ID = "clinics-manger";
 const BOOKINGS_COLLECTION = "clinicBookings";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -247,7 +248,8 @@ function validateBooking(data) {
   return null;
 }
 
-export async function onRequest({ request, env }) {
+export async function onRequest(context) {
+  const { request, env } = context;
   if (request.method !== "POST") {
     return jsonResponse({ message: "طريقة الطلب غير مسموحة." }, 405);
   }
@@ -303,6 +305,9 @@ export async function onRequest({ request, env }) {
       notes: data.notes ?? ""
     });
     try { await writePublicAuditLog(account.project_id, accessToken, "booking_created", "info", "تم استلام طلب حجز من الموقع العام.", id); } catch (logError) { console.error("Public audit log failed:", logError); }
+    const notification = publishClinicRealtime(env, "booking_created");
+    if (typeof context.waitUntil === "function") context.waitUntil(notification);
+    else void notification;
 
     return jsonResponse({
       success: true,
