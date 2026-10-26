@@ -133,10 +133,19 @@ const clinicRealtime = createClinicRealtime(auth, event => {
     if (typeof loadBookings === "function" && (!currentAccountAccess?.accountType || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings))) loadBookings();
   } else if (event === "accounts_changed" || event === "custody_changed") {
     if (doctorAccountsSection && !doctorAccountsSection.hidden) {
+      if (event === "accounts_changed") {
+        if (typeof renderDoctorAccounts === "function") renderDoctorAccounts();
+        if (typeof loadDoctorAccountRecords === "function") loadDoctorAccountRecords();
+      }
       if (typeof loadDoctorCustody === "function") loadDoctorCustody();
       if (typeof loadDoctorSettlements === "function") loadDoctorSettlements();
       if (typeof previewDoctorSettlement === "function") previewDoctorSettlement(settlementPreviewPeriodType || "day");
     }
+  } else if (event === "patient_changed") {
+    if (patientAccountSearch?.value.trim()) patientAccountSearch.dispatchEvent(new Event("input"));
+    if (activeMedicalPatient && medicalRecordsSection && !medicalRecordsSection.hidden) loadMedicalPatient(activeMedicalPatient);
+  } else if (event === "medical_record_changed") {
+    if (activeMedicalPatient && medicalRecordsSection && !medicalRecordsSection.hidden) loadMedicalPatient(activeMedicalPatient);
   } else if (event === "clinic_settings_changed") {
     fetch("/api/clinic-management", { cache: "no-store" })
       .then(response => response.ok ? response.json() : null)
