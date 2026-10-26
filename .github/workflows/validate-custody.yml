@@ -6,6 +6,7 @@ on:
       - feature/clinic-settings-logs
     paths:
       - "src/staff.js"
+      - "src/admin.js"
       - "functions/api/doctor/custody.js"
       - "staff.html"
       - "staff.css"
@@ -13,6 +14,7 @@ on:
   pull_request:
     paths:
       - "src/staff.js"
+      - "src/admin.js"
       - "functions/api/doctor/custody.js"
       - "staff.html"
       - "staff.css"
@@ -30,4 +32,5 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check src/staff.js
+          node --check src/admin.js
           node --check functions/api/doctor/custody.js
