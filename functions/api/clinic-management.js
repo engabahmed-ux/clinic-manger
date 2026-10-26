@@ -302,13 +302,6 @@ export async function onRequest(context) {
     const result = await onRequestPost(context);
     let event = "";
     if (result.ok && input.action === "saveSettings") event = "clinic_settings_changed";
-    if (result.ok && input.action === "recordLog") {
-      const action = input.log?.action;
-      if (action === "patient_created") event = "patient_changed";
-      else if (action === "medical_record_saved") event = "medical_record_changed";
-      else if (action === "employee_created") event = "clinic_settings_changed";
-      else if (action === "settlement_closed" || action === "expense_recorded") event = "accounts_changed";
-    }
     if (event) {
       const notification = publishClinicRealtime(context.env, event);
       if (typeof context.waitUntil === "function") context.waitUntil(notification);
