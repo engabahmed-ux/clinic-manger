@@ -1,3 +1,4 @@
+import { publishClinicRealtime } from "../../_shared/realtime.js";
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const EXPECTED_PROJECT_ID = "clinics-manger";
 const STAFF_COLLECTION = "clinicStaff";
@@ -132,7 +133,7 @@ async function getPatientHistory(projectId,token,patientId){
   const bookings=bookingDocs.map(doc=>({doc,fields:doc.fields||{}})).filter(x=>read(x.fields,"patientId")===patientId||(!read(x.fields,"patientId")&&norm(read(x.fields,"patientName"))===norm(patient.displayName)&&normPhone(read(x.fields,"patientPhone"))===normPhone(patient.phone))).map(x=>({id:(x.doc.name||"").split("/").pop(),appointmentDate:read(x.fields,"appointmentDate"),patientName:read(x.fields,"patientName"),patientPhone:read(x.fields,"patientPhone"),service:read(x.fields,"service"),status:read(x.fields,"status"),bloodPressure:read(x.fields,"bloodPressure"),weight:read(x.fields,"weight"),bloodSugar:read(x.fields,"bloodSugar"),preVisitNotes:read(x.fields,"preVisitNotes"),createdAt:read(x.fields,"createdAt")}));
   return {patient,visits,bookings};
 }
-export async function onRequest({request,env}){
+async function onRequestInternal({request,env}){
   if(request.method!=="POST")return jsonResponse({message:"طريقة الطلب غير مسموحة."},405);
   if(!(request.headers.get("Content-Type")||"").toLowerCase().includes("application/json"))return jsonResponse({message:"نوع محتوى الطلب غير مدعوم."},415);
   let data;try{const raw=await request.text();if(raw.length>20000)return jsonResponse({message:"حجم الطلب أكبر من المسموح."},413);data=JSON.parse(raw);}catch{return jsonResponse({message:"صيغة الطلب غير صحيحة."},400);}
@@ -171,4 +172,17 @@ export async function onRequest({request,env}){
     await firestore(account.project_id,token,"/"+BOOKINGS_COLLECTION+"/"+encodeURIComponent(bookingId)+"?"+["patientId","bloodPressure","weight","bloodSugar","preVisitNotes"].map(k=>"updateMask.fieldPaths="+k).join("&"),{method:"PATCH",body:JSON.stringify({fields:{patientId:str(patientId),bloodPressure:str(visit.bloodPressure),weight:str(visit.weight),bloodSugar:str(visit.bloodSugar),preVisitNotes:str(visit.preVisitNotes)}})});
     return jsonResponse({visit:decodeVisit(saved)});
   }catch(error){console.error("Medical records request failed:",error);return jsonResponse({message:error.message||"تعذر تنفيذ العملية الطبية."},error.status===404?404:400);}
+}
+
+
+export async function onRequest(context) {
+  let input = {};
+  try { input = await context.request.clone().json(); } catch {}
+  const result = await onRequestInternal(context);
+  if (result.ok && input.action === "saveVisit") {
+    const notification = publishClinicRealtime(context.env, "medical_record_changed");
+    if (typeof context.waitUntil === "function") context.waitUntil(notification);
+    else void notification;
+  }
+  return result;
 }
