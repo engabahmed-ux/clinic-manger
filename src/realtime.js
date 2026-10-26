@@ -49,7 +49,6 @@ export function createClinicRealtime(auth, onEvent, onStatus = () => {}) {
   }
 
   function close() {
-    stopped = true;
     ready = false;
     if (socket) {
       const current = socket;
@@ -73,6 +72,7 @@ export function createClinicRealtime(auth, onEvent, onStatus = () => {}) {
     close,
     isConnected: () => ready,
     dispose: () => {
+      stopped = true;
       close();
       document.removeEventListener("visibilitychange", resume);
       window.removeEventListener("online", resume);
