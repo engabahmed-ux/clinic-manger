@@ -1,3 +1,5 @@
+import { publishClinicRealtime } from "../_shared/realtime.js";
+
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const EXPECTED_PROJECT_ID = "clinics-manger";
 const SETTINGS_DOCUMENT = "clinicSettings/current";
@@ -187,7 +189,11 @@ async function ensureLogTtl(projectId, token) {
     return false;
   }
 }
+let lastCleanupAttemptAt = 0;
 async function cleanupExpiredLogs(projectId, token) {
+  const nowMs = Date.now();
+  if (ttlEnabled === true || nowMs - lastCleanupAttemptAt < 6 * 60 * 60 * 1000) return;
+  lastCleanupAttemptAt = nowMs;
   const query = {
     structuredQuery: {
       from: [{ collectionId: LOGS_COLLECTION }],
@@ -290,6 +296,25 @@ async function onRequestPost({ request, env }) {
 }
 export async function onRequest(context) {
   if (context.request.method === "GET") return onRequestGet(context);
-  if (context.request.method === "POST") return onRequestPost(context);
+  if (context.request.method === "POST") {
+    let input = {};
+    try { input = await context.request.clone().json(); } catch {}
+    const result = await onRequestPost(context);
+    let event = "";
+    if (result.ok && input.action === "saveSettings") event = "clinic_settings_changed";
+    if (result.ok && input.action === "recordLog") {
+      const action = input.log?.action;
+      if (action === "patient_created") event = "patient_changed";
+      else if (action === "medical_record_saved") event = "medical_record_changed";
+      else if (action === "employee_created") event = "clinic_settings_changed";
+      else if (action === "settlement_closed" || action === "expense_recorded") event = "accounts_changed";
+    }
+    if (event) {
+      const notification = publishClinicRealtime(context.env, event);
+      if (typeof context.waitUntil === "function") context.waitUntil(notification);
+      else void notification;
+    }
+    return result;
+  }
   return new Response(null, { status: 405, headers: { Allow: "GET, POST", "Cache-Control": "no-store" } });
 }
