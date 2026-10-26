@@ -1241,7 +1241,9 @@ async function loadBookings() {
     allBookings = Array.isArray(result.bookings) ? result.bookings : [];
     openDoctorScheduleCalendar?.refresh?.();
     updatePendingBookingBadge();
-    renderPendingBookings(); renderDailyAppointments(); renderDoctorArchive(); renderDoctorAccounts();
+    renderPendingBookings(); renderDailyAppointments(); renderDoctorArchive();
+    // Avoid rebuilding the visible accounts table during background booking refreshes.
+    if (doctorAccountsSection?.hidden) renderDoctorAccounts();
   } catch (error) {
     console.error("تعذر تحميل الحجوزات:", error);
     showMessage(bookingListMessage,error.message||"تعذر تحميل الحجوزات.");
@@ -1259,11 +1261,7 @@ setInterval(() => {
   if (!hasOpenBookingCard()) loadBookings();
   if (Date.now() - lastDashboardRefreshAt >= 15000) {
     lastDashboardRefreshAt = Date.now();
-    if (!doctorAccountsSection?.hidden) {
-      loadDoctorAccountRecords();
-      loadSettlementEmployees();
-      loadDoctorCustody();
-    }
+    // Account panels refresh when opened and after their own save/actions.
     if (!employeeManagementSection?.hidden && !isStaff) loadEmployees();
   }
 }, 5000);
@@ -1272,7 +1270,7 @@ document.addEventListener("visibilitychange", () => {
     const isStaff = currentAccountAccess?.accountType === "staff";
     if ((!isStaff || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings)) && !hasOpenBookingCard()) loadBookings();
     lastDashboardRefreshAt = Date.now();
-    if (!doctorAccountsSection?.hidden) { loadDoctorAccountRecords(); loadSettlementEmployees(); loadDoctorCustody(); }
+    // Account panels refresh when opened and after their own save/actions.
     if (!employeeManagementSection?.hidden && !isStaff) loadEmployees();
   }
 });
