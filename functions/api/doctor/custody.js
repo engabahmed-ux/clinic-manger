@@ -48,6 +48,7 @@ async function authenticate(request,env) {
 }
 async function readDoc(ctx,id){return dec(await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+encodeURIComponent(id)));}
 async function createRecord(ctx,id,record){return fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+encodeURIComponent(id)+"?currentDocument.exists=false",{method:"PATCH",body:JSON.stringify(enc(record))});}
+async function listCustodyRecords(ctx){const result=await fs(ctx.project,ctx.token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:COLLECTION}]}})});return (Array.isArray(result)?result:[]).filter(x=>x.document).map(x=>dec(x.document));}
 export async function onRequestPost({request,env}) {
   let data;try{const raw=await request.text();if(raw.length>12000)return reply({message:"حجم الطلب أكبر من المسموح."},413);data=JSON.parse(raw);}catch{return reply({message:"صيغة الطلب غير صحيحة."},400);}
   let ctx;try{ctx=await authenticate(request,env);}catch(e){console.error("Custody auth error",e);return reply({message:"تعذر التحقق من الجلسة."},503);}
@@ -58,8 +59,11 @@ export async function onRequestPost({request,env}) {
       const lock=await readDoc(ctx,LOCK_ID);
       const history=await readDoc(ctx,"custody-last-closed");
       const selectedDate=String(data.date||"");
-      const handoverDate=String(history.date||String(history.closedAt||"").slice(0,10));
-      const handover=ctx.role==="staff"&&history.previousEmployeeUid===ctx.uid&&handoverDate===(selectedDate||cairoDate(now))?{actualAmount:String(history.totalHandedOverAmount??history.nextOpeningAmount??"0.00"),lastHandoverAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.expectedAmount||history.nextOpeningAmount||"0.00"),previousEmployeeName:history.previousEmployeeName||ctx.name,closedAt:history.closedAt||"",settledAt:history.settledAt||"",notes:history.notes||"",date:handoverDate}:null;
+      const handoverDate=selectedDate||cairoDate(now);
+      const records=ctx.role==="staff"?await listCustodyRecords(ctx):[];
+      const dayHandovers=records.filter(x=>x.type==="custodyHandover"&&x.previousEmployeeUid===ctx.uid&&(String(x.date||cairoDate(x.createdAt))===handoverDate));
+      const latestHandover=dayHandovers.sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))[0]||null;
+      const handover=latestHandover?{actualAmount:dayHandovers.reduce((sum,x)=>sum+(Number(x.actualAmount)||0),0).toFixed(2),lastHandoverAmount:String(latestHandover.actualAmount||"0.00"),expectedAmount:String(latestHandover.expectedAmount||latestHandover.actualAmount||"0.00"),previousEmployeeName:latestHandover.previousEmployeeName||ctx.name,closedAt:latestHandover.createdAt||"",settledAt:history.previousEmployeeUid===ctx.uid&&String(history.date||"")===handoverDate?(history.settledAt||""):"",notes:latestHandover.notes||"",date:handoverDate}:null;
       return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,uid:ctx.uid,role:ctx.role,handover});
     }
     if(action==="doctorStatus") {
