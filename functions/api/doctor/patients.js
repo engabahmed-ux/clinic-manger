@@ -1,3 +1,4 @@
+import { publishClinicRealtime } from "../../_shared/realtime.js";
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const EXPECTED_PROJECT_ID = "clinics-manger";
 const STAFF_COLLECTION = "clinicStaff";
@@ -145,7 +146,7 @@ async function deleteAuthUser(apiKey, idToken) {
   }
 }
 
-export async function onRequest({ request, env }) {
+async function onRequestInternal({ request, env }) {
   if (request.method !== "POST") return jsonResponse({ message: "طريقة الطلب غير مسموحة." }, 405);
   if (!(request.headers.get("Content-Type") || "").toLowerCase().includes("application/json")) {
     return jsonResponse({ message: "نوع محتوى الطلب غير مدعوم." }, 415);
@@ -386,4 +387,17 @@ export async function onRequest({ request, env }) {
     console.error("Patient account creation failed:", error);
     return jsonResponse({ message: error.message || "تعذر إنشاء حساب المريضة." }, error.status === 403 ? 403 : 503);
   }
+}
+
+
+export async function onRequest(context) {
+  let input = {};
+  try { input = await context.request.clone().json(); } catch {}
+  const result = await onRequestInternal(context);
+  if (result.ok && ["create", "accountStatus", "resetPassword"].includes(input.action)) {
+    const notification = publishClinicRealtime(context.env, "patient_changed");
+    if (typeof context.waitUntil === "function") context.waitUntil(notification);
+    else void notification;
+  }
+  return result;
 }
