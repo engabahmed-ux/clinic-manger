@@ -1,3 +1,4 @@
+import { publishClinicRealtime } from "../../_shared/realtime.js";
 
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const EXPECTED_PROJECT_ID = "clinics-manger";
@@ -779,7 +780,7 @@ async function cancelBooking(projectId, accessToken, data, actorUid = "", actorA
   }, actorUid, actorAccountType);
 }
 
-export async function onRequest(context) {
+async function onRequestInternal(context) {
   const { request, env } = context;
 
   if (request.method !== "POST") {
@@ -1097,4 +1098,25 @@ export async function onRequest(context) {
       error.status === 404 ? 404 : 400
     );
   }
+}
+
+
+export async function onRequest(context) {
+  const input = context.request.method === "POST"
+    ? await context.request.clone().json().catch(() => ({}))
+    : {};
+  const result = await onRequestInternal(context);
+  if (result.ok) {
+    let event = "";
+    if (input.action === "create") event = "booking_created";
+    else if (input.action === "cancel") event = "booking_cancelled";
+    else if (input.action === "update") event = input.booking?.status ? "booking_status_changed" : "booking_updated";
+    else if (["archiveDay", "restoreArchived", "updatePaidAmount"].includes(input.action)) event = "booking_updated";
+    if (event) {
+      const notification = publishClinicRealtime(context.env, event);
+      if (typeof context.waitUntil === "function") context.waitUntil(notification);
+      else void notification;
+    }
+  }
+  return result;
 }
