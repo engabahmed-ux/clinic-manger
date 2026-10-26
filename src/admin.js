@@ -1159,13 +1159,13 @@ async function loadDoctorCustody(){
    const card=document.createElement("article");card.className="doctor-custody-card";
    const info=document.createElement("div"),title=document.createElement("strong"),detail=document.createElement("p");
    title.textContent="الموظف: "+(handover.previousEmployeeName||"غير محدد");
-   detail.textContent=(handover.settledAt?"تمت التصفية بواسطة الدكتور في "+formatSubmittedAt(handover.settledAt):"بانتظار تصفية الدكتور")+" · تسليم الموظف: "+doctorMoney(handover.nextOpeningAmount||0);
+   detail.textContent=(handover.settledAt?"تمت التصفية بواسطة الدكتور في "+formatSubmittedAt(handover.settledAt):"بانتظار تصفية الدكتور")+" · تسليم الموظف: "+doctorMoney(handover.totalHandedOverAmount??handover.nextOpeningAmount??0);
    info.append(title,detail);
    const button=document.createElement("button");button.type="button";button.className="primary-button doctor-custody-settle-button";button.textContent=handover.settledAt?"تمت التصفية":"تصفية العهدة";
    button.disabled=!!handover.settledAt||!!result.active;
    button.addEventListener("click",async()=>{
     if(handover.settledAt)return;
-    const amount=Number(handover.nextOpeningAmount||0),receipts=Number(handover.baselineReceipts||0),expenses=Number(handover.baselineExpenses||0);
+    const amount=Number(handover.totalHandedOverAmount??handover.nextOpeningAmount??0),receipts=Number(handover.baselineReceipts||0),expenses=Number(handover.baselineExpenses||0);
     const details="الموظف: "+(handover.previousEmployeeName||"غير محدد")+"\nمقبوضات اليوم: "+doctorMoney(receipts)+"\nالمصروفات المعتمدة: "+doctorMoney(expenses)+"\nالعهدة المسلّمة: "+doctorMoney(amount)+"\n\nهل تؤكد تصفية العهدة وتسجيلها في السجل؟";
     if(!window.confirm(details))return;
     button.disabled=true;
@@ -1174,7 +1174,7 @@ async function loadDoctorCustody(){
    });
    card.append(info,button);
    const breakdown=document.createElement("div");breakdown.className="doctor-custody-breakdown";
-   for(const [label,value] of [["مقبوضات اليوم",handover.baselineReceipts||0],["المصروفات المعتمدة",handover.baselineExpenses||0],["العهدة المسلّمة",handover.nextOpeningAmount||0]]){
+   for(const [label,value] of [["مقبوضات اليوم",handover.baselineReceipts||0],["المصروفات المعتمدة",handover.baselineExpenses||0],["العهدة المسلّمة",handover.totalHandedOverAmount??handover.nextOpeningAmount??0]]){
     const item=document.createElement("div"),caption=document.createElement("span"),amount=document.createElement("strong");caption.textContent=label;amount.textContent=doctorMoney(value);item.append(caption,amount);breakdown.append(item)
    }
    const wrap=document.createElement("div");wrap.append(card,breakdown);doctorCustodyStatus.append(wrap);
