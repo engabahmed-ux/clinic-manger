@@ -32,6 +32,7 @@ async function fs(project,token,path,options={}) {
 const sv=v=>({stringValue:String(v??"")});
 function enc(o){const fields={};for(const [k,v] of Object.entries(o)) if(v!==undefined&&v!==null) fields[k]=typeof v==="number"?{integerValue:String(v)}:typeof v==="boolean"?{booleanValue:v}:sv(v);return {fields};}
 function dec(d){const f=d?.fields||{},o={id:d?.name?.split("/").pop()};for(const[k,v]of Object.entries(f))o[k]=v.stringValue??v.integerValue??v.booleanValue??"";return o;}
+function cairoDate(value){if(!value)return"";const d=new Date(value);if(Number.isNaN(d.getTime()))return String(value).slice(0,10);const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(d),v=Object.fromEntries(p.map(x=>[x.type,x.value]));return `${v.year}-${v.month}-${v.day}`;}
 async function authenticate(request,env) {
   if(!env.FIREBASE_API_KEY||!env.FIREBASE_SERVICE_ACCOUNT_JSON) return {error:"إعدادات التحقق غير مكتملة.",status:503};
   const m=(request.headers.get("Authorization")||"").match(/^Bearer\s+(\S+)$/i);if(!m||m[1].length>8192)return {error:"يلزم تسجيل الدخول.",status:401};
