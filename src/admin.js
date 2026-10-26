@@ -1,6 +1,7 @@
 
 import { FIREBASE_CONFIG } from "./config/firebase-config.js";
 import { APP_CONFIG } from "./config/app-config.js";
+import { createClinicRealtime } from "./realtime.js";
 import { loadRuntimeSettings, statusLabel, applyRuntimeStatusColor, recordRuntimeLog, applyRuntimeBranding } from "./config/runtime-settings.js";
 
 import {
@@ -126,6 +127,25 @@ const app =
   initializeApp(FIREBASE_CONFIG);
 
 const auth = getAuth(app);
+let realtimeConnected = false;
+const clinicRealtime = createClinicRealtime(auth, event => {
+  if (event.startsWith("booking_")) {
+    if (typeof loadBookings === "function" && (!currentAccountAccess?.accountType || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings))) loadBookings();
+  } else if (event === "accounts_changed" || event === "custody_changed") {
+    if (doctorAccountsSection && !doctorAccountsSection.hidden) {
+      if (typeof loadDoctorCustody === "function") loadDoctorCustody();
+      if (typeof loadDoctorSettlements === "function") loadDoctorSettlements();
+      if (typeof previewDoctorSettlement === "function") previewDoctorSettlement(settlementPreviewPeriodType || "day");
+    }
+  } else if (event === "clinic_settings_changed") {
+    fetch("/api/clinic-management", { cache: "no-store" })
+      .then(response => response.ok ? response.json() : null)
+      .then(result => {
+        if (result?.settings) window.dispatchEvent(new CustomEvent("clinic-settings-updated", { detail: result.settings }));
+      }).catch(() => {});
+    if (!employeeManagementSection?.hidden && typeof loadEmployees === "function") loadEmployees();
+  }
+}, connected => { realtimeConnected = connected; });
 
 const $ = (selector, parent = document) =>
   parent.querySelector(selector);
@@ -1258,7 +1278,7 @@ setInterval(() => {
   if (document.hidden || !auth.currentUser) return;
   const isStaff = currentAccountAccess?.accountType === "staff";
   if (isStaff && !["view", "edit"].includes(currentAccountAccess?.permissions?.bookings)) return;
-  if (!hasOpenBookingCard()) loadBookings();
+  if (!realtimeConnected && !hasOpenBookingCard()) loadBookings();
   if (Date.now() - lastDashboardRefreshAt >= 15000) {
     lastDashboardRefreshAt = Date.now();
     // Account panels refresh when opened and after their own save/actions.
@@ -1268,7 +1288,7 @@ setInterval(() => {
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && auth.currentUser) {
     const isStaff = currentAccountAccess?.accountType === "staff";
-    if ((!isStaff || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings)) && !hasOpenBookingCard()) loadBookings();
+    if ((!realtimeConnected && (!isStaff || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings))) && !hasOpenBookingCard()) loadBookings();
     lastDashboardRefreshAt = Date.now();
     // Account panels refresh when opened and after their own save/actions.
     if (!employeeManagementSection?.hidden && !isStaff) loadEmployees();
@@ -2047,11 +2067,13 @@ onAuthStateChanged(auth, async (user) => {
   const requestNumber = ++verificationRequestNumber;
 
   if (!user) {
+    clinicRealtime.close();
     showLogin();
     setLoginBusy(false);
     return;
   }
 
+  clinicRealtime.connect();
   showLogin();
   setLoginBusy(true);
 
@@ -2095,7 +2117,7 @@ finalizeMonthlySettlementButton?.addEventListener("click",async()=>{
   finally{await previewDoctorSettlement("month")}
 });
 doctorArchiveDateFilter?.addEventListener("change",renderDoctorArchive);doctorArchiveToDateFilter?.addEventListener("change",renderDoctorArchive);doctorArchiveSearch?.addEventListener("input",renderDoctorArchive);exportClinicExcelButton?.addEventListener("click",exportClinicExcel);
-$("#openDoctorScheduleFilter")?.addEventListener("click",openDoctorScheduleCalendar);homeAddBookingButton?.addEventListener("click",()=>{const date=$("#newBookingDate");if(date)date.value=doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());openBookingCreateDialog()});function showDoctorArchive(){if(medicalRecordsSection)medicalRecordsSection.hidden=true;if(doctorAccountsSection)doctorAccountsSection.hidden=true;homeAppointmentsSection.hidden=true;bookingManagementSection.hidden=true;patientManagementSection.hidden=true;employeeManagementSection.hidden=true;doctorArchiveSection.hidden=false;for(const b of document.querySelectorAll(".dashboard-tab"))b.setAttribute("aria-selected",String(b===openArchiveTabButton));renderDoctorArchive()}openArchiveTabButton?.addEventListener("click",showDoctorArchive);setInterval(()=>{const editing=!!document.querySelector(".booking-request-details:not([hidden]),.booking-create-card:not([hidden])")||document.activeElement?.matches("input,select,textarea");if(auth.currentUser&&!document.hidden&&!isLoadingBookings&&!editing)loadBookings()},20000);document.addEventListener("visibilitychange",()=>{const editing=!!document.querySelector(".booking-request-details:not([hidden]),.booking-create-card:not([hidden])")||document.activeElement?.matches("input,select,textarea");if(!document.hidden&&auth.currentUser&&!editing)loadBookings()});
+$("#openDoctorScheduleFilter")?.addEventListener("click",openDoctorScheduleCalendar);homeAddBookingButton?.addEventListener("click",()=>{const date=$("#newBookingDate");if(date)date.value=doctorHomeDateFilter?.value||new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());openBookingCreateDialog()});function showDoctorArchive(){if(medicalRecordsSection)medicalRecordsSection.hidden=true;if(doctorAccountsSection)doctorAccountsSection.hidden=true;homeAppointmentsSection.hidden=true;bookingManagementSection.hidden=true;patientManagementSection.hidden=true;employeeManagementSection.hidden=true;doctorArchiveSection.hidden=false;for(const b of document.querySelectorAll(".dashboard-tab"))b.setAttribute("aria-selected",String(b===openArchiveTabButton));renderDoctorArchive()}openArchiveTabButton?.addEventListener("click",showDoctorArchive);setInterval(()=>{const editing=!!document.querySelector(".booking-request-details:not([hidden]),.booking-create-card:not([hidden])")||document.activeElement?.matches("input,select,textarea");if(!realtimeConnected&&auth.currentUser&&!document.hidden&&!isLoadingBookings&&!editing)loadBookings()},20000);document.addEventListener("visibilitychange",()=>{const editing=!!document.querySelector(".booking-request-details:not([hidden]),.booking-create-card:not([hidden])")||document.activeElement?.matches("input,select,textarea");if(!document.hidden&&auth.currentUser&&!editing)loadBookings()});
 showLogin();
 
 
