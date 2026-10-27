@@ -52,13 +52,25 @@ const newBookingButton = $("#newBookingButton");
 const closeEditorButton = $("#closeEditorButton");
 const cancelEditorButton = $("#cancelEditorButton");
 const refreshButton = $("#refreshButton");
+const archiveButton = $("#archiveButton");
 const permissionLabel = $("#permissionLabel");
+const listLimitNote = $("#listLimitNote");
+
+/*
+ * التحديث التلقائي: كل 60 ثانية نسأل الخادم عن رقم إصدار الحجوزات فقط
+ * (قراءة واحدة لمستند صغير). إذا لم يتغير الرقم لا تُقرأ أي حجوزات.
+ * يتوقف التحديث عندما يكون التبويب مخفيًا أو عند عرض الأرشيف.
+ */
+const POLL_INTERVAL_MS = 60000;
 
 let currentUser = null;
 let bookings = [];
+let bookingsVersion = null;
+let archiveMode = false;
 let canEdit = false;
 let accountVerified = false;
 let loading = false;
+let pollTimer = null;
 
 const STATUS_LABELS = {
   pending: "طلب جديد",
@@ -259,6 +271,38 @@ function renderBookings() {
   emptyState.hidden = filtered.length > 0;
 }
 
+function updateArchiveUi() {
+  if (archiveButton) {
+    archiveButton.textContent = archiveMode
+      ? "عرض الحجوزات الحديثة"
+      : "عرض الأرشيف (أقدم من 30 يومًا)";
+  }
+
+  if (listLimitNote) {
+    listLimitNote.textContent = archiveMode
+      ? "وضع الأرشيف: يعرض أحدث 300 حجز بدون حد زمني، ويتوقف التحديث التلقائي مؤقتًا."
+      : "تعرض القائمة حجوزات آخر 30 يومًا فقط لتقليل استهلاك القراءات، مع تحديث تلقائي عند وجود أي حجز جديد.";
+  }
+}
+
+function applyBookingsResult(result) {
+  bookings = Array.isArray(result.bookings) ? result.bookings : [];
+
+  if (typeof result.version === "number") {
+    bookingsVersion = result.version;
+  }
+
+  accountVerified = true;
+  setEditControls(result.permission === "edit");
+
+  permissionLabel.textContent = canEdit
+    ? "لديك صلاحية مشاهدة الحجوزات وتعديلها."
+    : "صلاحيتك الحالية: مشاهدة الحجوزات فقط.";
+
+  renderStats();
+  renderBookings();
+}
+
 async function loadBookings() {
   if (loading) return;
 
@@ -267,18 +311,12 @@ async function loadBookings() {
   showMessage(listMessage, "");
 
   try {
-    const result = await apiRequest("list");
+    const result = await apiRequest("list", {
+      force: true,
+      includeArchive: archiveMode
+    });
 
-    bookings = Array.isArray(result.bookings) ? result.bookings : [];
-    accountVerified = true;
-    setEditControls(result.permission === "edit");
-
-    permissionLabel.textContent = canEdit
-      ? "لديك صلاحية مشاهدة الحجوزات وتعديلها."
-      : "صلاحيتك الحالية: مشاهدة الحجوزات فقط.";
-
-    renderStats();
-    renderBookings();
+    applyBookingsResult(result);
   } catch (error) {
     console.error("Loading bookings failed:", error);
 
@@ -295,6 +333,68 @@ async function loadBookings() {
     loading = false;
     refreshButton.disabled = false;
   }
+}
+
+/*
+ * فحص خفيف للتغييرات: يرسل رقم الإصدار المعروف، فإن لم يتغير
+ * لا تُقرأ الحجوزات إطلاقًا (قراءة واحدة فقط لمستند الإصدار).
+ */
+async function checkForUpdates() {
+  if (loading || !accountVerified || archiveMode) return;
+  if (bookingsVersion === null || document.hidden) return;
+
+  try {
+    const result = await apiRequest("list", {
+      knownVersion: bookingsVersion
+    });
+
+    if (result.changed === false) return;
+
+    applyBookingsResult(result);
+  } catch (error) {
+    // فشل الفحص الخفيف لا يجب أن يعطل الصفحة
+    console.warn("Bookings update check failed:", error);
+  }
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function startPolling() {
+  stopPolling();
+
+  if (!archiveMode) {
+    pollTimer = setInterval(checkForUpdates, POLL_INTERVAL_MS);
+  }
+}
+
+/*
+ * تحديث محلي بعد الحفظ/الإلغاء بدون إعادة قراءة كل الحجوزات.
+ * الخادم يرجع النسخة المحدثة من الحجز ورقم الإصدار الجديد.
+ */
+function applyLocalBookingChange(updatedBooking, version) {
+  const index = bookings.findIndex((item) => item.id === updatedBooking.id);
+
+  if (index >= 0) {
+    bookings[index] = updatedBooking;
+  } else {
+    bookings.push(updatedBooking);
+  }
+
+  bookings.sort((a, b) =>
+    a.appointmentDate.localeCompare(b.appointmentDate)
+  );
+
+  if (typeof version === "number") {
+    bookingsVersion = version;
+  }
+
+  renderStats();
+  renderBookings();
 }
 
 function resetEditor() {
@@ -374,16 +474,22 @@ async function saveBooking(event) {
   showMessage(formMessage, "");
 
   try {
+    let result;
+
     if (id) {
-      await apiRequest("update", {
+      result = await apiRequest("update", {
         booking: { id, ...data }
       });
     } else {
-      await apiRequest("create", { booking: data });
+      result = await apiRequest("create", { booking: data });
     }
 
     closeEditor();
-    await loadBookings();
+
+    if (result.booking) {
+      applyLocalBookingChange(result.booking, result.version);
+    }
+
     showMessage(listMessage, "تم حفظ الحجز بنجاح.");
   } catch (error) {
     console.error("Saving booking failed:", error);
@@ -408,8 +514,12 @@ async function cancelBooking(booking) {
   if (!confirmed) return;
 
   try {
-    await apiRequest("cancel", { id: booking.id });
-    await loadBookings();
+    const result = await apiRequest("cancel", { id: booking.id });
+
+    if (result.booking) {
+      applyLocalBookingChange(result.booking, result.version);
+    }
+
     showMessage(listMessage, "تم إلغاء الحجز.");
   } catch (error) {
     showMessage(
@@ -417,6 +527,22 @@ async function cancelBooking(booking) {
       error.message || "تعذر إلغاء الحجز.",
       true
     );
+  }
+}
+
+async function toggleArchive() {
+  archiveMode = !archiveMode;
+  updateArchiveUi();
+
+  if (archiveMode) {
+    stopPolling();
+  }
+
+  bookings = [];
+  await loadBookings();
+
+  if (!archiveMode) {
+    startPolling();
   }
 }
 
@@ -432,6 +558,7 @@ async function verifyAndLoad(user) {
     }
 
     showOnly(appSection);
+    startPolling();
   } catch (error) {
     showError(error.message || "تعذر التحقق من الحساب.");
   }
@@ -441,6 +568,7 @@ onAuthStateChanged(auth, (user) => {
   currentUser = user;
 
   if (!user) {
+    stopPolling();
     window.location.replace("./index.html#patient-portal");
     return;
   }
@@ -455,6 +583,8 @@ closeEditorButton.addEventListener("click", closeEditor);
 cancelEditorButton.addEventListener("click", closeEditor);
 
 refreshButton.addEventListener("click", loadBookings);
+archiveButton.addEventListener("click", toggleArchive);
+
 retryButton.addEventListener("click", () => {
   if (currentUser) verifyAndLoad(currentUser);
 });
@@ -463,10 +593,22 @@ searchInput.addEventListener("input", renderBookings);
 filterDate.addEventListener("change", renderBookings);
 filterStatus.addEventListener("change", renderBookings);
 
+// التحقق فور الرجوع إلى التبويب، وإيقاف الفحص أثناء إخفائه
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopPolling();
+    return;
+  }
+
+  checkForUpdates();
+  startPolling();
+});
+
 logoutButton.addEventListener("click", async () => {
   logoutButton.disabled = true;
 
   try {
+    stopPolling();
     await signOut(auth);
     window.location.replace("./index.html#patient-portal");
   } catch (error) {
@@ -475,3 +617,5 @@ logoutButton.addEventListener("click", async () => {
     showError("تعذر تسجيل الخروج. حاول مرة أخرى.");
   }
 });
+
+updateArchiveUi();

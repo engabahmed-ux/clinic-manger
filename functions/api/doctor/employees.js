@@ -7,8 +7,7 @@ const ALLOWED_PERMISSION_KEYS = [
   "bookings",
   "patients",
   "medicalRecords",
-  "settings",
-  "accounts"
+  "settings"
 ];
 
 const ALLOWED_PERMISSION_VALUES = [
@@ -25,6 +24,11 @@ const FIREBASE_LOOKUP_URL =
   "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
 const FIREBASE_DELETE_URL =
   "https://identitytoolkit.googleapis.com/v1/accounts:delete";
+
+// كاش توكن Google على مستوى الـ isolate (صالح 55 دقيقة)
+// بدل طلب توكن جديد مع كل طلب API.
+let cachedAccessToken = null;
+let cachedAccessTokenExpiry = 0;
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -100,7 +104,13 @@ function parseServiceAccount(env) {
 }
 
 async function createGoogleAccessToken(serviceAccount) {
-  const now = Math.floor(Date.now() / 1000);
+  const nowMs = Date.now();
+
+  if (cachedAccessToken && nowMs < cachedAccessTokenExpiry) {
+    return cachedAccessToken;
+  }
+
+  const now = Math.floor(nowMs / 1000);
 
   const header = {
     alg: "RS256",
@@ -171,6 +181,9 @@ async function createGoogleAccessToken(serviceAccount) {
   ) {
     throw new Error("Google access token missing.");
   }
+
+  cachedAccessToken = result.access_token;
+  cachedAccessTokenExpiry = nowMs + 55 * 60 * 1000;
 
   return result.access_token;
 }
@@ -339,7 +352,6 @@ function decodeEmployeeDocument(document) {
     email: decodeString(fields.email),
     displayName: decodeString(fields.displayName),
     permissions: decodePermissions(fields.permissions),
-    expenseMode: decodeString(fields.expenseMode) === "auto" ? "auto" : "approval",
     createdAt: fields.createdAt?.timestampValue || null
   };
 }
@@ -461,9 +473,6 @@ async function createEmployeeAccount(env, data) {
     };
   }
 
-  const expenseMode = data.expenseMode === "approval" ? "approval" : data.expenseMode === "auto" ? "auto" : data.expenseMode == null ? "approval" : null;
-  if (!expenseMode) return { status:400, body:{ message:"طريقة اعتماد المصروفات غير صحيحة." } };
-
   let permissions;
 
   try {
@@ -568,7 +577,6 @@ async function createEmployeeAccount(env, data) {
         role: encodeString("staff"),
         active: { booleanValue: true },
         permissions: encodePermissions(permissions),
-        expenseMode: encodeString(expenseMode),
         createdAt: {
           timestampValue: new Date().toISOString()
         }
@@ -596,8 +604,7 @@ async function createEmployeeAccount(env, data) {
           uid,
           email,
           displayName,
-          permissions,
-          expenseMode
+          permissions
         }
       }
     };
@@ -637,22 +644,6 @@ async function createEmployeeAccount(env, data) {
   }
 }
 
-async function updateEmployeeExpenseMode(projectId, accessToken, data) {
-  const uid = typeof data.uid === "string" ? data.uid.trim() : "";
-  const expenseMode = data.expenseMode;
-  if (!uid || uid.length > 128 || uid.includes("/") || !["auto","approval"].includes(expenseMode)) {
-    return { status:400, body:{ message:"بيانات طريقة اعتماد المصروفات غير صحيحة." } };
-  }
-  try {
-    await firestoreRequest(projectId, accessToken,
-      `/${FIRESTORE_COLLECTION}/${encodeURIComponent(uid)}?updateMask.fieldPaths=expenseMode`,
-      { method:"PATCH", body:JSON.stringify({fields:{expenseMode:encodeString(expenseMode)}}) });
-    return { status:200, body:{uid, expenseMode} };
-  } catch {
-    return { status:404, body:{message:"تعذر تحديث إعدادات مصروفات الموظف."} };
-  }
-}
-
 async function updateEmployeePermissions(
   projectId,
   accessToken,
@@ -678,25 +669,31 @@ async function updateEmployeePermissions(
     };
   }
 
-  const fields = { permissions: encodePermissions(permissions) };
-  let path = `/${FIRESTORE_COLLECTION}/${encodeURIComponent(uid)}?updateMask.fieldPaths=permissions`;
-  let expenseMode;
-  if (data.expenseMode !== undefined) {
-    if (!["auto","approval"].includes(data.expenseMode)) return {status:400,body:{message:"طريقة اعتماد المصروفات غير صحيحة."}};
-    expenseMode = data.expenseMode;
-    fields.expenseMode = encodeString(expenseMode);
-    path += "&updateMask.fieldPaths=expenseMode";
-  }
+  const path =
+    `/${FIRESTORE_COLLECTION}/${encodeURIComponent(uid)}` +
+    "?updateMask.fieldPaths=permissions";
 
   try {
-    await firestoreRequest(projectId, accessToken, path, {
-      method: "PATCH",
-      body: JSON.stringify({ fields })
-    });
+    await firestoreRequest(
+      projectId,
+      accessToken,
+      path,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          fields: {
+            permissions: encodePermissions(permissions)
+          }
+        })
+      }
+    );
 
     return {
       status: 200,
-      body: { uid, permissions, ...(expenseMode ? {expenseMode} : {}) }
+      body: {
+        uid,
+        permissions
+      }
     };
   } catch (error) {
     return {
@@ -826,11 +823,6 @@ export async function onRequestPost({ request, env }) {
         return jsonResponse(result.body, result.status);
       }
 
-      case "updateExpenseMode": {
-        const result = await updateEmployeeExpenseMode(serviceAccount.project_id, accessToken, data);
-        return jsonResponse(result.body, result.status);
-      }
-
       case "updatePermissions": {
         const result = await updateEmployeePermissions(
           serviceAccount.project_id,
@@ -868,13 +860,6 @@ export async function onRequest(context) {
       }
     });
   }
-  let input = {};
-  try { input = await context.request.clone().json(); } catch {}
-  const result = await onRequestPost(context);
-  if (result.ok && input.action && input.action !== "list") {
-    const notification = publishClinicRealtime(context.env, "clinic_settings_changed");
-    if (typeof context.waitUntil === "function") context.waitUntil(notification);
-    else void notification;
-  }
-  return result;
+
+  return onRequestPost(context);
 }
