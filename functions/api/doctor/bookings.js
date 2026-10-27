@@ -482,7 +482,18 @@ async function isFinancialPeriodClosed(projectId, accessToken, dateValue, employ
   if (!employeeUid || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const result = await firestoreRequest(projectId, accessToken, ":runQuery", {
     method:"POST",
-    body:JSON.stringify({structuredQuery:{from:[{collectionId:"clinicAccountRecords"}]}})
+    body:JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "clinicAccountRecords" }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "type" },
+            op: "EQUAL",
+            value: { stringValue: "settlement" }
+          }
+        }
+      }
+    })
   });
   return (Array.isArray(result)?result:[]).some(item => {
     const fields = item.document?.fields || {};
