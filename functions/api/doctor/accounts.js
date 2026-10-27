@@ -115,6 +115,31 @@ async function listRecords(projectId, token, type = "") {
   });
   return (Array.isArray(result) ? result : []).filter(x => x.document).map(x => decode(x.document));
 }
+async function listEmployeeBookings(projectId, token, employeeUid) {
+  const result = await fsRequest(projectId, token, ":runQuery", {
+    method: "POST",
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: "clinicBookings" }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "paymentEnteredByUid" },
+            op: "EQUAL",
+            value: { stringValue: employeeUid }
+          }
+        }
+      }
+    })
+  });
+  return (Array.isArray(result) ? result : []).filter(x => x.document).map(x => {
+    const fields = x.document.fields || {}, get = key => fields[key]?.stringValue || "";
+    return {
+      date: get("appointmentDate").slice(0, 10),
+      paymentEnteredByUid: get("paymentEnteredByUid"),
+      paid: Number(get("paidAmount")) || 0
+    };
+  });
+}
 function cleanString(value, max) { return typeof value === "string" && value.trim().length > 0 && value.trim().length <= max; }
 export async function onRequestPost({ request, env }) {
   let data;
@@ -212,11 +237,8 @@ export async function onRequestPost({ request, env }) {
        const expenses = allExpenses.filter(x=>x.enteredBy===employeeUid && inPeriod(x.date));
       const pendingExpenses = expenses.filter(x=>(x.status || "approved")==="pending").length;
       const approvedExpenses = expenses.filter(x=>(x.status || "approved")==="approved").reduce((sum,x)=>sum+(Number(x.amount)||0),0);
-      const query = await fsRequest(projectId, token, ":runQuery", {method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:"clinicBookings"}]}})});
-      const bookings = (Array.isArray(query)?query:[]).filter(x=>x.document).map(x=>{
-        const fields=x.document.fields||{}, get=k=>fields[k]?.stringValue || "";
-        return {date:get("appointmentDate").slice(0,10),paymentEnteredByUid:get("paymentEnteredByUid"),paid:Number(get("paidAmount"))||0};
-      }).filter(x=>inPeriod(x.date) && x.paymentEnteredByUid===employeeUid && x.paid>0);
+      const bookings = (await listEmployeeBookings(projectId, token, employeeUid))
+        .filter(x=>inPeriod(x.date) && x.paid>0);
       const receipts = bookings.reduce((sum,x)=>sum+x.paid,0);
       return jsonResponse({periodType,periodKey,employeeUid,totalReceipts:receipts.toFixed(2),totalExpenses:approvedExpenses.toFixed(2),
         netTotal:(receipts-approvedExpenses).toFixed(2),bookingCount:bookings.length,pendingExpenses,previouslySettledDays:closedDays.size,
@@ -246,11 +268,8 @@ export async function onRequestPost({ request, env }) {
       const pending = expenses.filter(x=>(x.status || "approved")==="pending");
       if (pending.length) return jsonResponse({message:"لا يمكن تصفية عهدة الموظف قبل اعتماد أو رفض كل مصروفاته المعلقة."},409);
       const approvedExpenses = expenses.filter(x=>(x.status || "approved")==="approved").reduce((sum,x)=>sum+(Number(x.amount)||0),0);
-      const query = await fsRequest(projectId, token, ":runQuery", {method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:"clinicBookings"}]}})});
-      const bookings = (Array.isArray(query)?query:[]).filter(x=>x.document).map(x=>{
-        const fields=x.document.fields||{}, get=k=>fields[k]?.stringValue || "";
-        return {date:get("appointmentDate").slice(0,10),paymentEnteredByUid:get("paymentEnteredByUid"),paid:Number(get("paidAmount"))||0};
-      }).filter(x=>inPeriod(x.date) && x.paymentEnteredByUid===employeeUid && x.paid>0);
+      const bookings = (await listEmployeeBookings(projectId, token, employeeUid))
+        .filter(x=>inPeriod(x.date) && x.paid>0);
       const receipts = bookings.reduce((sum,x)=>sum+x.paid,0);
       const now = new Date().toISOString();
       const settlement = {type:"settlement",periodType,periodKey,date:periodKey,employeeUid,employeeName,status:"closed",
