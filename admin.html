@@ -9,6 +9,9 @@
 
   <title>إدارة العيادة</title>
 
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./admin.css">
 </head>
 <body>
@@ -26,8 +29,8 @@
       <div class="panel-heading">
         <span class="panel-icon" aria-hidden="true">↪</span>
         <div>
-          <h2>دخول الدكتور</h2>
-          <p>سجّل الدخول باستخدام حساب الدكتور المسجل في Firebase.</p>
+          <h2>دخول الدكتور أو الموظف المصرح له</h2>
+          <p>سجّل الدخول باستخدام حساب العيادة المعتمد.</p>
         </div>
       </div>
 
@@ -65,66 +68,141 @@
     </section>
 
     <section id="dashboardSection" class="panel dashboard-panel" hidden>
+      <div id="adminMenuBackdrop" class="clinic-menu-backdrop" hidden></div>
+      <aside id="adminSidebar" class="clinic-sidebar admin-sidebar" aria-label="القائمة الرئيسية" aria-hidden="true">
+        <div class="clinic-sidebar-heading">
+          <span class="clinic-sidebar-mark" aria-hidden="true">ط</span>
+          <div><strong>إدارة العيادة</strong><small>القائمة الرئيسية</small></div>
+          <button class="clinic-menu-close" type="button" data-clinic-menu-close aria-label="إغلاق القائمة">×</button>
+        </div>
+        <nav class="dashboard-tabs" aria-label="أقسام إدارة العيادة">
+          <button id="openHomeTabButton" class="dashboard-tab" type="button" aria-selected="true">الرئيسية</button>
+          <button id="openArchiveTabButton" class="dashboard-tab" type="button" aria-selected="false">أرشيف الحجوزات</button>
+          <button id="openAccountsTabButton" class="dashboard-tab" type="button" aria-selected="false">حسابات</button>
+          <button id="openBookingsButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الحجوزات <span id="pendingBookingBadge" class="booking-notification-badge" aria-live="polite" hidden></span></button>
+          <button id="openPatientsButton" class="dashboard-tab" type="button" aria-selected="false">حسابات المريضات</button>
+          <button id="openMedicalRecordsButton" class="dashboard-tab" type="button" aria-selected="false">السجلات الطبية</button>
+          <button id="openEmployeesButton" class="dashboard-tab" type="button" aria-selected="false">إدارة الموظفين</button>
+          <button id="openClinicManagementButton" class="dashboard-tab" type="button" aria-selected="false">إدارة العيادة</button>
+        </nav>
+        <div class="clinic-sidebar-footer">
+          <button id="logoutButton" class="secondary-button clinic-sidebar-logout" type="button"><span aria-hidden="true">↪</span> تسجيل الخروج</button>
+          <a class="clinic-sidebar-site-link" href="./index.html"><span aria-hidden="true">⌂</span> العودة إلى الموقع الرئيسي</a>
+        </div>
+      </aside>
       <div class="dashboard-top">
-        <div>
-          <p class="eyebrow">مساحة العمل الخاصة</p>
-          <h2>أهلاً بك يا دكتور</h2>
-          <p id="doctorAccountLabel" class="muted-text"></p>
-        </div>
-
-        <button id="logoutButton" class="secondary-button" type="button">
-          تسجيل الخروج
-        </button>
-      </div>
-
-      <div class="welcome-card">
-        <span class="welcome-icon" aria-hidden="true">✓</span>
-        <div>
-          <h3>تم التحقق من حساب الدكتور</h3>
-          <p>
-            يمكنك إدارة حسابات فريق العيادة وصلاحياتهم من القسم المخصص.
-            ستظل إدارة الحجوزات والمرضى ضمن مرحلة لاحقة.
-          </p>
+        <button id="adminMenuToggle" class="clinic-menu-toggle" type="button" aria-controls="adminSidebar" aria-expanded="false" aria-label="فتح قائمة التبويبات"><span aria-hidden="true">☰</span></button>
+        <div class="dashboard-brand-copy">
+          <p class="dashboard-welcome">أهلاً بك يا <span id="doctorAccountLabel">أحمد</span></p>
         </div>
       </div>
+      <section id="homeAppointmentsSection" class="employee-section home-appointments-section">
+        <div class="dashboard-stats" aria-label="ملخص مواعيد اليوم">
+          <article class="dashboard-stat-card dashboard-stat-bookings">
+            <span class="dashboard-stat-icon" aria-hidden="true">▦</span>
+            <div><p>حجوزات اليوم</p><strong id="doctorTodayBookingsCount">—</strong><small>موعدًا مسجلًا</small></div>
+          </article>
+          <article class="dashboard-stat-card dashboard-stat-completed">
+            <span class="dashboard-stat-icon" aria-hidden="true">✓</span>
+            <div><p>تم الكشف</p><strong id="doctorTodayCompletedCount">—</strong><small>كشف مكتمل</small></div>
+          </article>
+        </div>
+        <div class="employee-section-heading doctor-schedule-heading"><h3>جدول المواعيد <button id="doctorScheduleDateLabel" class="schedule-date-label" type="button" aria-label="اضغط لتغيير تاريخ المواعيد"></button><button id="openDoctorScheduleFilter" class="schedule-filter-button" type="button" aria-label="فلترة جدول المواعيد" title="فلترة جدول المواعيد">☷</button></h3><div class="doctor-home-actions"><button id="homeAddBookingButton" class="primary-button home-add-booking-button" type="button">＋ إضافة حجز</button></div></div><input id="doctorHomeDateFilter" type="date" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1"><input id="doctorHomeSearch" type="search" class="hidden-schedule-filter" aria-hidden="true" tabindex="-1">
+        <div class="schedule-status-legend" id="doctorStatusLegend" aria-label="فلترة حسب حالة الحجز"><button type="button" data-status-filter="all" class="is-active">✓ الكل</button><button type="button" data-status-filter="waiting">✓ في الانتظار</button><button type="button" data-status-filter="completed">✓ تم الكشف</button><button type="button" data-status-filter="postponed">✓ تم التأجيل</button><button type="button" data-status-filter="no_show">✓ لم يأتِ</button><button type="button" data-status-filter="apologized">✓ اعتذر</button></div>
+        <p id="dailyAppointmentsMessage" class="message" role="status" hidden></p>
+        <div id="dailyAppointmentsList" class="employee-list" aria-live="polite"></div><div class="schedule-bulk-actions"><button id="archiveSelectedAppointments" class="secondary-button archive-day-button" type="button">أرشفة مواعيد اليوم</button></div>
+        
+      </section>
 
-      <h3 class="section-heading">إدارة العيادة</h3>
+      <section id="patientManagementSection" class="employee-section" hidden>
+        <div class="employee-section-heading">
+          <div>
+            <p class="eyebrow">حسابات المريضات</p>
+            <h3>إنشاء حساب مريضة</h3>
+            <p class="muted-text">الحسابات تُنشأ بواسطة العيادة فقط. ستظهر بيانات الدخول التي تحددها بعد إنشاء الحساب.</p>
+          </div>
+          <button id="backFromPatientsButton" class="secondary-button" type="button">العودة للوحة</button>
+        </div>
+        <div class="security-information">
+          <strong>إدارة حساب المريض</strong>
+          <p>اختَر ملف المريض، ثم حدّد اسم المستخدم وكلمة المرور بنفسك. إذا كان له حساب بالفعل، يمكنك تعيين كلمة مرور جديدة. كلمة المرور لا تُحفظ كنص مكشوف في قاعدة البيانات.</p>
+        </div>
+        <div class="employee-form-card">
+          <form id="createPatientForm" class="employee-form" novalidate>
+            <label for="patientAccountSearch">ابحث عن المريض بالاسم أو رقم الهاتف</label>
+            <input id="patientAccountSearch" type="search" maxlength="120" autocomplete="off" placeholder="اكتب أول حروف الاسم أو رقم الهاتف">
+            <div id="patientAccountSearchResults" class="medical-patient-results" aria-live="polite"></div>
+            <input id="patientAccountPatientId" type="hidden" required>
+            <div id="patientAccountSelected" class="security-information" hidden></div>
+            <div id="patientAccountCreateFields" hidden>
+              <label for="patientAccountUsername">اسم المستخدم</label>
+              <input id="patientAccountUsername" name="username" type="text" minlength="3" maxlength="40" autocomplete="off" required>
+              <label for="patientAccountPassword">كلمة المرور التي تحددها للمريض</label>
+              <input id="patientAccountPassword" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" required>
+              <p class="form-hint">اختر كلمة مرور من 8 أحرف على الأقل. لن يتم حفظها مكشوفة في ملف المريض.</p>
+              <button id="createPatientButton" class="primary-button" type="submit">إنشاء حساب المريض</button>
+            </div>
+            <div id="patientAccountResetPanel" class="security-information" hidden>
+              <strong>هذا الملف مرتبط بحساب موجود</strong>
+              <p>اسم المستخدم: <span id="patientAccountExistingUsername"></span></p>
+              <label for="patientAccountNewPassword">كلمة المرور الجديدة</label>
+              <input id="patientAccountNewPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password">
+              <button id="resetPatientPasswordButton" class="primary-button" type="button">إعادة تعيين كلمة المرور</button>
+            </div>
+            <p id="createPatientMessage" class="message" role="status" hidden></p>
+          </form>
+          <div id="patientCredentialsPanel" class="patient-credentials-panel" hidden>
+            <h4>بيانات الدخول — سلّمها للمريض بشكل خاص</h4>
+            <p id="patientCredentialsMessage" role="status"></p>
+            <dl>
+              <dt>اسم المستخدم</dt><dd id="createdPatientUsername"></dd>
+              <dt>كلمة المرور المحددة</dt><dd id="createdPatientPassword"></dd>
+            </dl>
+            <button id="copyPatientCredentialsButton" class="secondary-button" type="button">نسخ بيانات الدخول</button>
+          </div>
+        </div>
+      </section>
 
-      <div class="management-grid">
-        <article class="management-card">
-          <span class="card-icon" aria-hidden="true">♙</span>
-          <h3>إدارة الموظفين</h3>
-          <p>إنشاء حسابات الموظفين وتحديد صلاحيات كل موظف.</p>
-          <button
-            id="openEmployeesButton"
-            class="card-action-button"
-            type="button"
-          >
-            فتح إدارة الموظفين
-          </button>
-        </article>
+      <section id="doctorAccountsSection" class="employee-section" hidden><div class="employee-section-heading"><h3>حسابات العيادة</h3></div><nav id="doctorAccountsSubtabs" class="accounts-subtabs" aria-label="أقسام الحسابات"></nav><div id="doctorAccountsSubcontent" class="accounts-subcontent"><section id="patientDailyAccountsPanel"><div class="employee-section-heading"><h4>حسابات المرضى اليومية <span id="accountsDateLabel" class="schedule-date-label"></span></h4><label class="doctor-accounts-date-label">التاريخ<input id="doctorAccountsDate" type="date"></label></div><p class="muted-text">يُحتسب دخل اليوم تلقائيًا من أجور الخدمات التي أصبحت حالتها «تم الكشف»، ثم تُخصم المصروفات المعتمدة. تفاصيل الحجوزات للعرض فقط.</p><div id="doctorAccountsSummary" class="accounts-content"></div><details id="doctorAccountsDetails" class="accounts-details"><summary>إظهار الحسابات</summary><div id="doctorAccountsContent" class="accounts-content"></div></details><section class="doctor-daily-expenses"><div class="employee-section-heading"><h4>مصروفات اليوم</h4></div><form id="doctorDailyExpenseForm" class="doctor-daily-expense-form"><label>المبلغ (جنيه)<input name="amount" type="number" min="0.01" step="0.01" required></label><label>اتصرف في إيه؟<input name="description" maxlength="160" required></label><label>ملاحظات (اختياري)<input name="notes" maxlength="500"></label><button class="primary-button" type="submit">تسجيل المصروف</button><p id="doctorDailyExpenseMessage" class="message" role="status" hidden></p></form><div id="doctorDailyExpensesList" class="accounts-content"></div><div class="accounts-total"><span>صافي العيادة اليوم بعد المصروفات المعتمدة</span><strong id="doctorDailyNetTotal">0 ج.م</strong></div></section><section class="doctor-custody-panel" aria-labelledby="doctorCustodyTitle"><div class="doctor-custody-heading"><div><h5 id="doctorCustodyTitle">تصفية آخر تسليم للعهدة</h5><p class="muted-text">راجع آخر تسليم من الموظف وأكّد تصفيته من هنا.</p></div><button id="refreshDoctorCustody" class="secondary-button" type="button">تحديث</button></div><div id="doctorCustodyStatus" class="doctor-custody-status" role="status">جارٍ تحميل حالة العهدة...</div><p id="doctorCustodyMessage" class="message" role="status" hidden></p></section></section><section id="salaryAccountsPanel" hidden><div class="employee-section-heading"><h4>مرتبات الموظفين</h4><button id="addSalaryEntryButton" class="primary-button" type="button">＋ تسجيل مرتب</button></div><form id="salaryEntryForm" class="accounts-entry-form" hidden><label>اسم الموظف<input name="personName" maxlength="120" required></label><label>قيمة المرتب (جنيه)<input name="amount" type="number" min="0.01" max="99999999" step="0.01" required></label><label>تاريخ الصرف<input name="date" type="date" required></label><label>ملاحظات<input name="notes" maxlength="1000"></label><button class="primary-button" type="submit">حفظ المرتب</button><p id="salaryEntryMessage" class="message" role="status" hidden></p></form><div id="salaryEntriesList" class="accounts-content"></div></section><section id="customAccountsPanel" hidden><div class="employee-section-heading"><h4 id="customAccountTitle"></h4><button id="addAccountEntryButton" class="primary-button" type="button">＋ إضافة حركة</button></div><form id="customAccountEntryForm" class="accounts-entry-form" hidden><label>البيان<input name="personName" maxlength="120" required></label><label>القيمة (جنيه)<input name="amount" type="number" min="0.01" max="99999999" step="0.01" required></label><label>التاريخ<input name="date" type="date" required></label><label>ملاحظات<input name="notes" maxlength="1000"></label><button class="primary-button" type="submit">حفظ الحركة</button><p id="customAccountEntryMessage" class="message" role="status" hidden></p></form><div id="customAccountEntriesList" class="accounts-content"></div></section></div><div class="accounts-category-create"><button id="addAccountsCategoryButton" class="secondary-button" type="button">＋ إضافة قسم حسابات</button><form id="accountsCategoryForm" class="accounts-entry-form" hidden><label>اسم القسم<input name="name" maxlength="80" required></label><label>نوع القسم<select name="kind" required><option value="income">دخل</option><option value="expense">مصروف</option></select></label><button class="primary-button" type="submit">إنشاء القسم</button><p id="accountsCategoryMessage" class="message" role="status" hidden></p></form></div></section>
+      <section id="medicalRecordsSection" class="employee-section medical-records-section" hidden><div class="employee-section-heading"><div><h3>السجلات الطبية</h3><p class="muted-text">ملف موحّد لكل مريض وتاريخ مستقل لكل كشف.</p></div></div><label class="medical-search-label" for="medicalPatientSearch">ابحث بالاسم أو رقم الملف أو الهاتف</label><input id="medicalPatientSearch" type="search" autocomplete="off" placeholder="اكتب اسم المريض أو رقم هاتفه"><div id="medicalPatientResults" class="medical-patient-results" aria-live="polite"></div><section id="medicalPatientProfile" class="medical-patient-profile" hidden><div id="medicalPatientSummary"></div><h4>سجل الزيارات السابقة</h4><div id="medicalVisitHistory" class="medical-visit-history"></div><form id="medicalVisitForm" class="medical-visit-form" novalidate><h4>تسجيل أو تحديث تفاصيل الكشف</h4><label>الحجز المرتبط بالكشف<select id="medicalVisitBooking" required><option value="">اختر حجزًا للمريض</option></select></label><label>تاريخ الكشف<input id="medicalVisitDate" type="date" required></label><div class="medical-vitals-grid"><label>ضغط الدم<input id="medicalVisitBloodPressure" maxlength="40" placeholder="مثال: 120/80"></label><label>الوزن (كجم)<input id="medicalVisitWeight" type="number" min="0" max="500" step="0.1"></label><label>قياس السكر<input id="medicalVisitBloodSugar" maxlength="40" placeholder="القيمة والوحدة"></label></div><label>ملاحظات الموظف قبل الكشف<textarea id="medicalVisitPreNotes" rows="2" maxlength="1000"></textarea></label><label>التشخيص<input id="medicalVisitDiagnosis" maxlength="1000"></label><label>ملاحظات الدكتور أثناء الكشف<textarea id="medicalVisitClinicalNotes" rows="3" maxlength="4000"></textarea></label><label>العلاج والتوصيات<textarea id="medicalVisitTreatment" rows="3" maxlength="4000"></textarea></label><label>موعد المتابعة أو تعليماتها<input id="medicalVisitFollowUp" maxlength="1000"></label><p id="medicalVisitMessage" class="message" role="status" hidden></p><button id="medicalVisitSave" class="primary-button" type="submit">حفظ الكشف في السجل الطبي</button></form></section></section>
+      <section id="doctorArchiveSection" class="employee-section" hidden><div class="employee-section-heading"><h3>أرشيف الحجوزات</h3></div><div class="booking-list-filters"><label>بحث بالاسم أو الهاتف أو الخدمة<input id="doctorArchiveSearch" type="search" placeholder="ابحث في الأرشيف"></label><label>من تاريخ الموعد<input id="doctorArchiveDateFilter" type="date"></label><label>إلى تاريخ الموعد<input id="doctorArchiveToDateFilter" type="date"></label><button id="exportClinicExcelButton" class="secondary-button" type="button">استخراج ملف Excel</button></div><p id="archiveExportMessage" class="message" role="status" hidden></p><div id="doctorArchiveList" class="employee-list" aria-live="polite"></div></section>
 
-        <article class="management-card">
-          <span class="card-icon" aria-hidden="true">▤</span>
-          <h3>صلاحيات الوصول</h3>
-          <p>
-            تحديد مستوى الوصول لكل قسم بصورة مستقلة، مع التحقق من الطلبات
-            على الخادم.
-          </p>
-          <span class="status-label">إدارة مركزية للصلاحيات</span>
-        </article>
+      <section id="bookingManagementSection" class="employee-section" hidden>
+        <div class="employee-section-heading">
+          <div><h3>إدارة الحجوزات</h3></div>
+          <div class="employee-list-actions">
+            <button id="addBookingToggleButton" class="primary-button add-booking-toggle" type="button"><span aria-hidden="true">＋</span> إضافة حجز جديد</button>
+            
+          </div>
+        </div>
+        <div class="employee-form-card booking-create-card" hidden>
+          <form id="createBookingForm" class="employee-form" novalidate>
+            <label for="newBookingPatientName">اسم المريضة</label>
+            <input id="newBookingPatientName" name="patientName" type="text" maxlength="120" autocomplete="off" required><input id="newBookingPatientId" type="hidden" name="patientId"><div id="newBookingPatientSuggestions" class="patient-suggestions" hidden></div>
+            <label for="newBookingPatientPhone">رقم الهاتف</label>
+            <input id="newBookingPatientPhone" name="patientPhone" type="tel" maxlength="40" required>
+            <label for="newBookingDate">التاريخ المطلوب</label>
+            <input id="newBookingDate" name="appointmentDate" type="date" required>
+            <label for="newBookingService">نوع الحجز أو الخدمة</label>
+            <div class="service-quick-field"><input id="newBookingService" name="service" type="text" maxlength="120" placeholder="اكتب الخدمة يدويًا"><select class="service-quick-select" aria-label="اختيار خدمة جاهزة"><option value="">أو اختر خدمة جاهزة</option><option value="كشف">كشف</option><option value="استشارة">استشارة</option><option value="متابعة">متابعة</option><option value="سونار">سونار</option><option value="إعادة كشف">إعادة كشف</option><option value="خدمة أخرى">خدمة أخرى</option></select></div>
+            <label for="newBookingServicePrice">قيمة الكشف أو الاستشارة (جنيه)</label><input id="newBookingServicePrice" name="servicePrice" type="number" min="0" max="99999999" step="0.01" inputmode="decimal" placeholder="مثال: 300"><label for="newBookingBloodPressure">ضغط الدم (اختياري)</label><input id="newBookingBloodPressure" name="bloodPressure" maxlength="40" placeholder="مثال: 120/80"><label for="newBookingWeight">الوزن بالكيلو (اختياري)</label><input id="newBookingWeight" name="weight" type="number" min="0" max="500" step="0.1"><label for="newBookingBloodSugar">قياس السكر (اختياري)</label><input id="newBookingBloodSugar" name="bloodSugar" maxlength="40" placeholder="القيمة والوحدة"><label for="newBookingPreVisitNotes">ملاحظات الموظف قبل الكشف</label><textarea id="newBookingPreVisitNotes" name="preVisitNotes" maxlength="1000" rows="2"></textarea>
+            
+            <label for="newBookingNotes">ملاحظات</label>
+            <textarea id="newBookingNotes" name="notes" maxlength="2000" rows="3"></textarea>
+            <p id="createBookingMessage" class="message" role="status" hidden></p>
+            <div class="booking-form-actions"><button id="createBookingButton" class="primary-button" type="submit">تأكيد الحجز</button><button id="cancelCreateBookingButton" class="secondary-button" type="button">إلغاء</button></div>
+          </form>
+        </div>
+        <button id="openBookingRequestsButton" class="booking-requests-toggle" type="button" aria-expanded="false">طلبات الحجوزات <span aria-hidden="true">⌄</span></button><div id="bookingRequestsPanel" hidden><div class="booking-list-filters">
+          <label>بحث بالاسم أو رقم الهاتف<input id="bookingSearchInput" type="search" placeholder="ابحث في طلبات الحجوزات"></label>
+        </div>
+        <p id="bookingListMessage" class="message" role="status" hidden></p>
+        <div id="bookingList" class="employee-list" aria-live="polite"></div></div>
+      </section>
 
-        <article class="management-card upcoming-card">
-          <span class="card-icon" aria-hidden="true">▦</span>
-          <h3>الحجوزات والمرضى</h3>
-          <p>
-            ستتم معالجة هذا القسم في مرحلة لاحقة دون تغيير وظائفه الحالية.
-          </p>
-          <span class="status-label">مرحلة لاحقة</span>
-        </article>
-      </div>
+<dialog id="doctorQueueDialog" class="queue-number-dialog" aria-labelledby="doctorQueueDialogTitle"><div class="queue-number-dialog-content"><h2 id="doctorQueueDialogTitle">تمت إضافة الحجز</h2><p>رقم الدور</p><strong id="doctorQueueNumber">—</strong><button id="doctorQueueDialogDone" class="primary-button" type="button">تم</button></div></dialog>
 
-      <section id="employeeManagementSection" class="employee-section" hidden>
+            <section id="employeeManagementSection" class="employee-section" hidden>
         <div class="employee-section-heading">
           <div>
             <p class="eyebrow">فريق العيادة</p>
@@ -233,6 +311,23 @@
               </div>
 
               <div class="permission-row">
+                <label for="permissionAccounts">حسابات اليوم</label>
+                <select id="permissionAccounts" name="accounts">
+                  <option value="none">بدون وصول</option>
+                  <option value="view">مشاهدة فقط</option>
+                  <option value="edit">مشاهدة وتعديل</option>
+                </select>
+              </div>
+
+              <div class="permission-row">
+                <label for="employeeExpenseMode">طريقة خصم المصروفات</label>
+                <select id="employeeExpenseMode" name="expenseMode">
+                  <option value="auto">خصم تلقائي بعد التسجيل</option>
+                  <option value="approval" selected>اعتماد الدكتور قبل الخصم</option>
+                </select>
+              </div>
+
+              <div class="permission-row">
                 <label for="permissionSettings">إعدادات العيادة</label>
                 <select id="permissionSettings" name="settings">
                   <option value="none">بدون وصول</option>
@@ -275,15 +370,61 @@
         <div id="employeeList" class="employee-list" aria-live="polite"></div>
       </section>
 
+      <section id="clinicManagementSection" class="employee-section clinic-management-section" hidden>
+        <div class="employee-section-heading">
+          <div><h3>إعدادات العيادة</h3><p class="muted-text">التغييرات المحفوظة تُستخدم في الموقع ولوحات العمل التي تقرأ الإعدادات المشتركة.</p></div>
+        </div>
+        <form id="clinicSettingsForm" class="employee-form clinic-settings-form">
+          <h4>بيانات العيادة</h4>
+          <div class="clinic-settings-grid">
+            <label>اسم الطبيب<input name="doctorName" maxlength="120" required></label>
+            <label>التخصص<input name="specialty" maxlength="160" required></label>
+            <label>رقم الهاتف<input name="phone" maxlength="40"></label>
+            <label>رقم واتساب<input name="whatsapp" maxlength="40"></label>
+            <label>العنوان<input name="address" maxlength="300"></label>
+            <label>رابط الشعار<input name="logo" maxlength="500"></label>
+            <label>مسار صورة الطبيب<input name="doctorImage" maxlength="500"></label>
+            <label class="clinic-settings-wide">وصف العيادة<textarea name="description" rows="2" maxlength="1000"></textarea></label>
+          </div>
+          <h4>ألوان الموقع</h4>
+          <div class="clinic-settings-grid clinic-color-grid">
+            <label>لون الخلفية<input name="background" type="color" required></label>
+            <label>لون المساحات<input name="surface" type="color" required></label>
+            <label>اللون الأساسي<input name="accent" type="color" required></label>
+            <label>اللون الثانوي<input name="secondary" type="color" required></label>
+          </div>
+          <h4>الخدمات التي تقدمها العيادة</h4>
+          <p class="muted-text">يمكن إضافة خدمة أو حذفها أو تعديل اسمها ووصفها ورمزها. الخدمات المفعلة تظهر في الموقع ونموذج الحجز.</p>
+          <div id="clinicServicesEditor" class="clinic-dynamic-list"></div>
+          <button id="addClinicServiceButton" class="secondary-button" type="button">＋ إضافة خدمة</button>
+          <h4>أسماء الحالات وألوانها</h4>
+          <p class="muted-text">يمكن تعديل الاسم واللون لكل حالة. المعرّفات الداخلية ثابتة للحفاظ على قواعد سير الحجز والتقارير.</p>
+          <div id="clinicStatusesEditor" class="clinic-dynamic-list"></div>
+          <h4>باقي متغيرات الموقع</h4>
+          <p class="muted-text">يمكن تعديل النصوص والأقسام الأخرى هنا بصيغة JSON. لا تغيّر مفاتيح الإعدادات أو بنية البيانات إذا لم تكن متأكدًا منها.</p>
+          <textarea id="clinicAdvancedSettings" class="clinic-advanced-settings" rows="16" spellcheck="false" aria-label="باقي متغيرات الموقع بصيغة JSON"></textarea>
+          <p id="clinicSettingsMessage" class="message" role="status" hidden></p>
+          <button id="saveClinicSettingsButton" class="primary-button" type="submit">حفظ إعدادات العيادة</button>
+        </form>
+        <div class="clinic-logs-heading">
+          <div><h4>سجل الأحداث والأخطاء</h4><p class="muted-text">خاص بالدكتور فقط. تُحدد صلاحية كل سجل بثلاثين يومًا، وقد يتأخر الحذف التلقائي قليلًا.</p></div>
+          <button id="openClinicLogsButton" class="secondary-button" type="button">عرض سجل الأحداث</button>
+        </div>
+        <div id="clinicLogsPanel" hidden>
+          <div class="clinic-logs-toolbar"><label>نوع الحدث<select id="clinicLogsLevelFilter"><option value="all">كل الأحداث</option><option value="error">أخطاء</option><option value="warning">تحذيرات</option><option value="security">أمان</option><option value="info">معلومات</option></select></label><button id="refreshClinicLogsButton" class="secondary-button" type="button">تحديث السجل</button></div>
+          <p id="clinicLogsMessage" class="message" role="status" hidden></p>
+          <div id="clinicLogsList" class="clinic-logs-list" aria-live="polite"></div>
+        </div>
+      </section>
       <p id="dashboardMessage" class="message" role="status" hidden></p>
     </section>
 
-    <footer class="admin-footer">
-      <a href="./index.html">العودة إلى الموقع العام</a>
-      <span>إدارة العيادة</span>
-    </footer>
+    <dialog id="doctorScheduleFilterDialog" class="schedule-filter-dialog schedule-calendar-dialog"><form method="dialog" id="doctorScheduleFilterForm"><div class="employee-section-heading schedule-calendar-top"><h4>اختيار تاريخ المواعيد</h4><button class="schedule-filter-close" value="cancel" aria-label="إغلاق التقويم" type="submit">×</button></div><div class="schedule-calendar-shortcuts"><button type="button" data-calendar-offset="-1">أمس</button><button type="button" data-calendar-offset="0">اليوم</button><button type="button" data-calendar-offset="1">غدًا</button></div><div class="schedule-calendar-month-controls"><button type="button" id="doctorCalendarPrev" aria-label="الشهر السابق">‹</button><select id="doctorCalendarMonth" aria-label="الشهر"></select><select id="doctorCalendarYear" aria-label="السنة"></select><button type="button" id="doctorCalendarNext" aria-label="الشهر التالي">›</button></div><div class="schedule-calendar-weekdays" aria-hidden="true"><span>الأحد</span><span>الإثنين</span><span>الثلاثاء</span><span>الأربعاء</span><span>الخميس</span><span>الجمعة</span><span>السبت</span></div><div id="doctorCalendarDays" class="schedule-calendar-days" role="group" aria-label="أيام الشهر"></div><input id="doctorFilterDate" type="date" hidden><div class="schedule-calendar-footer"><span>اختر اليوم لعرض مواعيده مباشرة</span><button class="secondary-button" value="cancel" type="submit">إغلاق</button></div></form></dialog>
   </main>
 
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="./src/clinic-ui-shell.js"></script>
   <script type="module" src="./src/admin.js"></script>
+  <script type="module" src="./src/clinic-management.js"></script>
 </body>
 </html>

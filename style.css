@@ -1599,3 +1599,158 @@ p {
 .floating-card {
   display: none !important;
 }
+
+.patient-appointments-panel {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.patient-appointments-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.patient-appointments-heading h3 {
+  margin: 0;
+}
+
+.patient-appointments-heading .button {
+  min-height: 40px;
+  padding: 9px 14px;
+  font-size: 12px;
+}
+
+.patient-appointments-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.patient-appointment-card {
+  padding: 15px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.patient-appointment-card h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.patient-appointment-card p {
+  margin: 0 0 10px;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.patient-appointment-status {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #f1f4ec;
+  color: #42513a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+
+/* Patient portal medical history and booking request */
+.patient-history-panel, .patient-request-booking { margin-top: 24px; padding-top: 18px; border-top: 1px solid rgba(17,20,26,.12); }
+.patient-history-list { display: grid; gap: 12px; }
+.patient-history-card { padding: 14px; border: 1px solid rgba(17,20,26,.12); border-radius: 12px; background: var(--color-light, #F9F5F1); }
+.patient-history-card h4 { margin: 0 0 10px; }
+.patient-history-card p { margin: 7px 0; line-height: 1.7; }
+.patient-request-booking form { display: grid; gap: 12px; }
+
+
+/* Medical visit editor opened directly from a booking card */
+.medical-booking-panel {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid rgba(17, 20, 26, 0.14);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--color-dark, #11141A);
+}
+.medical-booking-panel h4 { margin: 0 0 12px; color: var(--color-dark, #11141A); }
+.medical-booking-form { display: grid; gap: 12px; margin-top: 12px; }
+.medical-booking-field { display: grid; gap: 6px; color: var(--color-dark, #11141A); font-size: 13px; font-weight: 700; }
+.medical-booking-field input, .medical-booking-field textarea {
+  width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid rgba(17,20,26,.18);
+  border-radius: 10px; background: #fff; color: #11141A; font: inherit;
+}
+.medical-booking-field textarea { resize: vertical; }
+.medical-booking-form .medical-vitals-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.medical-booking-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.medical-booking-form input:disabled, .medical-booking-form textarea:disabled { background: #f2f2f2; color: #444; opacity: 1; }
+.patient-history-card h4 { color: var(--color-dark, #11141A); }
+@media (max-width: 650px) { .medical-booking-form .medical-vitals-grid { grid-template-columns: 1fr; } }
+
+
+/* Smooth, accessible interactions for the public clinic website. */
+:root {
+  --motion-fast: 180ms;
+  --motion-normal: 240ms;
+  --motion-ease: cubic-bezier(.2, .75, .25, 1);
+}
+button,
+input,
+select,
+textarea,
+a,
+.service-card,
+.patient-appointment-card,
+.medical-booking-panel,
+.patient-history-card,
+.booking-card,
+dialog {
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease);
+}
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea,
+button {
+  border-radius: 12px;
+}
+.service-card,
+.patient-appointment-card,
+.patient-history-card,
+.medical-booking-panel,
+.booking-card {
+  border-radius: 18px;
+}
+button:hover:not(:disabled),
+a:hover {
+  transform: translateY(-1px);
+}
+button:active:not(:disabled) {
+  transform: translateY(0) scale(.985);
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-secondary, #BFD2AF);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

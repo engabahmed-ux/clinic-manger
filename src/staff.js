@@ -1,234 +1,329 @@
 import { FIREBASE_CONFIG } from "./config/firebase-config.js";
+import { APP_CONFIG } from "./config/app-config.js";
+import { createClinicRealtime } from "./realtime.js";
+import { loadRuntimeSettings, statusLabel, applyRuntimeStatusColor, recordRuntimeLog, applyRuntimeBranding } from "./config/runtime-settings.js";
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-import {
-  initializeApp,
-  getApps
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-
-import {
-  getAuth,
-  onAuthStateChanged,
-  signOut
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-
-const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
-
-const firebaseApp =
-  getApps().find((item) => item.name === "[DEFAULT]") ||
-  initializeApp(FIREBASE_CONFIG);
-
-const auth = getAuth(firebaseApp);
-
-const $ = (selector, parent = document) =>
-  parent.querySelector(selector);
-
-const loadingSection = $("#staffLoading");
-const errorSection = $("#staffError");
-const dashboardSection = $("#staffDashboard");
-const errorMessage = $("#staffErrorMessage");
-const logoutButton = $("#staffLogoutButton");
-const retryButton = $("#staffRetryButton");
-const permissionsGrid = $("#staffPermissionsGrid");
-const noPermissionsMessage = $("#staffNoPermissions");
-const displayNameElement = $("#staffDisplayName");
-
-let currentUser = null;
-let checkingAccount = false;
-
-const permissionSections = [
-  {
-    key: "bookings",
-    title: "إدارة الحجوزات",
-    description: "صلاحية الوصول إلى قسم الحجوزات."
-  },
-  {
-    key: "patients",
-    title: "إدارة المريضات",
-    description: "صلاحية الوصول إلى قسم بيانات المريضات."
-  },
-  {
-    key: "medicalRecords",
-    title: "السجلات الطبية",
-    description: "صلاحية الوصول إلى قسم السجلات الطبية."
-  },
-  {
-    key: "settings",
-    title: "الإعدادات",
-    description: "صلاحية الوصول إلى قسم إعدادات العيادة."
-  }
-];
-
-function showOnly(section) {
-  loadingSection.hidden = section !== loadingSection;
-  errorSection.hidden = section !== errorSection;
-  dashboardSection.hidden = section !== dashboardSection;
-}
-
-function showError(message) {
-  errorMessage.textContent = message;
-  showOnly(errorSection);
-  logoutButton.hidden = !auth.currentUser;
-}
-
-async function identifyAccount(user) {
-  const idToken = await user.getIdToken();
-
-  const response = await fetch("/api/auth/account-type", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${idToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({})
-  });
-
-  let result;
-
+/* Soft UI feedback sounds. Web Audio is created only after a user interaction. */
+let clinicUiAudioContext = null;
+function playClinicUiSound(kind = "success") {
   try {
-    result = await response.json();
-  } catch {
-    throw new Error("تعذر قراءة استجابة التحقق من الحساب.");
+    if (localStorage.getItem("clinicUiSounds") === "off") return;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    clinicUiAudioContext ||= new AudioContextClass();
+    const context = clinicUiAudioContext;
+    if (context.state === "suspended") context.resume().catch(() => {});
+    const presets = {
+      success: [{ f: 660, t: 0, d: 0.075 }, { f: 880, t: 0.07, d: 0.09 }],
+      archive: [{ f: 520, t: 0, d: 0.065 }],
+      expense: [{ f: 587, t: 0, d: 0.06 }, { f: 740, t: 0.055, d: 0.065 }],
+      notification: [{ f: 740, t: 0, d: 0.075 }, { f: 880, t: 0.085, d: 0.085 }]
+    };
+    for (const tone of (presets[kind] || presets.success)) {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(tone.f, context.currentTime + tone.t);
+      gain.gain.setValueAtTime(0.0001, context.currentTime + tone.t);
+      gain.gain.exponentialRampToValueAtTime(0.035, context.currentTime + tone.t + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + tone.t + tone.d);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(context.currentTime + tone.t);
+      oscillator.stop(context.currentTime + tone.t + tone.d + 0.015);
+    }
+  } catch (_) {
+    // Sound is optional and must never interrupt clinic workflows.
   }
-
-  if (!response.ok) {
-    throw new Error(
-      result?.message || "تعذر التحقق من نوع الحساب."
-    );
-  }
-
-  return result;
 }
 
-function permissionLabel(value) {
-  if (value === "edit") {
-    return "مشاهدة وتعديل";
-  }
-
-  if (value === "view") {
-    return "مشاهدة فقط";
-  }
-
-  return "لا توجد صلاحية";
-}
-
-function renderPermissions(permissions) {
-  permissionsGrid.replaceChildren();
-
-  const allowedSections = permissionSections.filter((section) => {
-    return ["view", "edit"].includes(permissions?.[section.key]);
+const RUNTIME_SETTINGS = await loadRuntimeSettings(APP_CONFIG);
+applyRuntimeBranding(RUNTIME_SETTINGS);
+document.querySelectorAll("[data-status-filter]").forEach((button)=>{const key=button.dataset.statusFilter;if(key!=="all"&&RUNTIME_SETTINGS.statuses?.[key]){const prefix=button.textContent.trim().startsWith("✓")?"✓ ":"";button.textContent=prefix+statusLabel(RUNTIME_SETTINGS,key);applyRuntimeStatusColor(button,RUNTIME_SETTINGS,key)}});
+document.querySelectorAll(".service-quick-select").forEach((select)=>{const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent="أو اختر خدمة جاهزة";select.replaceChildren(placeholder);for(const service of RUNTIME_SETTINGS.services?.items||[]){if(service.enabled===false||!service.title)continue;const option=document.createElement("option");option.value=service.title;option.textContent=service.title;select.append(option)}});
+window.addEventListener("clinic-settings-updated", (event) => {
+  const next = event.detail;
+  if (!next) return;
+  for (const key of Object.keys(RUNTIME_SETTINGS)) delete RUNTIME_SETTINGS[key];
+  Object.assign(RUNTIME_SETTINGS, next);
+  applyRuntimeBranding(RUNTIME_SETTINGS);
+  BOOKING_STATUS_OPTIONS.splice(0, BOOKING_STATUS_OPTIONS.length,
+    ["waiting", statusLabel(RUNTIME_SETTINGS, "waiting", "في الانتظار")],
+    ["completed", statusLabel(RUNTIME_SETTINGS, "completed", "تم الكشف")],
+    ["no_show", statusLabel(RUNTIME_SETTINGS, "no_show", "لم يأتِ")],
+    ["apologized", statusLabel(RUNTIME_SETTINGS, "apologized", "اعتذر")]
+  );
+  document.querySelectorAll("[data-status-filter]").forEach((button) => {
+    const key = button.dataset.statusFilter;
+    if (key !== "all" && RUNTIME_SETTINGS.statuses?.[key]) {
+      const prefix = button.textContent.trim().startsWith("✓") ? "✓ " : "";
+      button.textContent = prefix + (key === "postponed" ? "تم التأجيل" : statusLabel(RUNTIME_SETTINGS, key));
+      applyRuntimeStatusColor(button, RUNTIME_SETTINGS, key);
+    }
   });
-
-  noPermissionsMessage.hidden = allowedSections.length > 0;
-
-  allowedSections.forEach((section) => {
-    const permission = permissions[section.key];
-
-    const card = document.createElement("article");
-    card.className = "staff-permission-card";
-
-    const heading = document.createElement("div");
-    heading.className = "staff-permission-heading";
-
-    const title = document.createElement("h3");
-    title.textContent = section.title;
-
-    const status = document.createElement("span");
-    status.className = `staff-permission-status ${
-      permission === "edit" ? "can-edit" : "view-only"
-    }`;
-
-    status.textContent = permissionLabel(permission);
-
-    heading.append(title, status);
-
-    const description = document.createElement("p");
-    description.textContent = section.description;
-
-    const unavailable = document.createElement("p");
-    unavailable.className = "staff-feature-unavailable";
-    unavailable.textContent =
-      "سيتم تفعيل عمليات هذا القسم بعد استكمال ربطه الآمن.";
-
-    card.append(heading, description, unavailable);
-    permissionsGrid.append(card);
+  document.querySelectorAll(".service-quick-select").forEach((select) => {
+    const selected = select.value;
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "أو اختر خدمة جاهزة";
+    select.replaceChildren(placeholder);
+    for (const service of RUNTIME_SETTINGS.services?.items || []) {
+      if (service.enabled === false || !service.title) continue;
+      const option = document.createElement("option");
+      option.value = service.title;
+      option.textContent = service.title;
+      select.append(option);
+    }
+    select.value = selected;
   });
-}
-
-async function checkCurrentAccount() {
-  if (checkingAccount) return;
-
-  checkingAccount = true;
-  showOnly(loadingSection);
-
-  try {
-    const user = currentUser || auth.currentUser;
-
-    if (!user) {
-      window.location.replace("./index.html#patient-portal");
-      return;
-    }
-
-    const account = await identifyAccount(user);
-
-    if (account.accountType === "doctor") {
-      window.location.replace("./admin.html");
-      return;
-    }
-
-    if (account.accountType === "patient") {
-      window.location.replace("./index.html#patient-portal");
-      return;
-    }
-
-    if (account.accountType !== "staff") {
-      throw new Error("نوع الحساب غير معتمد لهذه اللوحة.");
-    }
-
-    displayNameElement.textContent =
-      account.displayName || "في لوحة الموظف";
-
-    renderPermissions(account.permissions || {});
-
-    showOnly(dashboardSection);
-    logoutButton.hidden = false;
-  } catch (error) {
-    console.error("Staff dashboard verification failed:", error);
-
-    showError(
-      error.message ||
-      "تعذر التحقق من حساب الموظف. حاول مرة أخرى."
-    );
-  } finally {
-    checkingAccount = false;
-  }
-}
-
-onAuthStateChanged(auth, (user) => {
-  currentUser = user;
-
-  if (!user) {
-    window.location.replace("./index.html#patient-portal");
-    return;
-  }
-
-  checkCurrentAccount();
+  if (typeof loadBookings === "function") loadBookings();
 });
 
-retryButton.addEventListener("click", () => {
-  checkCurrentAccount();
-});
-
-logoutButton.addEventListener("click", async () => {
-  logoutButton.disabled = true;
-
-  try {
-    await signOut(auth);
-    window.location.replace("./index.html#patient-portal");
-  } catch (error) {
-    console.error("Staff logout failed:", error);
-
-    showError("تعذر تسجيل الخروج. حاول مرة أخرى.");
-  } finally {
-    logoutButton.disabled = false;
+document.querySelectorAll(".service-quick-select").forEach((select)=>select.addEventListener("change",()=>{const container=select.closest("label")||select.closest(".service-quick-field");const input=container?.querySelector('[name="service"]');if(input&&select.value)input.value=select.value}));
+const app=getApps().find(x=>x.name==="[DEFAULT]")||initializeApp(FIREBASE_CONFIG),auth=getAuth(app),$=(s,p=document)=>p.querySelector(s);
+let realtimeConnected = false;
+const clinicRealtime = createClinicRealtime(auth, event => {
+  if (event.startsWith("booking_")) {
+    if (["view", "edit"].includes(currentAccount?.permissions?.bookings)) loadBookings();
+  } else if (event === "accounts_changed" || event === "custody_changed") {
+    if (!accountsSection.hidden && ["view", "edit"].includes(currentAccount?.permissions?.accounts)) {
+      loadDailyAccounts();
+      loadStaffCustody();
+      if (event === "accounts_changed" && typeof loadMonthlyExpenses === "function") loadMonthlyExpenses();
+    }
+  } else if (event === "patient_changed" || event === "medical_record_changed") {
+    if (staffMedicalPatient && !recordsSection.hidden) loadStaffMedicalPatient(staffMedicalPatient);
+    if (staffMedicalSearch?.value.trim()) staffMedicalSearch.dispatchEvent(new Event("input"));
+  } else if (event === "clinic_settings_changed" && !settingsSection.hidden) {
+    fetch("/api/clinic-management", { cache: "no-store" })
+      .then(response => response.ok ? response.json() : null)
+      .then(result => {
+        if (result?.settings) window.dispatchEvent(new CustomEvent("clinic-settings-updated", { detail: result.settings }));
+      }).catch(() => {});
   }
-});
+}, connected => { realtimeConnected = connected; });
+const loadingSection=$("#staffLoading"),errorSection=$("#staffError"),dashboardSection=$("#staffDashboard"),errorMessage=$("#staffErrorMessage"),logoutButton=$("#staffLogoutButton"),retryButton=$("#staffRetryButton"),displayNameElement=$("#staffDisplayName"),tabs=$("#staffTabs");
+const staffStatusLegend=$("#staffStatusLegend"),staffArchiveSelected=$("#staffArchiveSelectedAppointments");let activeStaffStatusFilter="all";
+const homeSection=$("#staffHomeSection"),bookingsSection=$("#staffBookingsSection"),archiveSection=$("#staffArchiveSection"),patientsSection=$("#staffPatientsSection"),accountsSection=$("#staffAccountsSection"),recordsSection=$("#staffRecordsSection"),settingsSection=$("#staffSettingsSection");
+const dailyList=$("#dailyAppointmentsList"),dailyMessage=$("#dailyAppointmentsMessage"),homeDateFilter=$("#staffHomeDateFilter"),homeSearch=$("#staffHomeSearch"),filterDialog=$("#staffScheduleFilterDialog"),filterMode=$("#staffFilterMode"),filterDate=$("#staffFilterDate"),filterQuery=$("#staffFilterQuery"),filterApply=$("#staffFilterApply"),scheduleDateLabel=$("#staffScheduleDateLabel"),archiveList=$("#staffArchiveList"),archiveDateFilter=$("#staffArchiveDateFilter"),pendingList=$("#staffPendingBookingsList"),bookingRequestsToggle=$("#staffOpenBookingRequests"),bookingRequestsPanel=$("#staffBookingRequestsPanel"),bookingsMessage=$("#staffBookingsMessage"),addBookingToggle=$("#addBookingToggle"),homeAddBooking=$("#staffHomeAddBooking"),createBookingForm=$("#staffCreateBookingForm"),createBookingMessage=$("#staffCreateBookingMessage"),dateFilter=$("#staffBookingDateFilter"),detailSection=$("#staffBookingDetail"),detailContent=$("#staffBookingDetailContent"),closeDetailButton=$("#closeStaffBookingDetail"),patientTools=$("#staffPatientTools"),patientMessage=$("#staffPatientMessage"),accountsDate=$("#staffAccountsDate"),accountsMonth=$("#staffAccountsMonth"),monthlyExpensesList=$("#staffMonthlyExpensesList"),accountsMessage=$("#staffAccountsMessage"),accountsBookings=$("#staffAccountsBookings"),accountsCompletedTotal=$("#staffAccountsCompletedTotal"),accountsPaidTotal=$("#staffAccountsPaidTotal"),accountsExpenseTotal=$("#staffAccountsExpenseTotal"),accountsNetTotal=$("#staffAccountsNetTotal"),expenseEntrySection=$("#staffExpenseEntrySection"),expenseForm=$("#staffExpenseForm"),expensesList=$("#staffExpensesList"),noPermissionsMessage=$("#staffNoPermissions"),pendingBookingBadge=$("#staffPendingBookingBadge"),queueDialog=$("#staffQueueDialog"),queueNumberLabel=$("#staffQueueNumber"),queueDialogDone=$("#staffQueueDialogDone");
+let currentUser=null,checkingAccount=false,currentAccount=null,allBookings=[],activeBooking=null;
+const sections=[{key:"bookings",title:"إدارة الحجوزات",target:"bookings"},{key:"patients",title:"حسابات المريضات",target:"patients"},{key:"medicalRecords",title:"السجلات الطبية",target:"records"},{key:"settings",title:"إعدادات العيادة",target:"settings"}];
+let dailyExpenses=[];
+function showOnly(section){loadingSection.hidden=section!==loadingSection;errorSection.hidden=section!==errorSection;dashboardSection.hidden=section!==dashboardSection}
+function showError(message){errorMessage.textContent=message;showOnly(errorSection);logoutButton.hidden=!auth.currentUser}
+async function identifyAccount(user){const response=await fetch("/api/auth/account-type",{method:"POST",headers:{Authorization:`Bearer ${await user.getIdToken()}`,"Content-Type":"application/json"},body:JSON.stringify({})});const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.message||"تعذر التحقق من نوع الحساب.");return result}
+async function custodyRequest(action,data={}){const user=auth.currentUser;if(!user)throw new Error("انتهت جلسة الدخول.");const response=await fetch("/api/doctor/custody",{method:"POST",headers:{Authorization:`Bearer ${await user.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});const result=await response.json().catch(()=>({}));if(!response.ok){const error=new Error(result.message||"تعذر تنفيذ عملية العهدة.");error.status=response.status;error.details=result;throw error}return result}
+async function bookingsRequest(action,data={}){const user=auth.currentUser;if(!user)throw new Error("انتهت جلسة الدخول.");const response=await fetch("/api/doctor/bookings",{method:"POST",headers:{Authorization:`Bearer ${await user.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});const result=await response.json().catch(()=>({}));if(!response.ok){recordRuntimeLog(user,{action:"request_failed",area:"bookings",level:response.status===401||response.status===403?"security":"error",message:"فشل طلب إدارة الحجوزات."});throw new Error(result.message||"تعذر تنفيذ طلب الحجوزات.")}if(["create","update","cancel","archiveDay","updatePaidAmount"].includes(action)){const eventAction=action==="create"?"booking_created":action==="cancel"?"booking_cancelled":action==="updatePaidAmount"?"payment_updated":action==="update"&&data.booking?.status?"booking_status_changed":"booking_updated";recordRuntimeLog(user,{action:eventAction,area:"bookings",level:"info",message:"تم تنفيذ عملية على حجز.",targetType:"booking",targetId:data.booking?.id||data.id||result.booking?.id||""})}return result}
+const custodyExpectedElement=$("#staffCustodyExpected"),custodyDialogExpected=$("#staffCustodyDialogExpected"),custodyStateElement=$("#staffCustodyState"),custodyMessageElement=$("#staffCustodyMessage"),custodyAdditionForm=$("#staffCustodyAdditionForm"),custodyDialog=$("#staffCustodyDialog"),custodyOpenButton=$("#staffCustodyOpen"),custodyCloseButton=$("#staffCustodyClose"),handoverDialog=$("#staffHandoverDialog"),handoverForm=$("#staffHandoverForm"),handoverExpected=$("#staffHandoverExpected"),handoverActual=$("#staffHandoverActual"),handoverNotes=$("#staffHandoverNotes"),handoverMessage=$("#staffHandoverMessage");let custodySessionActive=false,custodyAddedAmount=0,custodySessionExpected=0,accountsReceiptsTotal=0,accountsExpensesTotal=0,custodyBaselineReceipts=0,custodyBaselineExpenses=0,custodyHandoverExpected=0,custodyHandoverBaselineReceipts=0,custodyHandoverBaselineExpenses=0,custodyHandoverPaid=0,custodyHandoverDate="",custodyHandoverRecorded=false,custodySettledHandoverAmount=0,custodySettledHandoverDate="",custodySettledHandoverRecorded=false;
+function staffCurrentCustodyExpected(){return custodySessionActive?custodySessionExpected+Math.max(0,(accountsReceiptsTotal-custodyBaselineReceipts)-(accountsExpensesTotal-custodyBaselineExpenses)):0}function renderStaffCustodyExpected(){const amount=staffCurrentCustodyExpected();const formatted=amount.toLocaleString("ar-EG",{minimumFractionDigits:2,maximumFractionDigits:2})+" ج.م";if(custodyExpectedElement)custodyExpectedElement.textContent=formatted;if(custodyDialogExpected)custodyDialogExpected.textContent=formatted;}async function loadStaffCustody(){if(!custodyExpectedElement)return;try{const selectedDate=accountsDate?.value||todayISO();const r=await custodyRequest("status",{date:selectedDate});custodyHandoverPaid=Number(r.handover?.actualAmount||0);custodyHandoverDate=r.handover?.date||"";custodyHandoverRecorded=!!r.handover;custodySettledHandoverAmount=Number(r.settledHandover?.amount||0);custodySettledHandoverDate=r.settledHandover?.date||"";custodySettledHandoverRecorded=!!r.settledHandover;if(r.active&&r.session){custodySessionActive=true;custodySessionExpected=Number(r.session.expectedAmount||0);custodyBaselineReceipts=Number(r.session.baselineReceipts||0);custodyBaselineExpenses=Number(r.session.baselineExpenses||0);const opening=Number(r.session.openingAmount||0);custodyAddedAmount=cairoDate(r.session.startedAt)===selectedDate?Math.max(0,custodySessionExpected-opening):0;renderStaffCustodyExpected();custodyStateElement.textContent=r.session.employeeUid===auth.currentUser?.uid?"عهدتك نشطة":"جلسة موظف آخر";if(handoverExpected)handoverExpected.textContent=staffMoney(staffCurrentCustodyExpected());message(custodyMessageElement,"")}else{custodySessionActive=false;custodySessionExpected=0;custodyAddedAmount=0;custodyBaselineReceipts=0;custodyBaselineExpenses=0;renderStaffCustodyExpected();custodyStateElement.textContent="لا توجد عهدة نشطة";message(custodyMessageElement,"لا توجد عهدة نشطة حاليًا.",true)}}catch(e){message(custodyMessageElement,e.message||"تعذر تحميل العهدة.",true)}}
+function message(el,text,error=false){if(!el)return;el.textContent=text;el.hidden=!text;el.classList.toggle("error",error)}
+async function medicalRecordsRequest(action,data={}){const user=auth.currentUser;if(!user)throw new Error("انتهت جلسة الدخول.");const response=await fetch("/api/doctor/medical-records",{method:"POST",headers:{Authorization:`Bearer ${await user.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});const result=await response.json().catch(()=>({}));if(!response.ok){recordRuntimeLog(user,{action:"request_failed",area:"medical_records",level:"error",message:"فشل طلب السجلات الطبية."});throw new Error(result.message||"تعذر الوصول إلى السجل الطبي.")}if(/save|create|update/i.test(action))recordRuntimeLog(user,{action:"medical_record_saved",area:"medical_records",level:"info",message:"تم حفظ أو تعديل سجل طبي."});return result}
+function cairoDate(value){if(!value)return"";const date=new Date(value);if(Number.isNaN(date.getTime()))return String(value).slice(0,10);const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(date),v=Object.fromEntries(parts.map(x=>[x.type,x.value]));return `${v.year}-${v.month}-${v.day}`}
+function todayISO(){const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date()),v=Object.fromEntries(parts.map(x=>[x.type,x.value]));return `${v.year}-${v.month}-${v.day}`}
+function dateLabel(value){if(!value)return"غير محدد";const d=new Date(`${String(value).slice(0,10)}T12:00:00`);return Number.isNaN(d.getTime())?value:new Intl.DateTimeFormat("ar-EG",{weekday:"long",day:"2-digit",month:"2-digit",year:"numeric"}).format(d)}
+function submittedLabel(value){if(!value)return"وقت الطلب غير متاح";const d=new Date(value);return Number.isNaN(d.getTime())?"وقت الطلب غير متاح":new Intl.DateTimeFormat("ar-EG",{dateStyle:"medium",timeStyle:"short"}).format(d)}
+function empty(text){const el=document.createElement("p");el.className="staff-empty";el.textContent=text;return el}
+function openTab(target){const map={home:homeSection,bookings:bookingsSection,archive:archiveSection,patients:patientsSection,accounts:accountsSection,records:recordsSection,settings:settingsSection};for(const[k,el]of Object.entries(map))if(el)el.hidden=k!==target;for(const b of tabs.querySelectorAll("[data-tab]"))b.setAttribute("aria-selected",String(b.dataset.tab===target));detailSection.hidden=true;if(target==="accounts"){loadDailyAccounts();loadStaffCustody()}}
+function buildTabs(permissions){tabs.replaceChildren();const canViewBookings=["view","edit"].includes(permissions?.bookings);const items=[...(canViewBookings?[{key:"home",label:"الرئيسية"}]:[]),...sections.filter(s=>["view","edit"].includes(permissions?.[s.key])).map(s=>({key:s.target,label:s.title})),...(["view","edit"].includes(permissions?.bookings)?[{key:"archive",label:"أرشيف الحجوزات"}]:[]),...(["view","edit"].includes(permissions?.accounts)?[{key:"accounts",label:"حسابات اليوم"}]:[])];noPermissionsMessage.hidden=items.length>0;for(const item of items){const b=document.createElement("button");b.type="button";b.className="staff-tab";b.dataset.tab=item.key;const label=document.createElement("span");label.textContent=item.label;b.append(label);if(item.key==="bookings"){const badge=document.createElement("span");badge.id="staffTopPendingBookingBadge";badge.className="booking-notification-badge";badge.hidden=true;b.append(badge)}b.setAttribute("aria-selected",String(item.key==="home"));b.addEventListener("click",()=>openTab(item.key));tabs.append(b)}updateStaffPendingBadge()}
+function parseRescheduleHistory(booking){try{const value=JSON.parse(booking.rescheduleHistory||"[]");return Array.isArray(value)?value.filter(item=>item&&/^\d{4}-\d{2}-\d{2}$/.test(item.fromDate||"")&&/^\d{4}-\d{2}-\d{2}$/.test(item.toDate||"")):[]}catch{return[]}}function queueNumberAtHistoryTime(booking,date,at){const target=Date.parse(at||"");if(!Number.isFinite(target))return"—";const dateAtTime=item=>{let value=String(item.appointmentDate||"").slice(0,10);const history=parseRescheduleHistory(item).filter(entry=>Number.isFinite(Date.parse(entry.at||""))&&Date.parse(entry.at)>target).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at));for(const entry of history)value=entry.fromDate;return value};const rows=allBookings.filter(item=>dateAtTime(item)===date).sort((a,b)=>(Date.parse(a.createdAt||"")||0)-(Date.parse(b.createdAt||"")||0));const index=rows.findIndex(item=>item.id===booking.id);return index<0?"—":index+1}function queueNumberForDate(booking,date){if(!date)return"—";const history=parseRescheduleHistory(booking);const from=history.find(entry=>entry.fromDate===date&&Number(entry.fromQueueNumber)>0);if(from)return Number(from.fromQueueNumber);const legacyFrom=history.find(entry=>entry.fromDate===date&&entry.at);if(legacyFrom){const historicalNumber=queueNumberAtHistoryTime(booking,date,legacyFrom.at);if(historicalNumber!=="—")return historicalNumber}if(String(booking.appointmentDate||"").slice(0,10)===date&&Number(booking.queueNumber)>0)return Number(booking.queueNumber);const to=[...history].reverse().find(entry=>entry.toDate===date&&Number(entry.toQueueNumber)>0);if(to)return Number(to.toQueueNumber);const rows=allBookings.filter(item=>String(item.appointmentDate||"").slice(0,10)===date||parseRescheduleHistory(item).some(entry=>entry.fromDate===date)).sort((x,y)=>(Date.parse(x.createdAt||"")||0)-(Date.parse(y.createdAt||"")||0));const index=rows.findIndex(item=>item.id===booking.id);return index<0?"—":index+1}function queueNumberFor(booking){const date=String(booking.appointmentDate||"").slice(0,10);if(!date)return"—";if(Number(booking.queueNumber)>0)return Number(booking.queueNumber);const rows=allBookings.filter(item=>String(item.appointmentDate||"").slice(0,10)===date).sort((x,y)=>(Date.parse(x.createdAt||"")||0)-(Date.parse(y.createdAt||"")||0));const index=rows.findIndex(item=>item.id===booking.id);return index<0?"—":index+1}function renderRescheduleNotice(booking,entry){const card=document.createElement("article");card.className="staff-appointment-card reschedule-notice-card";const main=document.createElement("div"),title=document.createElement("h3"),note=document.createElement("p"),meta=document.createElement("p"),number=Number(entry.fromQueueNumber)>0?Number(entry.fromQueueNumber):queueNumberForDate(booking,entry.fromDate);title.textContent=number+" · "+(booking.patientName||"المريضة");note.className="reschedule-notice-text";note.textContent=`تم نقل موعد كشف المريضة إلى ${dateLabel(entry.toDate)} · رقم الدور ${number}`;meta.textContent=[booking.patientPhone,booking.service].filter(Boolean).join(" · ");main.append(title,note,meta);card.append(main);return card}
+const BOOKING_STATUS_OPTIONS=[["waiting",statusLabel(RUNTIME_SETTINGS,"waiting","في الانتظار")],["completed",statusLabel(RUNTIME_SETTINGS,"completed","تم الكشف")],["no_show",statusLabel(RUNTIME_SETTINGS,"no_show","لم يأتِ")],["apologized",statusLabel(RUNTIME_SETTINGS,"apologized","اعتذر")]];
+const ARCHIVE_STATUSES=new Set(["archived","cancelled"]);
+function normalizedStatus(status){return status==="confirmed"?"waiting":status}
+function bookingStatusLabel(status){return statusLabel(RUNTIME_SETTINGS,status,({pending:"قيد المراجعة",confirmed:"في الانتظار",waiting:"في الانتظار",completed:"تم الكشف",postponed:"تم التأجيل",no_show:"لم يأتِ",apologized:"اعتذر",cancelled:"ملغي",archived:"مؤرشف"})[status]||"غير محدد")}
+async function changeBookingStatus(booking,status,control){if(!["waiting","completed","postponed","no_show","apologized"].includes(status))return;if(control)control.disabled=true;try{const result=await bookingsRequest("update",{booking:{id:booking.id,status}});if(status==="completed")playClinicUiSound("success");await loadBookings();if(status==="completed"&&accountsSection&&!accountsSection.hidden)await loadDailyAccounts();message(bookingsMessage,result.booking?.financialPeriodClosed?"تم تسجيل الكشف، لكن لم يُضف المبلغ تلقائيًا لأن الفترة المالية تمت تصفيتها. راجع الدكتور لتسجيل المبلغ بالطريقة المعتمدة.":status==="completed"?"تم تسجيل الكشف وإضافة قيمته إلى الحسابات تلقائيًا إن كانت غير مسجلة.":"تم تحديث حالة الحجز.")}catch(e){message(bookingsMessage,e.message||"تعذر تحديث حالة الحجز.",true);if(control)control.value=normalizedStatus(booking.status)}finally{if(control)control.disabled=false}}
+function applyStatusColor(el,status){for(const name of ["waiting","completed","postponed","no_show","apologized","pending","archived","cancelled","confirmed"])el.classList.remove(`status-${name}`);el.classList.add(`status-${status||"waiting"}`);applyRuntimeStatusColor(el,RUNTIME_SETTINGS,status||"waiting")}function makeStatusSelect(booking){const select=document.createElement("select");select.className="staff-status-select";select.setAttribute("aria-label",`حالة حجز ${booking.patientName||""}`);for(const[value,label]of BOOKING_STATUS_OPTIONS){const option=document.createElement("option");option.value=value;option.textContent=label;option.className=`status-option-${value}`;select.append(option)}select.value=normalizedStatus(booking.status)||"waiting";if(booking.status==="completed"){select.disabled=true;select.title="حالة تم الكشف نهائية ولا يمكن تغييرها"}applyStatusColor(select,select.value);select.addEventListener("change",()=>{applyStatusColor(select,select.value);changeBookingStatus(booking,select.value,select)});return select}
+function makeAppointmentCard(booking,archived=false){const card=document.createElement("article");card.className="staff-appointment-card";applyStatusColor(card,normalizedStatus(booking.status));card.dataset.bookingId=booking.id;const main=document.createElement("div"),title=document.createElement("h3"),info=document.createElement("p"),status=document.createElement("span");main.className="staff-appointment-main";title.textContent=queueNumberFor(booking)+" · "+(booking.patientName||"مريضة");info.textContent=[booking.patientPhone,booking.service].filter(Boolean).join(" · ");status.className="staff-appointment-time";status.textContent=bookingStatusLabel(booking.status);main.append(title,info);const vitals=document.createElement("div");vitals.className="staff-appointment-vitals";[["🩺","الضغط",booking.bloodPressure],["🩸","السكر",booking.bloodSugar],["⚖️","الوزن",booking.weight?booking.weight+" كجم":""]].filter(item=>item[2]!==undefined&&item[2]!==null&&String(item[2]).trim()!=="").forEach(([icon,label,value])=>{const badge=document.createElement("span");badge.className="staff-vital-badge";badge.title=label;badge.textContent=icon+" "+label+" "+value;vitals.append(badge)});card.append(main,vitals);if(currentAccount?.permissions?.bookings==="edit"&&!archived){const controls=document.createElement("div");controls.className="schedule-card-controls";const edit=document.createElement("button");edit.type="button";edit.className="staff-edit-booking-button";edit.textContent="✎";edit.setAttribute("aria-label","تعديل حجز "+(booking.patientName||"المريضة"));edit.title="تعديل بيانات الحجز";edit.addEventListener("click",()=>showBookingDetail(booking,true));controls.append(edit,makeStatusSelect(booking));card.append(controls)}else card.append(status);return card}
+
+function updateStaffDashboardStats(day){
+  const appointments=allBookings.filter(booking=>!booking.isArchived&&!["pending","archived","cancelled"].includes(booking.status)&&String(booking.appointmentDate||"").slice(0,10)===day);
+  const bookingsCount=$("#staffTodayBookingsCount");
+  const completedCount=$("#staffTodayCompletedCount");
+  if(bookingsCount)bookingsCount.textContent=String(appointments.length);
+  if(completedCount)completedCount.textContent=String(appointments.filter(booking=>normalizedStatus(booking.status)==="completed").length);
+}
+function renderDaily(){dailyList.replaceChildren();const day=homeDateFilter.value||todayISO(),mode=filterMode?.value||"date",q=(homeSearch.value||"").trim().toLocaleLowerCase("ar");updateStaffDashboardStats(day);if(scheduleDateLabel)scheduleDateLabel.textContent=mode==="search"?"نتائج البحث":dateLabel(day);const rows=allBookings.filter(b=>!b.isArchived&&!["pending","archived","cancelled"].includes(b.status)&&((mode==="search"&&q)||String(b.appointmentDate||"").slice(0,10)===day)&&(!q||(String(b.patientName||"")+" "+String(b.patientPhone||"")+" "+String(b.service||"")).toLocaleLowerCase("ar").includes(q))&&(activeStaffStatusFilter==="all"||(activeStaffStatusFilter==="postponed"&&(normalizedStatus(b.status)==="postponed"||parseRescheduleHistory(b).some(h=>h.toDate===String(b.appointmentDate||"").slice(0,10))))||(activeStaffStatusFilter!=="postponed"&&normalizedStatus(b.status)===activeStaffStatusFilter))).sort((a,b)=>String(a.appointmentDate||"").localeCompare(String(b.appointmentDate||""))||queueNumberFor(a)-queueNumberFor(b));const notices=mode==="date"?allBookings.flatMap(b=>parseRescheduleHistory(b).filter(h=>h.fromDate===day).map(entry=>({booking:b,entry}))):[];if(!rows.length&&!notices.length)dailyList.append(empty(mode==="search"?"لا توجد نتائج مطابقة للبحث.":`لا توجد مواعيد في ${dateLabel(day)}.`));else{for(const b of rows)dailyList.append(makeAppointmentCard(b));for(const item of notices)dailyList.append(renderRescheduleNotice(item.booking,item.entry))}if(staffArchiveSelected){staffArchiveSelected.disabled=mode!=="date"||currentAccount?.permissions?.bookings!=="edit"||!allBookings.some(b=>!b.isArchived&&String(b.appointmentDate||"").slice(0,10)===day&& !["pending","archived","cancelled"].includes(b.status))}}
+function renderArchive(){archiveList.replaceChildren();const day=archiveDateFilter.value,q=$("#staffArchiveSearch")?.value.trim().toLocaleLowerCase("ar")||"";const rows=allBookings.filter(b=>b.isArchived||ARCHIVE_STATUSES.has(b.status)).filter(b=>(!day||String(b.appointmentDate||"").slice(0,10)===day)&&(!q||`${b.patientName||""} ${b.patientPhone||""} ${b.service||""}`.toLocaleLowerCase("ar").includes(q))).sort((a,b)=>(Date.parse(b.updatedAt||b.createdAt||"")||0)-(Date.parse(a.updatedAt||a.createdAt||"")||0));if(!rows.length){archiveList.append(empty("لا توجد حجوزات أو طلبات مؤرشفة حسب الفلتر الحالي."));return}for(const b of rows)archiveList.append(makeAppointmentCard(b,true))}
+async function archiveStaffDay(){if(currentAccount?.permissions?.bookings!=="edit")return;const day=homeDateFilter.value||todayISO();if((filterMode?.value||"date")!=="date"){message(dailyMessage,"اختر عرض مواعيد يوم محدد قبل الأرشفة.",true);return}if(!window.confirm("هل تريد نقل جميع مواعيد يوم "+dateLabel(day)+" إلى الأرشيف؟ لن تظهر هذه المواعيد في جدول اليوم بعد الأرشفة."))return;staffArchiveSelected.disabled=true;try{const result=await bookingsRequest("archiveDay",{date:day});await loadBookings();message(dailyMessage,"تم نقل "+(result.archivedCount||0)+" حجز إلى الأرشيف.")}catch(e){message(dailyMessage,e.message||"تعذر أرشفة مواعيد اليوم.",true)}finally{staffArchiveSelected.disabled=false}}
+function renderPending(){pendingList.replaceChildren();const d=dateFilter?.value||"";const rows=allBookings.filter(b=>b.status==="pending"&&(!d||String(b.appointmentDate||"").slice(0,10)===d));if(!rows.length){pendingList.append(empty("لا توجد طلبات مراجعة مطابقة."));return}for(const b of rows){const card=document.createElement("article");card.className="staff-request-card";const open=document.createElement("button");open.type="button";open.className="staff-request-open";const main=document.createElement("div");main.className="staff-request-main";const title=document.createElement("h3");title.textContent=b.patientName||"طلب حجز جديد";const meta=document.createElement("p");meta.className="staff-request-meta";meta.textContent=`الهاتف: ${b.patientPhone||"غير مسجل"} · الخدمة: ${b.service||"غير محددة"} · تاريخ الطلب: ${submittedLabel(b.createdAt)} · الموعد: ${dateLabel(b.appointmentDate)}`;main.append(title,meta);const status=document.createElement("span");status.className="staff-request-status";status.textContent=statusLabel(RUNTIME_SETTINGS,"pending","قيد المراجعة");open.append(main,status);open.addEventListener("click",()=>showBookingDetail(b));card.append(open);if(currentAccount?.permissions?.bookings==="edit"){const edit=document.createElement("button");edit.type="button";edit.className="staff-request-edit";edit.textContent="✎";edit.title="تعديل الحجز";edit.setAttribute("aria-label","تعديل حجز "+(b.patientName||"المريضة"));edit.addEventListener("click",()=>showBookingDetail(b));card.append(edit)}pendingList.append(card)}}
+function showBookingDetail(b,returnToSchedule=false){if(returnToSchedule)openTab("bookings");activeBooking=b;detailSection.hidden=false;detailContent.replaceChildren();const title=document.createElement("h4");title.textContent=b.patientName||"طلب حجز";detailContent.append(title);for(const[label,value]of [["رقم الهاتف",b.patientPhone],["تاريخ الطلب",submittedLabel(b.createdAt)],["الموعد المطلوب",dateLabel(b.appointmentDate)],["الخدمة",b.service||"—"],["ملاحظات",b.notes||"—"]]){const p=document.createElement("p");p.textContent=`${label}: ${value||"—"}`;detailContent.append(p)}const permission=currentAccount?.permissions?.bookings;if(permission!=="edit")return;const edit=document.createElement("div");edit.className="staff-booking-edit";const inputs={};for(const[key,labelText,type]of [["patientName","اسم المريضة","text"],["patientPhone","رقم الهاتف","tel"],["appointmentDate","الموعد","date"],["service","الخدمة","text"],["servicePrice","قيمة الخدمة (جنيه)","number"],["bloodPressure","ضغط الدم","text"],["weight","الوزن (كجم)","number"],["bloodSugar","قياس السكر","text"],["preVisitNotes","ملاحظات الموظف قبل الكشف","text"],["notes","ملاحظات الحجز","text"]]){const label=document.createElement("label");label.textContent=labelText;const input=document.createElement("input");input.type=type;input.value=key==="appointmentDate"?String(b[key]||"").slice(0,10):(b[key]||"");if(key==="servicePrice"){input.min="0";input.max="99999999";input.step="0.01";input.inputMode="decimal"}else input.maxLength=key==="patientName"?120:key==="patientPhone"?40:key==="service"?120:2000;inputs[key]=input;label.append(input);edit.append(label)}const statusLabelEl=document.createElement("label");statusLabelEl.textContent="حالة الحجز";const statusSelect=document.createElement("select");for(const[value,labelText]of [["pending",statusLabel(RUNTIME_SETTINGS,"pending","قيد المراجعة")],...BOOKING_STATUS_OPTIONS,["cancelled",statusLabel(RUNTIME_SETTINGS,"cancelled","ملغي")],["archived",statusLabel(RUNTIME_SETTINGS,"archived","في الأرشيف")]]){const option=document.createElement("option");option.value=value;option.textContent=labelText;statusSelect.append(option)}statusSelect.value=normalizedStatus(b.status)||"pending";if(b.status==="completed"){statusSelect.disabled=true;statusSelect.title="حالة تم الكشف نهائية ولا يمكن تغييرها"}inputs.status=statusSelect;statusLabelEl.append(statusSelect);edit.append(statusLabelEl);detailContent.append(edit);const actions=document.createElement("div");actions.className="staff-booking-actions";const save=document.createElement("button");save.type="button";save.className="staff-secondary";save.textContent="حفظ التعديلات";save.addEventListener("click",async()=>{save.disabled=true;try{const updated={id:b.id};for(const k of Object.keys(inputs))updated[k]=inputs[k].value.trim();updated.status=inputs.status.value;const original=allBookings.find(item=>item.id===b.id)||b;const resolved=await medicalRecordsRequest("resolve",{patientId:updated.patientName===original.patientName&&updated.patientPhone===original.patientPhone?(original.patientId||""):"",patientName:updated.patientName,patientPhone:updated.patientPhone});updated.patientId=resolved.patient.id;await bookingsRequest("update",{booking:updated});if(ARCHIVE_STATUSES.has(updated.status))playClinicUiSound("archive");detailSection.hidden=true;if(returnToSchedule){if(filterMode)filterMode.value="date";homeSearch.value="";if(updated.appointmentDate)homeDateFilter.value=String(updated.appointmentDate).slice(0,10);if(ARCHIVE_STATUSES.has(updated.status))openTab("archive");else openTab("home")}await loadBookings();if(!returnToSchedule)message(bookingsMessage,ARCHIVE_STATUSES.has(updated.status)?"تم حفظ التعديلات ونقل الحجز إلى الأرشيف.":"تم حفظ تعديلات الحجز.");}catch(e){message(bookingsMessage,e.message,true)}finally{save.disabled=false}});actions.append(save);if(b.status==="pending"){const confirm=document.createElement("button");confirm.type="button";confirm.className="staff-primary";confirm.textContent="تأكيد الحجز";confirm.addEventListener("click",async()=>{confirm.disabled=true;try{const updated={id:b.id,status:"waiting"};for(const k of Object.keys(inputs))updated[k]=inputs[k].value.trim();updated.status="waiting";const resolved=await medicalRecordsRequest("resolve",{patientName:updated.patientName,patientPhone:updated.patientPhone});updated.patientId=resolved.patient.id;await bookingsRequest("update",{booking:updated});playClinicUiSound("success");detailSection.hidden=true;await loadBookings();const accepted=allBookings.find(item=>item.id===b.id)||b;if(accepted.appointmentDate)homeDateFilter.value=String(accepted.appointmentDate).slice(0,10);if(queueNumberLabel)queueNumberLabel.textContent=queueNumberFor(accepted);const queueTitle=$("#staffQueueDialogTitle");if(queueTitle)queueTitle.textContent="تم تأكيد الحجز";openTab("home");if(queueDialog?.showModal){try{queueDialog.showModal()}catch{message(dailyMessage,"تم تأكيد الحجز. رقم الدور: "+queueNumberFor(accepted))}}else message(dailyMessage,"تم تأكيد الحجز. رقم الدور: "+queueNumberFor(accepted))}catch(e){message(bookingsMessage,e.message,true);confirm.disabled=false}});actions.append(confirm)}if(["pending","confirmed"].includes(b.status)){const cancel=document.createElement("button");cancel.type="button";cancel.className="staff-secondary";cancel.textContent="إلغاء الحجز";cancel.addEventListener("click",async()=>{if(!window.confirm("هل تريد إلغاء الحجز؟"))return;cancel.disabled=true;try{await bookingsRequest("cancel",{id:b.id});detailSection.hidden=true;await loadBookings()}catch(e){message(bookingsMessage,e.message,true);cancel.disabled=false}});actions.append(cancel)}if(b.status==="pending"){const archiveRequest=document.createElement("button");archiveRequest.type="button";archiveRequest.className="staff-archive-action";archiveRequest.textContent="نقل الطلب إلى الأرشيف";archiveRequest.addEventListener("click",async()=>{archiveRequest.disabled=true;try{await bookingsRequest("update",{booking:{id:b.id,status:"archived"}});detailSection.hidden=true;await loadBookings();openTab("archive")}catch(e){message(bookingsMessage,e.message,true);archiveRequest.disabled=false}});actions.append(archiveRequest)}detailContent.append(actions);detailSection.scrollIntoView({behavior:"smooth",block:"start"})}
+let bookingsLoading=false;function updateStaffPendingBadge(){const count=allBookings.filter(b=>b.status==="pending").length;for(const badge of [pendingBookingBadge,$("#staffTopPendingBookingBadge")])if(badge){badge.textContent=count>99?"99+":String(count);badge.hidden=count===0;badge.setAttribute("aria-label",count?`${count} طلب حجز جديد`:"لا توجد طلبات حجز جديدة")}if(bookingRequestsToggle){bookingRequestsToggle.classList.toggle("has-pending-bookings",count>0);bookingRequestsToggle.setAttribute("aria-label",count?`طلبات الحجوزات، ${count} طلب جديد`:"طلبات الحجوزات")}}
+async function loadBookings(){if(bookingsLoading)return;bookingsLoading=true;message(bookingsMessage,"");message(dailyMessage,"");try{const result=await bookingsRequest("list");allBookings=Array.isArray(result.bookings)?result.bookings:[];openStaffScheduleCalendar?.refresh?.();updateStaffPendingBadge();renderPending();renderDaily();renderArchive()}catch(e){message(bookingsMessage,e.message||"تعذر تحميل الطلبات.",true);message(dailyMessage,e.message||"تعذر تحميل المواعيد.",true)}finally{bookingsLoading=false}}
+async function dailyAccountsRequest(action,data={}){const user=auth.currentUser;if(!user)throw new Error("انتهت جلسة الدخول.");const response=await fetch("/api/doctor/accounts",{method:"POST",headers:{Authorization:`Bearer ${await user.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});const result=await response.json().catch(()=>({}));if(!response.ok){recordRuntimeLog(user,{action:"request_failed",area:"accounts",level:response.status===401||response.status===403?"security":"error",message:"فشل طلب حسابات العيادة."});throw new Error(result.message||"تعذر تحميل حسابات اليوم.")}if(["createDailyExpense","createEntry"].includes(action))recordRuntimeLog(user,{action:"expense_recorded",area:"accounts",level:"info",message:"تم تسجيل حركة مالية."});if(action==="finalizeSettlement")recordRuntimeLog(user,{action:"settlement_closed",area:"accounts",level:"info",message:"تمت تصفية فترة مالية."});return result}
+function staffMoney(value){return new Intl.NumberFormat("ar-EG",{maximumFractionDigits:2}).format(Number(value)||0)+" ج.م"}
+let loadingDailyAccounts=false;async function loadDailyAccounts(){if(loadingDailyAccounts||!accountsSection||accountsSection.hidden||!["view","edit"].includes(currentAccount?.permissions?.accounts))return;loadingDailyAccounts=true;const date=accountsDate?.value||todayISO();if(accountsDate)accountsDate.value=date;if(accountsMonth&&!accountsMonth.value)accountsMonth.value=date.slice(0,7);message(accountsMessage,"");if(accountsBookings)accountsBookings.replaceChildren(empty("جارٍ تحميل حسابات اليوم..."));try{const [bookingResult,expenseResult]=await Promise.all([bookingsRequest("listDailyAccounts",{date}),dailyAccountsRequest("listDailyExpenses",{date})]);const rows=Array.isArray(bookingResult.bookings)?bookingResult.bookings:[];dailyExpenses=Array.isArray(expenseResult.expenses)?expenseResult.expenses:[];renderDailyAccounts(rows);await loadMonthlyExpenses()}catch(error){if(accountsBookings)accountsBookings.replaceChildren(empty(error.message||"تعذر تحميل الحسابات."));message(accountsMessage,error.message||"تعذر تحميل حسابات اليوم.",true)}finally{loadingDailyAccounts=false}}
+async function loadMonthlyExpenses(){if(!monthlyExpensesList||!["view","edit"].includes(currentAccount?.permissions?.accounts))return;const month=accountsMonth?.value||todayISO().slice(0,7);if(accountsMonth)accountsMonth.value=month;try{const result=await dailyAccountsRequest("listMonthlyExpenses",{month});const rows=Array.isArray(result.expenses)?result.expenses:[];monthlyExpensesList.replaceChildren();if(!rows.length){monthlyExpensesList.append(empty("لا توجد مصروفات مسجلة لهذا الشهر."));return}for(const item of rows){const row=document.createElement("div");row.className="staff-expense-row";const description=document.createElement("span");description.textContent=item.date+" · "+item.description+(item.notes?" · "+item.notes:"")+" · "+({pending:"بانتظار اعتماد الدكتور",approved:"معتمد ومخصوم",rejected:"مرفوض وغير محتسب"}[item.status||"approved"]||"");const amount=document.createElement("strong");amount.textContent=(item.status==="rejected"?"":"− ")+staffMoney(item.amount);row.append(description,amount);monthlyExpensesList.append(row)}}catch(error){monthlyExpensesList.replaceChildren(empty(error.message||"تعذر تحميل مصروفات الشهر."))}}
+function renderDailyAccounts(rows){
+  if(!accountsBookings)return;
+  accountsBookings.replaceChildren();
+  const selectedDate=accountsDate?.value||todayISO();
+  let completedTotal=0;
+  const expenseTotal=dailyExpenses.filter(item=>(item.status||"approved")==="approved").reduce((sum,item)=>sum+(Number(item.amount)||0),0);
+  const canEdit=currentAccount?.permissions?.accounts==="edit";
+  expenseEntrySection.hidden=!canEdit;
+  const money=staffMoney;
+  if(!rows.length)accountsBookings.append(empty("لا توجد حجوزات في هذا اليوم."));
+  for(const booking of rows){
+    const completionDay=cairoDate(booking.completedAt);
+    const fee=Number(booking.completedFee!==undefined&&booking.completedFee!==""?booking.completedFee:(booking.status==="completed"?booking.servicePrice:0))||0;
+    // Older completed bookings may have a fee but no stored receipt amount.
+    const recordedAmount=Number(booking.paidAmount)||0;
+    const received=recordedAmount>0?recordedAmount:(booking.status==="completed"?fee:0);
+    if(booking.status==="completed"&&completionDay===selectedDate&&booking.isArchived!==true&&!["archived","cancelled"].includes(booking.status))completedTotal+=received;
+    const card=document.createElement("article");
+    card.className="staff-account-booking";
+    const details=document.createElement("div"),title=document.createElement("h4"),meta=document.createElement("p");
+    title.textContent=booking.patientName||"مريضة";
+    meta.textContent=[booking.service||"الخدمة غير محددة",booking.status==="completed"?"قيمة الكشف: "+money(fee):"",received>0?"المبلغ المقبوض: "+money(received):booking.status==="completed"?"لم يُسجّل مبلغ قبض لهذا الحجز":"",booking.paymentReadOnly&&booking.paymentEnteredByName?"تم تسجيل المبلغ بواسطة: "+booking.paymentEnteredByName:"",bookingStatusLabel(booking.status)].filter(Boolean).join(" · ");
+    details.append(title,meta);
+    card.append(details);
+    accountsBookings.append(card);
+  }
+  if(accountsCompletedTotal)accountsCompletedTotal.textContent=money(completedTotal);
+  if(accountsPaidTotal)accountsPaidTotal.textContent=money(completedTotal);
+  if(accountsExpenseTotal)accountsExpenseTotal.textContent=money(expenseTotal);
+  accountsReceiptsTotal=completedTotal;accountsExpensesTotal=expenseTotal;if(accountsNetTotal)accountsNetTotal.textContent=money(completedTotal-expenseTotal);renderStaffCustodyExpected();const handoverNote=$("#staffAccountsHandoverNote");if(handoverNote){const handedOver=custodyHandoverDate===selectedDate&&custodyHandoverRecorded;const settledHandover=custodySettledHandoverDate===selectedDate&&custodySettledHandoverRecorded;handoverNote.hidden=!handedOver&&!settledHandover;handoverNote.textContent=[handedOver?"مبلغ بانتظار التصفية = "+money(custodyHandoverPaid):"",settledHandover?"تمت تصفية سابقة بمبلغ = "+money(custodySettledHandoverAmount):""].filter(Boolean).join(" · ")}
+  if(expensesList){
+    expensesList.replaceChildren();
+    if(!dailyExpenses.length)expensesList.append(empty("لا توجد مصروفات مسجلة لهذا اليوم."));
+    for(const item of dailyExpenses){
+      const row=document.createElement("div");
+      row.className="staff-expense-row";
+      const description=document.createElement("span");
+      description.textContent=item.description+(item.notes?" · "+item.notes:"")+" · "+({pending:"بانتظار اعتماد الدكتور",approved:"معتمد ومخصوم",rejected:"مرفوض وغير محتسب"}[item.status||"approved"]||"");
+      const amount=document.createElement("strong");
+      amount.textContent=(item.status==="rejected"?"":"− ")+money(item.amount);
+      row.append(description,amount);
+      expensesList.append(row);
+    }
+  }
+}
+
+function wireScheduleCalendar({dialog,input,monthSelect,yearSelect,daysGrid,previousButton,nextButton,onSelect,today,getBookings=()=>[]}){if(!dialog||!input||!monthSelect||!yearSelect||!daysGrid)return()=>{};let viewDate=new Date();const months=Array.from({length:12},(_,month)=>new Intl.DateTimeFormat("ar-EG",{month:"long"}).format(new Date(2024,month,1)));monthSelect.replaceChildren(...months.map((label,index)=>{const option=document.createElement("option");option.value=String(index);option.textContent=label;return option}));function iso(date){return date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")+"-"+String(date.getDate()).padStart(2,"0")}function parse(value){const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||"").slice(0,10));return match?new Date(Number(match[1]),Number(match[2])-1,Number(match[3]),12):new Date()}function fillYears(){const year=viewDate.getFullYear(),start=Math.min(year-10,new Date().getFullYear()-2),end=Math.max(year+10,new Date().getFullYear()+5);yearSelect.replaceChildren();for(let y=start;y<=end;y++){const option=document.createElement("option");option.value=String(y);option.textContent=String(y);yearSelect.append(option)}}function render(){monthSelect.value=String(viewDate.getMonth());if(![...yearSelect.options].some(option=>Number(option.value)===viewDate.getFullYear()))fillYears();yearSelect.value=String(viewDate.getFullYear());daysGrid.replaceChildren();const year=viewDate.getFullYear(),month=viewDate.getMonth(),offset=new Date(year,month,1).getDay(),count=new Date(year,month+1,0).getDate(),selected=String(input.value||""),todayValue=today(),bookingCounts=new Map();for(const booking of getBookings()){const date=String(booking.appointmentDate||"").slice(0,10);if(!date||booking.isArchived||["cancelled","archived"].includes(booking.status))continue;bookingCounts.set(date,(bookingCounts.get(date)||0)+1)}for(let i=0;i<offset;i++){const blank=document.createElement("span");blank.className="staff-calendar-empty";blank.setAttribute("aria-hidden","true");daysGrid.append(blank)}for(let day=1;day<=count;day++){const date=new Date(year,month,day,12),value=iso(date),button=document.createElement("button");button.type="button";button.className="staff-calendar-day";button.dataset.date=value;button.textContent=String(day);const count=bookingCounts.get(value)||0;button.setAttribute("aria-label",new Intl.DateTimeFormat("ar-EG",{dateStyle:"full"}).format(date)+(count?" · "+count+" حجز":""));if(count){const badge=document.createElement("span");badge.className="staff-calendar-count";badge.textContent=count>99?"99+":String(count);badge.setAttribute("aria-hidden","true");button.append(badge)}if(value===selected){button.classList.add("is-selected");button.setAttribute("aria-pressed","true")}if(value===todayValue)button.classList.add("is-today");daysGrid.append(button)}}function choose(value){input.value=value;viewDate=parse(value);onSelect(value);dialog.close();render()}function open(){viewDate=parse(input.value||today());fillYears();render();if(typeof dialog.showModal==="function")dialog.showModal();else dialog.setAttribute("open","")}previousButton?.addEventListener("click",()=>{viewDate=new Date(viewDate.getFullYear(),viewDate.getMonth()-1,1,12);render()});nextButton?.addEventListener("click",()=>{viewDate=new Date(viewDate.getFullYear(),viewDate.getMonth()+1,1,12);render()});monthSelect.addEventListener("change",()=>{viewDate=new Date(viewDate.getFullYear(),Number(monthSelect.value),1,12);render()});yearSelect.addEventListener("change",()=>{viewDate=new Date(Number(yearSelect.value),viewDate.getMonth(),1,12);render()});daysGrid.addEventListener("click",event=>{const button=event.target.closest("button[data-date]");if(button)choose(button.dataset.date)});dialog.querySelectorAll("[data-calendar-offset]").forEach(button=>button.addEventListener("click",()=>{const date=parse(today());date.setDate(date.getDate()+Number(button.dataset.calendarOffset));choose(iso(date))}));dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close()});open.refresh=render;return open}
+
+function createPatientForm(){
+  patientTools.replaceChildren();
+  const card=document.createElement("div");card.className="staff-booking-create-form";
+  const h=document.createElement("h3");h.textContent="حسابات المرضى";
+  const intro=document.createElement("p");intro.textContent="ابحث عن ملف المريض. يمكنك إنشاء حساب جديد أو إعادة تعيين كلمة مرور حساب موجود.";
+  const searchLabel=document.createElement("label");searchLabel.textContent="ابحث بالاسم أو رقم الهاتف";
+  const search=document.createElement("input");search.type="search";search.maxLength=120;search.autocomplete="off";search.placeholder="اكتب اسم المريض أو رقم الهاتف";
+  const results=document.createElement("div");results.className="medical-patient-results";results.setAttribute("aria-live","polite");
+  const selected=document.createElement("div");selected.className="security-information";selected.hidden=true;
+  const createPanel=document.createElement("div");createPanel.hidden=true;
+  const createForm=document.createElement("form");createForm.className="staff-form-grid";
+  const usernameLabel=document.createElement("label");usernameLabel.textContent="اسم المستخدم";
+  const username=document.createElement("input");username.type="text";username.minLength=3;username.maxLength=40;username.required=true;username.autocomplete="off";
+  usernameLabel.append(username);
+  const passwordLabel=document.createElement("label");passwordLabel.textContent="كلمة المرور التي تحددها للمريض";
+  const password=document.createElement("input");password.type="password";password.minLength=8;password.maxLength=128;password.required=true;password.autocomplete="new-password";
+  passwordLabel.append(password);
+  const createButton=document.createElement("button");createButton.type="submit";createButton.className="staff-primary";createButton.textContent="إنشاء حساب المريض";
+  createForm.append(usernameLabel,passwordLabel,createButton);createPanel.append(createForm);
+  const resetPanel=document.createElement("div");resetPanel.className="security-information";resetPanel.hidden=true;
+  const resetHeading=document.createElement("strong");resetHeading.textContent="هذا الملف مرتبط بحساب موجود";
+  const existingUsername=document.createElement("p");
+  const resetLabel=document.createElement("label");resetLabel.textContent="كلمة المرور الجديدة";
+  const newPassword=document.createElement("input");newPassword.type="password";newPassword.minLength=8;newPassword.maxLength=128;newPassword.autocomplete="new-password";
+  resetLabel.append(newPassword);
+  const resetButton=document.createElement("button");resetButton.type="button";resetButton.className="staff-primary";resetButton.textContent="إعادة تعيين كلمة المرور";
+  resetPanel.append(resetHeading,existingUsername,resetLabel,resetButton);
+  const status=document.createElement("p");status.className="message";status.hidden=true;status.setAttribute("role","status");
+  const credentials=document.createElement("div");credentials.className="staff-patient-credentials";credentials.hidden=true;
+  const credentialsHeading=document.createElement("strong");credentialsHeading.textContent="بيانات الدخول — سلّمها للمريض بشكل خاص";
+  const credentialsUsername=document.createElement("p"),credentialsPassword=document.createElement("p");
+  const copy=document.createElement("button");copy.type="button";copy.className="staff-secondary";copy.textContent="نسخ بيانات الدخول";
+  credentials.append(credentialsHeading,credentialsUsername,credentialsPassword,copy);
+  card.append(h,intro,searchLabel,search,results,selected,createPanel,resetPanel,status,credentials);patientTools.append(card);
+  let selectedPatientId="",sequence=0,working=false;
+  async function api(action,data={}){
+    if(!auth.currentUser)throw new Error("انتهت جلسة الدخول. سجّل الدخول مرة أخرى.");
+    const response=await fetch("/api/doctor/patients",{method:"POST",headers:{Authorization:`Bearer ${await auth.currentUser.getIdToken()}`,"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({action,...data}),cache:"no-store"});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(result.message||"تعذر تنفيذ طلب حساب المريض.");
+    return result;
+  }
+  function showStatus(text,isError=false){message(status,text,isError)}
+  function showCredentials(data){
+    credentialsUsername.textContent="اسم المستخدم: "+(data?.username||"");
+    credentialsPassword.textContent="كلمة المرور: "+(data?.password||"");
+    credentials.hidden=false;copy.textContent="نسخ بيانات الدخول";
+  }
+  search.addEventListener("input",async()=>{
+    const requestId=++sequence;selectedPatientId="";selected.hidden=true;createPanel.hidden=true;resetPanel.hidden=true;credentials.hidden=true;newPassword.value="";password.value="";username.value="";results.replaceChildren();
+    const query=search.value.trim();if(query.length<2)return;
+    const loading=document.createElement("p");loading.textContent="جارٍ البحث في ملفات المرضى...";results.append(loading);
+    try{
+      const result=await api("searchMedicalPatients",{query});
+      if(requestId!==sequence)return;
+      results.replaceChildren();
+      const patients=Array.isArray(result.patients)?result.patients:[];
+      if(!patients.length){const p=document.createElement("p");p.textContent="لا توجد ملفات مطابقة. أنشئ الملف الطبي أولًا.";results.append(p);return}
+      for(const patient of patients){
+        const button=document.createElement("button");button.type="button";button.className="medical-patient-result";
+        button.textContent=[patient.displayName,patient.phone||"الهاتف غير مسجل",patient.patientNumber?"رقم الملف: "+patient.patientNumber:""].filter(Boolean).join(" · ");
+        button.addEventListener("click",async()=>{
+          selectedPatientId=patient.patientId;search.value=patient.displayName||query;results.replaceChildren();
+          selected.textContent="المريض المختار: "+(patient.displayName||"")+" · الهاتف: "+(patient.phone||"غير مسجل");selected.hidden=false;
+          createPanel.hidden=true;resetPanel.hidden=true;credentials.hidden=true;showStatus("");
+          try{
+            const checkedPatientId=selectedPatientId;
+            const account=await api("accountStatus",{patientId:checkedPatientId});
+            if(selectedPatientId!==checkedPatientId)return;
+            if(account.accountExists){existingUsername.textContent="اسم المستخدم: "+(account.username||"");resetPanel.hidden=false}
+            else{createPanel.hidden=false;username.value="";password.value=""}
+          }catch(error){showStatus(error.message||"تعذر التحقق من حساب المريض.",true)}
+        });
+        results.append(button);
+      }
+    }catch(error){if(requestId!==sequence)return;results.replaceChildren();showStatus(error.message||"تعذر البحث في ملفات المرضى.",true)}
+  });
+  createForm.addEventListener("submit",async e=>{
+    e.preventDefault();if(working)return;showStatus("");credentials.hidden=true;
+    if(!selectedPatientId||!username.value.trim()||!password.value){showStatus("اختَر ملف المريض وحدد اسم المستخدم وكلمة المرور.",true);return}
+    working=true;createButton.disabled=true;
+    try{
+      const result=await api("create",{patientId:selectedPatientId,username:username.value.trim(),password:password.value});
+      recordRuntimeLog(auth.currentUser,{action:"patient_created",area:"patients",level:"info",message:"تم إنشاء حساب مريض."});
+      showCredentials(result.credentials);showStatus("تم إنشاء الحساب وربطه بالملف الطبي.");
+      existingUsername.textContent="اسم المستخدم: "+(result.credentials?.username||username.value.trim());createPanel.hidden=true;resetPanel.hidden=false;
+      password.value="";
+    }catch(error){recordRuntimeLog(auth.currentUser,{action:"request_failed",area:"patients",level:"error",message:"فشل إنشاء حساب مريض."});showStatus(error.message||"تعذر إنشاء الحساب.",true)}
+    finally{working=false;createButton.disabled=false}
+  });
+  resetButton.addEventListener("click",async()=>{
+    if(working)return;showStatus("");credentials.hidden=true;
+    if(!selectedPatientId||!newPassword.value){showStatus("اختَر ملف المريض واكتب كلمة المرور الجديدة.",true);return}
+    working=true;resetButton.disabled=true;
+    try{
+      const result=await api("resetPassword",{patientId:selectedPatientId,password:newPassword.value});
+      recordRuntimeLog(auth.currentUser,{action:"patient_password_reset",area:"patients",level:"info",message:"تمت إعادة تعيين كلمة مرور مريض."});
+      showCredentials(result.credentials);showStatus("تم تغيير كلمة المرور. انسخ بيانات الدخول وسلّمها للمريض بشكل خاص.");newPassword.value="";
+    }catch(error){recordRuntimeLog(auth.currentUser,{action:"request_failed",area:"patients",level:"error",message:"فشلت إعادة تعيين كلمة مرور مريض."});showStatus(error.message||"تعذر إعادة تعيين كلمة المرور.",true)}
+    finally{working=false;resetButton.disabled=false}
+  });
+  copy.addEventListener("click",async()=>{
+    try{await navigator.clipboard.writeText(credentialsUsername.textContent+"\n"+credentialsPassword.textContent);copy.textContent="تم النسخ"}
+    catch{showStatus("تعذر النسخ التلقائي؛ انسخ بيانات الدخول يدويًا.",true)}
+  });
+}
+function configure(permissions){const allowed=sections.filter(s=>["view","edit"].includes(permissions?.[s.key]));addBookingToggle.hidden=permissions?.bookings!=="edit";if(homeAddBooking)homeAddBooking.hidden=permissions?.bookings!=="edit";if(permissions?.patients==="edit")createPatientForm();else patientTools.replaceChildren(empty("لا تتوفر أدوات تعديل في هذا القسم."));noPermissionsMessage.hidden=allowed.length>0||["view","edit"].includes(permissions?.accounts);return allowed}
+async function checkAccount(){if(checkingAccount)return;checkingAccount=true;showOnly(loadingSection);try{const user=currentUser||auth.currentUser;if(!user){window.location.replace("./index.html#patient-portal");return}const account=await identifyAccount(user);if(account.accountType==="doctor"){window.location.replace("./admin.html");return}if(account.accountType==="patient"){window.location.replace("./index.html#patient-portal");return}if(account.accountType!=="staff")throw new Error("نوع الحساب غير معتمد لهذه اللوحة.");let custodyStarted=null;try{custodyStarted=await custodyRequest("start");const transfer={previousEmployeeName:"العهدة الافتتاحية",actualAmount:String(custodyStarted.session?.expectedAmount||"0.00"),notes:"راجع رصيد العهدة قبل بدء العمل."};const accepted=await confirmIncomingHandover(transfer);if(!accepted){showError("لم يتم تأكيد العهدة؛ لم يتم فتح لوحة العمل.");return}}catch(custodyError){if(custodyError.status===409&&custodyError.details?.pendingHandover){const transfer=custodyError.details.pendingHandover;const accepted=await confirmIncomingHandover(transfer);if(!accepted){showError("لم يتم استلام العهدة؛ لم يتم فتح لوحة العمل.");return}custodyStarted=await custodyRequest("start",{acceptHandover:true})}else if(custodyError.status===409){const previous=custodyError.details?.activeSession;showError((custodyError.message||"يوجد موظف آخر مسجل الدخول.")+(previous?.employeeName?" الموظف الحالي: "+previous.employeeName+".":""));return}else throw custodyError}currentAccount=account;displayNameElement.textContent=currentAccount.displayName||"الموظف";if(custodyAdditionForm)custodyAdditionForm.hidden=account.permissions?.accounts!=="edit";buildTabs(account.permissions||{});configure(account.permissions||{});showOnly(dashboardSection);logoutButton.hidden=false;const permissions=account.permissions||{};const firstAllowedTab=["view","edit"].includes(permissions.bookings)?"home":["view","edit"].includes(permissions.patients)?"patients":["view","edit"].includes(permissions.medicalRecords)?"records":["view","edit"].includes(permissions.settings)?"settings":["view","edit"].includes(permissions.accounts)?"accounts":null;if(firstAllowedTab)openTab(firstAllowedTab);else noPermissionsMessage.hidden=false;if(["view","edit"].includes(permissions.bookings))await loadBookings();if(["view","edit"].includes(permissions.accounts)&&accountsDate)accountsDate.value=todayISO()}catch(e){console.error("Staff dashboard verification failed:",e);showError(e.message||"تعذر التحقق من الحساب.")}finally{checkingAccount=false}}
+const incomingDialog=$("#staffIncomingHandoverDialog"),incomingForm=$("#staffIncomingHandoverForm"),incomingPreviousName=$("#staffIncomingPreviousName"),incomingAmount=$("#staffIncomingAmount"),incomingNotes=$("#staffIncomingNotes"),incomingAccept=$("#staffIncomingAccept");let incomingHandoverResolve=null;function confirmIncomingHandover(transfer){return new Promise(resolve=>{incomingHandoverResolve=resolve;incomingPreviousName.textContent=transfer.previousEmployeeName||"الموظف السابق";incomingAmount.textContent=(Number(transfer.actualAmount||0)).toLocaleString("ar-EG",{minimumFractionDigits:2,maximumFractionDigits:2})+" ج.م";incomingNotes.textContent=transfer.notes?"ملاحظات التسليم: "+transfer.notes:"لا توجد ملاحظات مسجلة للتسليم.";if(incomingDialog?.showModal)incomingDialog.showModal();else resolve(false)})}incomingForm?.addEventListener("submit",e=>{e.preventDefault();if(incomingAccept)incomingAccept.disabled=true;incomingDialog.close();const resolve=incomingHandoverResolve;incomingHandoverResolve=null;if(resolve)resolve(true);if(incomingAccept)incomingAccept.disabled=false});$("#staffIncomingReject")?.addEventListener("click",()=>{incomingDialog.close();const resolve=incomingHandoverResolve;incomingHandoverResolve=null;if(resolve)resolve(false)});incomingDialog?.addEventListener("cancel",e=>{e.preventDefault();const resolve=incomingHandoverResolve;incomingHandoverResolve=null;incomingDialog.close();if(resolve)resolve(false)});custodyOpenButton?.addEventListener("click",async()=>{await loadStaffCustody();if(custodyDialog?.showModal)custodyDialog.showModal()});custodyCloseButton?.addEventListener("click",()=>custodyDialog?.close());custodyAdditionForm?.addEventListener("submit",async e=>{e.preventDefault();if(!custodyAdditionForm.reportValidity())return;const button=custodyAdditionForm.querySelector('button[type="submit"]');button.disabled=true;const data=new FormData(custodyAdditionForm);try{await custodyRequest("addCash",{amount:data.get("amount"),notes:String(data.get("notes")||"").trim()});custodyAdditionForm.reset();const addedAmount=Number(data.get("amount"))||0;custodyDialog?.close();window.alert("تم إضافة "+addedAmount.toLocaleString("ar-EG",{minimumFractionDigits:2,maximumFractionDigits:2})+" جنيه إلى العهدة بنجاح");await loadStaffCustody();await loadDailyAccounts()}catch(error){message(custodyMessageElement,error.message||"تعذر إضافة المبلغ.",true)}finally{button.disabled=false}});
+homeDateFilter.value=todayISO();if(accountsDate)accountsDate.value=homeDateFilter.value;if(accountsMonth)accountsMonth.value=homeDateFilter.value.slice(0,7);if(filterDate)filterDate.value=homeDateFilter.value;const openStaffScheduleCalendar=wireScheduleCalendar({dialog:filterDialog,input:filterDate,monthSelect:$("#staffCalendarMonth"),yearSelect:$("#staffCalendarYear"),daysGrid:$("#staffCalendarDays"),previousButton:$("#staffCalendarPrev"),nextButton:$("#staffCalendarNext"),today:todayISO,getBookings:()=>allBookings,onSelect:value=>{homeDateFilter.value=value;if(homeSearch)homeSearch.value="";renderDaily()}});homeDateFilter.addEventListener("change",()=>{renderDaily();if(accountsDate)accountsDate.value=homeDateFilter.value});accountsDate?.addEventListener("change",()=>{loadDailyAccounts();loadStaffCustody()});accountsMonth?.addEventListener("change",loadMonthlyExpenses);expenseForm?.addEventListener("submit",async e=>{e.preventDefault();if(currentAccount?.permissions?.accounts!=="edit")return;const data=Object.fromEntries(new FormData(expenseForm).entries());const entry={date:accountsDate.value||todayISO(),amount:String(data.amount||"").trim(),description:String(data.description||"").trim(),notes:String(data.notes||"").trim()};const button=expenseForm.querySelector('button[type="submit"]');button.disabled=true;try{const result=await dailyAccountsRequest("createDailyExpense",{entry});expenseForm.reset();message(accountsMessage,result.expense?.status==="pending"?"تم تسجيل المصروف وهو بانتظار اعتماد الدكتور؛ لم يُخصم بعد.":"تم تسجيل المصروف وخصمه من صافي اليوم.");await loadDailyAccounts()}catch(error){message(accountsMessage,error.message||"تعذر تسجيل المصروف.",true)}finally{button.disabled=false}});homeSearch.addEventListener("input",renderDaily);staffStatusLegend?.addEventListener("click",e=>{const b=e.target.closest("[data-status-filter]");if(!b)return;activeStaffStatusFilter=b.dataset.statusFilter;for(const x of staffStatusLegend.querySelectorAll("[data-status-filter]"))x.classList.toggle("is-active",x===b);renderDaily()});staffArchiveSelected?.addEventListener("click",archiveStaffDay);$("#staffOpenFilter")?.addEventListener("click",openStaffScheduleCalendar);scheduleDateLabel?.addEventListener("click",openStaffScheduleCalendar);homeAddBooking?.addEventListener("click",()=>{openTab("bookings");createBookingForm.hidden=false;const dateInput=createBookingForm.querySelector('[name="appointmentDate"]');if(dateInput)dateInput.value=homeDateFilter.value||todayISO();createBookingForm.scrollIntoView({behavior:"smooth",block:"start"})});$("#staffArchiveSearch")?.addEventListener("input",renderArchive);archiveDateFilter.addEventListener("change",renderArchive);dateFilter.addEventListener("change",renderPending);bookingRequestsToggle?.addEventListener("click",()=>{const open=bookingRequestsPanel.hidden;bookingRequestsPanel.hidden=!open;bookingRequestsToggle.setAttribute("aria-expanded",String(open));bookingRequestsToggle.classList.toggle("is-open",open)});createBookingForm.querySelector(".service-quick-select")?.addEventListener("change",e=>{const input=createBookingForm.querySelector('[name="service"]');if(input&&e.target.value)input.value=e.target.value});addBookingToggle.addEventListener("click",()=>{createBookingForm.hidden=!createBookingForm.hidden});$("#cancelAddBooking").addEventListener("click",()=>{createBookingForm.reset();createBookingForm.hidden=true;message(createBookingMessage,"");document.activeElement?.blur()});createBookingForm.addEventListener("submit",async e=>{e.preventDefault();if(currentAccount?.permissions?.bookings!=="edit")return;const data=Object.fromEntries(new FormData(createBookingForm).entries());for(const k of Object.keys(data))data[k]=String(data[k]||"").trim();data.patientName=createBookingForm.querySelector('[name="patientName"]')?.value.trim()||data.patientName||"";data.patientPhone=createBookingForm.querySelector('[name="patientPhone"]')?.value.trim()||data.patientPhone||"";data.servicePrice=data.servicePrice||"0";if(data.patientName.length<2){message(createBookingMessage,"اكتب اسم المريضة بشكل صحيح.",true);return}if(data.patientPhone.length<5||data.patientPhone.length>40){message(createBookingMessage,"اكتب رقم هاتف المريضة أولًا (5 أرقام على الأقل).",true);return}const button=createBookingForm.querySelector('button[type="submit"]');button.disabled=true;try{const medicalPatient=await medicalRecordsRequest("resolve",{patientId:data.patientId||"",legacyBookingId:data.legacyBookingId||"",patientName:data.patientName,patientPhone:data.patientPhone});data.patientId=medicalPatient.patient.id;delete data.legacyBookingId;const result=await bookingsRequest("create",{booking:data});createBookingForm.reset();createBookingForm.hidden=true;homeDateFilter.value=data.appointmentDate;openTab("home");document.activeElement?.blur();await loadBookings();if(queueNumberLabel)queueNumberLabel.textContent=queueNumberFor(result.booking);const queueTitle=$("#staffQueueDialogTitle");if(queueTitle)queueTitle.textContent="تمت إضافة الحجز";if(queueDialog?.showModal)queueDialog.showModal();else message(createBookingMessage,"تمت إضافة الحجز. رقم الدور: "+queueNumberFor(result.booking))}catch(err){message(createBookingMessage,err.message,true)}finally{button.disabled=false}});
+closeDetailButton.addEventListener("click",()=>{detailSection.hidden=true});queueDialogDone?.addEventListener("click",()=>queueDialog?.close());retryButton.addEventListener("click",checkAccount);onAuthStateChanged(auth,user=>{currentUser=user;if(!user){clinicRealtime.close();window.location.replace("./index.html#patient-portal");return}clinicRealtime.connect();checkAccount()});let lastStaffBookingsRefreshAt=0,lastStaffAccountsRefreshAt=0;setInterval(()=>{const editing=!createBookingForm.hidden||!detailSection.hidden||document.activeElement?.matches("input,select,textarea");if(!auth.currentUser||document.hidden||checkingAccount||editing)return;if(!realtimeConnected){clinicRealtime.resume();if(["view","edit"].includes(currentAccount?.permissions?.bookings)&&Date.now()-lastStaffBookingsRefreshAt>=30000){lastStaffBookingsRefreshAt=Date.now();loadBookings()}}if(!realtimeConnected&&!accountsSection.hidden&&["view","edit"].includes(currentAccount?.permissions?.accounts)&&Date.now()-lastStaffAccountsRefreshAt>=30000){lastStaffAccountsRefreshAt=Date.now();loadDailyAccounts()}},5000);document.addEventListener("visibilitychange",()=>{const editing=!createBookingForm.hidden||!detailSection.hidden||document.activeElement?.matches("input,select,textarea");if(document.hidden||!auth.currentUser||editing)return;clinicRealtime.resume();if(!realtimeConnected&&["view","edit"].includes(currentAccount?.permissions?.bookings)){lastStaffBookingsRefreshAt=Date.now();loadBookings()}if(!realtimeConnected&&!accountsSection.hidden&&["view","edit"].includes(currentAccount?.permissions?.accounts)){lastStaffAccountsRefreshAt=Date.now();loadDailyAccounts()}});async function openHandoverDialog(){try{const status=await custodyRequest("status");if(!status.active||status.session?.employeeUid!==auth.currentUser?.uid){await signOut(auth);window.location.replace("./index.html#patient-portal");return}if(!["view","edit"].includes(currentAccount?.permissions?.accounts))throw new Error("يلزم أن تكون لديك صلاحية عرض الحسابات لحساب المتبقي اليومي قبل التسليم.");const handoverDate=todayISO();const [bookingResult,expenseResult]=await Promise.all([bookingsRequest("listDailyAccounts",{date:handoverDate}),dailyAccountsRequest("listDailyExpenses",{date:handoverDate})]);const handoverBookings=Array.isArray(bookingResult.bookings)?bookingResult.bookings:[];const handoverExpenses=Array.isArray(expenseResult.expenses)?expenseResult.expenses:[];let baselineReceipts=0;for(const booking of handoverBookings){const completionDay=cairoDate(booking.completedAt);const fee=Number(booking.completedFee!==undefined&&booking.completedFee!==""?booking.completedFee:(booking.status==="completed"?booking.servicePrice:0))||0;const recordedAmount=Number(booking.paidAmount)||0;const received=recordedAmount>0?recordedAmount:(booking.status==="completed"?fee:0);if(booking.status==="completed"&&completionDay===handoverDate&&booking.isArchived!==true&&!["archived","cancelled"].includes(booking.status))baselineReceipts+=received;}const baselineExpenses=handoverExpenses.filter(item=>(item.status||"approved")==="approved").reduce((sum,item)=>sum+(Number(item.amount)||0),0);accountsReceiptsTotal=baselineReceipts;accountsExpensesTotal=baselineExpenses;const sessionExpected=Number(status.session.expectedAmount||0);const sessionBaselineReceipts=Number(status.session.baselineReceipts||0);const sessionBaselineExpenses=Number(status.session.baselineExpenses||0);const expected=sessionExpected+Math.max(0,(baselineReceipts-sessionBaselineReceipts)-(baselineExpenses-sessionBaselineExpenses));custodySessionExpected=sessionExpected;custodyHandoverExpected=expected;custodyHandoverBaselineReceipts=baselineReceipts;custodyHandoverBaselineExpenses=baselineExpenses;handoverExpected.textContent=expected.toLocaleString("ar-EG",{minimumFractionDigits:2,maximumFractionDigits:2})+" ج.م";handoverActual.value=expected.toFixed(2);handoverNotes.value="";message(handoverMessage,"");if(handoverDialog?.showModal)handoverDialog.showModal();else throw new Error("المتصفح لا يدعم نافذة تسليم العهدة.")}catch(e){window.alert(e.message||"تعذر تحميل تفاصيل العهدة.")}}handoverForm?.addEventListener("submit",async e=>{e.preventDefault();if(!handoverForm.reportValidity())return;const actual=Number(handoverActual.value),expected=custodyHandoverExpected,notes=handoverNotes.value.trim();if(!Number.isFinite(actual)||actual<0){message(handoverMessage,"أدخل المبلغ الفعلي بصورة صحيحة.",true);return}if(Math.abs(actual-expected)>0.009&&!notes){message(handoverMessage,"اكتب سبب الفرق بين المبلغ المتوقع والفعلي قبل التأكيد.",true);handoverNotes.focus();return}const button=$("#staffHandoverConfirm");button.disabled=true;try{await custodyRequest("handover",{actualAmount:actual,expectedAmount:custodyHandoverExpected,baselineReceipts:custodyHandoverBaselineReceipts,baselineExpenses:custodyHandoverBaselineExpenses,notes});handoverDialog.close();await signOut(auth);window.location.replace("./index.html#patient-portal")}catch(e){message(handoverMessage,e.message||"تعذر تسليم العهدة.",true)}finally{button.disabled=false}});$("#staffHandoverClose")?.addEventListener("click",()=>handoverDialog.close());$("#staffHandoverCancel")?.addEventListener("click",()=>handoverDialog.close());logoutButton.addEventListener("click",async()=>{logoutButton.disabled=true;try{await openHandoverDialog()}finally{logoutButton.disabled=false}});
+
+
+// Patient lookup and longitudinal medical records for staff with the assigned permissions.
+function setupStaffPatientAutocomplete(){const input=$("#staffNewBookingPatientName"),phone=createBookingForm?.elements?.patientPhone,hidden=$("#staffNewBookingPatientId"),legacyHidden=$("#staffNewBookingLegacyBookingId"),box=$("#staffNewBookingPatientSuggestions");if(!input||!phone||!hidden||!box)return;let seq=0;input.addEventListener("input",async()=>{hidden.value="";if(legacyHidden)legacyHidden.value="";const q=input.value.trim(),id=++seq;box.replaceChildren();box.hidden=true;if(!q)return;try{const result=await medicalRecordsRequest("search",{query:q});if(id!==seq)return;for(const p of result.patients||[]){const button=document.createElement("button");button.type="button";const n=document.createElement("strong"),m=document.createElement("span");n.textContent=p.displayName;m.textContent=[p.patientNumber||"ملف سابق",p.phone||"الهاتف غير مسجل"].join(" · ");button.append(n,m);button.addEventListener("click",()=>{input.value=p.displayName||"";phone.value=p.phone||"";hidden.value=p.id||"";if(legacyHidden)legacyHidden.value=p.legacyBookingId||"";input.dispatchEvent(new Event("change",{bubbles:true}));phone.dispatchEvent(new Event("input",{bubbles:true}));phone.dispatchEvent(new Event("change",{bubbles:true}));box.hidden=true;box.replaceChildren();});box.append(button)}box.hidden=!box.childElementCount}catch(e){console.warn("Patient lookup failed:",e.message)}})}
+setupStaffPatientAutocomplete();
+let staffMedicalPatient=null,staffMedicalHistory=null;
+const staffMedicalSearch=$("#staffMedicalPatientSearch"),staffMedicalResults=$("#staffMedicalPatientResults"),staffMedicalProfile=$("#staffMedicalPatientProfile"),staffMedicalSummary=$("#staffMedicalPatientSummary"),staffMedicalVisits=$("#staffMedicalVisitHistory"),staffMedicalForm=$("#staffMedicalVisitForm"),staffMedicalBooking=$("#staffMedicalVisitBooking"),staffMedicalMessage=$("#staffMedicalVisitMessage");
+function fillStaffMedicalForm(v={},b={}){$("#staffMedicalVisitDate").value=v.visitDate||String(b.appointmentDate||"").slice(0,10)||"";$("#staffMedicalVisitBloodPressure").value=v.bloodPressure??b.bloodPressure??"";$("#staffMedicalVisitWeight").value=v.weight??b.weight??"";$("#staffMedicalVisitBloodSugar").value=v.bloodSugar??b.bloodSugar??"";$("#staffMedicalVisitPreNotes").value=v.preVisitNotes??b.preVisitNotes??"";$("#staffMedicalVisitDiagnosis").value=v.diagnosis||"";$("#staffMedicalVisitClinicalNotes").value=v.clinicalNotes||"";$("#staffMedicalVisitTreatment").value=v.treatment||"";$("#staffMedicalVisitFollowUp").value=v.followUp||"";}
+function renderStaffMedicalVisits(h){staffMedicalVisits.replaceChildren();const visits=h.visits||[],bookings=h.bookings||[];if(!visits.length&&!bookings.length){const p=document.createElement("p");p.textContent="لا توجد زيارات مسجلة لهذا المريض حتى الآن.";staffMedicalVisits.append(p);return;}for(const v of visits){const card=document.createElement("article");card.className="medical-visit-card";const title=document.createElement("h4");title.textContent="كشف "+(v.visitDate||"غير مؤرخ")+(v.queueNumber?" · الدور "+v.queueNumber:"");card.append(title);for(const[l,val]of [["ضغط الدم",v.bloodPressure],["الوزن",v.weight?v.weight+" كجم":""],["السكر",v.bloodSugar],["ملاحظات ما قبل الكشف",v.preVisitNotes],["التشخيص",v.diagnosis],["ملاحظات الدكتور",v.clinicalNotes],["العلاج والتوصيات",v.treatment],["المتابعة",v.followUp]])if(val){const p=document.createElement("p");p.textContent=l+": "+val;card.append(p)}staffMedicalVisits.append(card)}if(!visits.length&&bookings.length){const p=document.createElement("p");p.textContent="توجد حجوزات سابقة مرتبطة بالملف. اختر حجزًا لتسجيل تفاصيل الكشف.";staffMedicalVisits.append(p);}}
+async function loadStaffMedicalPatient(patient){staffMedicalPatient=patient;const h=await medicalRecordsRequest("history",{patientId:patient.id});staffMedicalHistory=h;staffMedicalProfile.hidden=false;staffMedicalSummary.replaceChildren();staffMedicalSummary.className="medical-patient-summary";const name=document.createElement("h3"),meta=document.createElement("p");name.textContent=h.patient.displayName;meta.textContent="رقم الملف: "+(h.patient.patientNumber||h.patient.id)+" · الهاتف: "+(h.patient.phone||"غير مسجل");staffMedicalSummary.append(name,meta);staffMedicalBooking.replaceChildren();const ph=document.createElement("option");ph.value="";ph.textContent="اختر حجزًا للمريض";staffMedicalBooking.append(ph);const bookings=(h.bookings||[]).slice().sort((a,b)=>String(b.appointmentDate).localeCompare(String(a.appointmentDate)));for(const b of bookings){const o=document.createElement("option");o.value=b.id;o.textContent=(b.appointmentDate||"تاريخ غير محدد")+" · "+(b.service||"كشف")+" · "+(b.status||"");staffMedicalBooking.append(o)}renderStaffMedicalVisits(h);if(bookings.length){staffMedicalBooking.value=bookings[0].id;staffMedicalBooking.dispatchEvent(new Event("change"))}else fillStaffMedicalForm();const editable=currentAccount?.permissions?.medicalRecords==="edit";staffMedicalForm.querySelectorAll("input,textarea").forEach(el=>{el.readOnly=!editable;});staffMedicalBooking.disabled=false;staffMedicalForm.querySelectorAll("button").forEach(el=>{el.hidden=!editable;el.disabled=!editable;});}
+let staffMedicalSearchSequence=0;
+staffMedicalSearch?.addEventListener("input",async()=>{const q=staffMedicalSearch.value.trim(),seq=++staffMedicalSearchSequence;staffMedicalResults.replaceChildren();if(!q)return;try{const r=await medicalRecordsRequest("search",{query:q});if(seq!==staffMedicalSearchSequence)return;for(const p of r.patients||[]){const button=document.createElement("button");button.type="button";button.className="medical-patient-result";const n=document.createElement("strong"),m=document.createElement("span");n.textContent=p.displayName;m.textContent=[p.patientNumber||"ملف سابق",p.phone||"الهاتف غير مسجل"].join(" · ");button.append(n,m);button.addEventListener("click",async()=>{button.disabled=true;try{if(p.id)await loadStaffMedicalPatient(p);else{const resolved=await medicalRecordsRequest("resolve",{patientName:p.displayName,patientPhone:p.phone});await loadStaffMedicalPatient(resolved.patient)}}catch(e){message(staffMedicalMessage,e.message,true)}finally{button.disabled=false}});staffMedicalResults.append(button)}if(!staffMedicalResults.childElementCount){const p=document.createElement("p");p.textContent="لا توجد نتائج مطابقة.";staffMedicalResults.append(p)}}catch(e){message(staffMedicalMessage,e.message,true)}});
+staffMedicalBooking?.addEventListener("change",()=>{const id=staffMedicalBooking.value,b=(staffMedicalHistory?.bookings||[]).find(x=>x.id===id)||{},v=(staffMedicalHistory?.visits||[]).find(x=>x.bookingId===id)||{};fillStaffMedicalForm(v,b);});
+staffMedicalForm?.addEventListener("submit",async e=>{e.preventDefault();if(currentAccount?.permissions?.medicalRecords!=="edit")return;if(!staffMedicalPatient||!staffMedicalBooking.value){message(staffMedicalMessage,"اختر ملف المريض والحجز المرتبط بالكشف.",true);return;}const button=staffMedicalForm.querySelector('button[type="submit"]');button.disabled=true;try{const b=(staffMedicalHistory?.bookings||[]).find(x=>x.id===staffMedicalBooking.value)||{},booking=allBookings.find(x=>x.id===b.id)||b;await medicalRecordsRequest("saveVisit",{patientId:staffMedicalPatient.id,bookingId:b.id,visitDate:$("#staffMedicalVisitDate").value,queueNumber:queueNumberFor(booking),bloodPressure:$("#staffMedicalVisitBloodPressure").value,weight:$("#staffMedicalVisitWeight").value,bloodSugar:$("#staffMedicalVisitBloodSugar").value,preVisitNotes:$("#staffMedicalVisitPreNotes").value,diagnosis:$("#staffMedicalVisitDiagnosis").value,clinicalNotes:$("#staffMedicalVisitClinicalNotes").value,treatment:$("#staffMedicalVisitTreatment").value,followUp:$("#staffMedicalVisitFollowUp").value});message(staffMedicalMessage,"تم حفظ بيانات الكشف وربطها بالحجز وملف المريض.");await loadStaffMedicalPatient(staffMedicalPatient);staffMedicalBooking.value=b.id;staffMedicalBooking.dispatchEvent(new Event("change"));await loadBookings()}catch(e){message(staffMedicalMessage,e.message,true)}finally{button.disabled=false}});

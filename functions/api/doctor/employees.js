@@ -7,7 +7,8 @@ const ALLOWED_PERMISSION_KEYS = [
   "bookings",
   "patients",
   "medicalRecords",
-  "settings"
+  "settings",
+  "accounts"
 ];
 
 const ALLOWED_PERMISSION_VALUES = [
@@ -338,6 +339,7 @@ function decodeEmployeeDocument(document) {
     email: decodeString(fields.email),
     displayName: decodeString(fields.displayName),
     permissions: decodePermissions(fields.permissions),
+    expenseMode: decodeString(fields.expenseMode) === "auto" ? "auto" : "approval",
     createdAt: fields.createdAt?.timestampValue || null
   };
 }
@@ -459,6 +461,9 @@ async function createEmployeeAccount(env, data) {
     };
   }
 
+  const expenseMode = data.expenseMode === "approval" ? "approval" : data.expenseMode === "auto" ? "auto" : data.expenseMode == null ? "approval" : null;
+  if (!expenseMode) return { status:400, body:{ message:"طريقة اعتماد المصروفات غير صحيحة." } };
+
   let permissions;
 
   try {
@@ -563,6 +568,7 @@ async function createEmployeeAccount(env, data) {
         role: encodeString("staff"),
         active: { booleanValue: true },
         permissions: encodePermissions(permissions),
+        expenseMode: encodeString(expenseMode),
         createdAt: {
           timestampValue: new Date().toISOString()
         }
@@ -590,7 +596,8 @@ async function createEmployeeAccount(env, data) {
           uid,
           email,
           displayName,
-          permissions
+          permissions,
+          expenseMode
         }
       }
     };
@@ -630,6 +637,22 @@ async function createEmployeeAccount(env, data) {
   }
 }
 
+async function updateEmployeeExpenseMode(projectId, accessToken, data) {
+  const uid = typeof data.uid === "string" ? data.uid.trim() : "";
+  const expenseMode = data.expenseMode;
+  if (!uid || uid.length > 128 || uid.includes("/") || !["auto","approval"].includes(expenseMode)) {
+    return { status:400, body:{ message:"بيانات طريقة اعتماد المصروفات غير صحيحة." } };
+  }
+  try {
+    await firestoreRequest(projectId, accessToken,
+      `/${FIRESTORE_COLLECTION}/${encodeURIComponent(uid)}?updateMask.fieldPaths=expenseMode`,
+      { method:"PATCH", body:JSON.stringify({fields:{expenseMode:encodeString(expenseMode)}}) });
+    return { status:200, body:{uid, expenseMode} };
+  } catch {
+    return { status:404, body:{message:"تعذر تحديث إعدادات مصروفات الموظف."} };
+  }
+}
+
 async function updateEmployeePermissions(
   projectId,
   accessToken,
@@ -655,31 +678,25 @@ async function updateEmployeePermissions(
     };
   }
 
-  const path =
-    `/${FIRESTORE_COLLECTION}/${encodeURIComponent(uid)}` +
-    "?updateMask.fieldPaths=permissions";
+  const fields = { permissions: encodePermissions(permissions) };
+  let path = `/${FIRESTORE_COLLECTION}/${encodeURIComponent(uid)}?updateMask.fieldPaths=permissions`;
+  let expenseMode;
+  if (data.expenseMode !== undefined) {
+    if (!["auto","approval"].includes(data.expenseMode)) return {status:400,body:{message:"طريقة اعتماد المصروفات غير صحيحة."}};
+    expenseMode = data.expenseMode;
+    fields.expenseMode = encodeString(expenseMode);
+    path += "&updateMask.fieldPaths=expenseMode";
+  }
 
   try {
-    await firestoreRequest(
-      projectId,
-      accessToken,
-      path,
-      {
-        method: "PATCH",
-        body: JSON.stringify({
-          fields: {
-            permissions: encodePermissions(permissions)
-          }
-        })
-      }
-    );
+    await firestoreRequest(projectId, accessToken, path, {
+      method: "PATCH",
+      body: JSON.stringify({ fields })
+    });
 
     return {
       status: 200,
-      body: {
-        uid,
-        permissions
-      }
+      body: { uid, permissions, ...(expenseMode ? {expenseMode} : {}) }
     };
   } catch (error) {
     return {
@@ -809,6 +826,11 @@ export async function onRequestPost({ request, env }) {
         return jsonResponse(result.body, result.status);
       }
 
+      case "updateExpenseMode": {
+        const result = await updateEmployeeExpenseMode(serviceAccount.project_id, accessToken, data);
+        return jsonResponse(result.body, result.status);
+      }
+
       case "updatePermissions": {
         const result = await updateEmployeePermissions(
           serviceAccount.project_id,
@@ -846,6 +868,13 @@ export async function onRequest(context) {
       }
     });
   }
-
-  return onRequestPost(context);
+  let input = {};
+  try { input = await context.request.clone().json(); } catch {}
+  const result = await onRequestPost(context);
+  if (result.ok && input.action && input.action !== "list") {
+    const notification = publishClinicRealtime(context.env, "clinic_settings_changed");
+    if (typeof context.waitUntil === "function") context.waitUntil(notification);
+    else void notification;
+  }
+  return result;
 }

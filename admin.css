@@ -1,15 +1,15 @@
 
 :root {
-  --color-dark: #11141A;
-  --color-light: #F9F5F1;
-  --color-accent: #FFF25C;
-  --color-secondary: #BFD2AF;
-  --color-muted: #77766F;
-  --color-border: rgba(17, 20, 26, 0.10);
-  --radius-large: 28px;
+  --color-dark: #102B3B;
+  --color-light: #F7F9FB;
+  --color-accent: #1E7EB8;
+  --color-secondary: #D5E8F3;
+  --color-muted: #616161;
+  --color-border: rgba(16, 43, 59, 0.12);
+  --radius-large: 24px;
   --radius-medium: 16px;
-  --font-heading: "Stack Sans Headline", "Cairo", sans-serif;
-  --font-body: "Cairo", "Stack Sans Headline", sans-serif;
+  --font-heading: "Cairo", "Poppins", sans-serif;
+  --font-body: "Cairo", "Poppins", sans-serif;
 }
 
 * {
@@ -72,7 +72,7 @@ select:focus-visible {
   margin-bottom: 18px;
   border-radius: 17px;
   background: var(--color-dark);
-  color: var(--color-accent);
+  color: #FFFFFF;
   font-family: var(--font-heading);
   font-size: 28px;
   font-weight: 800;
@@ -190,7 +190,7 @@ select:focus-visible {
 .primary-button {
   margin-top: 14px;
   background: var(--color-dark);
-  color: var(--color-accent);
+  color: #FFFFFF;
 }
 
 .secondary-button {
@@ -610,3 +610,948 @@ button:disabled {
     padding: 15px;
   }
 }
+
+.employee-list-actions,
+.booking-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.booking-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.booking-edit-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.booking-edit-field input,
+.booking-edit-field select {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--color-dark);
+  font: inherit;
+}
+
+.booking-card-actions {
+  margin-top: 16px;
+}
+
+.booking-card-actions button {
+  flex: 1 1 160px;
+}
+
+@media (max-width: 600px) {
+  .booking-edit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .employee-list-actions {
+    width: 100%;
+  }
+
+  .employee-list-actions button {
+    flex: 1 1 100%;
+  }
+}
+
+.patient-credentials-panel {
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-medium);
+  background: #f8fbf5;
+}
+
+.patient-credentials-panel h4 {
+  margin: 0 0 8px;
+}
+
+.patient-credentials-panel p {
+  line-height: 1.7;
+}
+
+.patient-credentials-panel dl {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.5fr) minmax(0, 1fr);
+  gap: 8px 12px;
+  overflow-wrap: anywhere;
+}
+
+.patient-credentials-panel dt {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.patient-credentials-panel dd {
+  margin: 0;
+  font-weight: 800;
+  user-select: text;
+}
+
+/* تبويبات لوحة الدكتور وقائمة الطلبات */
+.dashboard-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:22px 0 4px;padding:8px;border:1px solid var(--color-border);border-radius:16px;background:#fcfbf8}
+.dashboard-tab{min-height:44px;padding:10px 16px;border:1px solid transparent;border-radius:11px;background:transparent;color:var(--color-dark);font-weight:800;cursor:pointer}
+.dashboard-tab[aria-selected="true"]{background:var(--color-secondary)}
+.booking-request-summary{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0;border:0;background:transparent;color:inherit;text-align:right;cursor:pointer}
+.booking-request-main{display:grid;gap:4px;min-width:0}.booking-request-main strong{font-size:15px}.booking-request-main small{color:var(--color-muted);font-size:12px}
+.booking-request-badge{flex:0 0 auto;padding:5px 9px;border-radius:8px;background:#fff4d5;color:#71591d;font-size:11px;font-weight:800}
+.booking-request-details{padding-top:14px}.booking-request-details[hidden]{display:none!important}
+.add-booking-toggle{margin-top:0;display:inline-flex;align-items:center;gap:7px}.add-booking-toggle span{font-size:22px;line-height:1}
+.booking-list-filters{display:grid;grid-template-columns:minmax(0,2fr) minmax(180px,1fr);gap:12px;margin:18px 0 8px}
+.booking-list-filters label{display:grid;gap:6px;color:var(--color-muted);font-size:12px;font-weight:700}
+.booking-list-filters input{width:100%;min-height:44px;padding:9px 12px;border:1px solid var(--color-border);border-radius:11px;background:#fff;color:var(--color-dark);font:inherit}
+.daily-appointment-card h4{margin:0 0 4px}.daily-appointment-card p{margin:0;color:var(--color-muted);font-size:13px}
+@media(max-width:600px){.dashboard-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-tab{padding-inline:8px}.booking-list-filters{grid-template-columns:1fr}.booking-request-summary{align-items:flex-start}.employee-list-actions{width:100%}.employee-list-actions button{flex:1 1 100%}}
+
+/* حالات المواعيد والأرشيف */
+.booking-status-select{width:100%;min-height:42px;margin-bottom:10px;padding:8px 10px;border:1px solid var(--color-border);border-radius:10px;background:#fff;color:var(--color-dark);font:inherit;font-weight:700}.doctor-archive-section{margin-top:28px;padding-top:20px;border-top:1px solid var(--color-border)}
+
+.schedule-booking-card .booking-request-summary{margin-bottom:8px}.schedule-booking-card>.secondary-button{margin:8px 0 12px}
+
+
+/* جدول المواعيد: تاريخ واضح، فلتر مختصر، وحالات ملونة */
+.doctor-schedule-heading{align-items:center}.schedule-date-label{display:inline-flex;margin-inline-start:8px;padding:3px 9px;border-radius:8px;background:#f0eee8;color:#68675f;font-size:12px;font-weight:700;vertical-align:middle}.doctor-home-actions{display:flex;align-items:center;gap:8px}.schedule-filter-button{width:38px;height:38px;border:1px solid var(--color-border);border-radius:11px;background:#fff;color:var(--color-dark);font-size:20px;cursor:pointer}.home-add-booking-button{min-height:38px;margin:0;padding:7px 12px;border-radius:11px;font-size:12px}.hidden-schedule-filter{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.schedule-filter-dialog{width:min(92vw,440px);padding:22px;border:1px solid var(--color-border);border-radius:20px;background:#fff;color:var(--color-dark);box-shadow:0 24px 80px #11141a33}.schedule-filter-dialog::backdrop{background:#11141a66;backdrop-filter:blur(3px)}.schedule-filter-dialog form{display:grid;gap:14px}.schedule-filter-dialog label{display:grid;gap:6px;font-size:13px;font-weight:700}.schedule-filter-dialog input,.schedule-filter-dialog select{width:100%;min-height:44px;padding:9px 12px;border:1px solid var(--color-border);border-radius:10px;background:#fff;font:inherit}.schedule-filter-close{border:0;background:transparent;font-size:24px;cursor:pointer}.archive-booking-action{display:block;width:100%;margin-top:10px;padding:9px 12px;border:1px solid #d9b7b7;border-radius:10px;background:#fff5f5;color:#8f3333;font:inherit;font-size:12px;font-weight:800;cursor:pointer}.schedule-booking-card.status-waiting{background:#fff9ed;border-color:#f0ce8c}.schedule-booking-card.status-completed{background:#edf8ee;border-color:#b5d9ba}.schedule-booking-card.status-postponed{background:#eef5ff;border-color:#b8d0f3}.schedule-booking-card.status-no_show{background:#fff0f0;border-color:#edbcbc}.schedule-booking-card.status-apologized{background:#f8f0fc;border-color:#d9c1e8}.schedule-booking-card.status-archived,.schedule-booking-card.status-cancelled{background:#f5f4f1;border-color:#d8d5ce}.booking-status-select{background:#fff}.booking-status-select option{font-weight:700}.booking-status-select option.status-option-waiting{background:#fff1d8}.booking-status-select option.status-option-completed{background:#e6f4e8}.booking-status-select option.status-option-postponed{background:#e8f1ff}.booking-status-select option.status-option-no_show{background:#fff0f0}.booking-status-select option.status-option-apologized{background:#f4eafa}.doctor-archive-section{margin-top:0;padding-top:0;border-top:0}@media(max-width:600px){.doctor-home-actions{gap:6px}.home-add-booking-button{padding-inline:9px}}
+
+.schedule-booking-card.status-waiting .booking-request-badge{background:#ffe5b5;color:#79500e}.schedule-booking-card.status-completed .booking-request-badge{background:#cdebd1;color:#275a31}.schedule-booking-card.status-postponed .booking-request-badge{background:#d7e7ff;color:#214f91}.schedule-booking-card.status-no_show .booking-request-badge{background:#ffdada;color:#922d2d}.schedule-booking-card.status-apologized .booking-request-badge{background:#ead8f5;color:#693e83}
+
+.schedule-status-legend{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px}.schedule-status-legend button{min-height:36px;padding:6px 10px;border:1px solid var(--color-border);border-radius:999px;background:#fff;color:var(--color-dark);font:inherit;font-size:12px;cursor:pointer}.schedule-status-legend button.is-active{outline:2px solid #8fa982;font-weight:800}.schedule-status-legend [data-status-filter="waiting"]{background:#fff1d8}.schedule-status-legend [data-status-filter="completed"]{background:#e6f4e8}.schedule-status-legend [data-status-filter="postponed"]{background:#e8f1ff}.schedule-status-legend [data-status-filter="no_show"]{background:#fff0f0}.schedule-status-legend [data-status-filter="apologized"]{background:#f4eafa}.schedule-card-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}.schedule-card-controls .booking-status-select{width:auto;min-width:145px;min-height:40px;margin:0}.schedule-edit-button{min-height:40px;padding:7px 12px}.schedule-archive-check{width:20px;height:20px;accent-color:#667d58}.schedule-booking-card{padding:11px 13px!important;margin:0!important;gap:8px!important}.schedule-booking-card .booking-request-summary{margin:0!important}.schedule-bulk-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;padding:12px;border-top:1px solid var(--color-border);font-size:12px;color:var(--color-muted)}.schedule-bulk-actions button{min-height:42px}.accounts-content{overflow-x:auto}.accounts-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--color-border);border-radius:12px;overflow:hidden}.accounts-table th,.accounts-table td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--color-border);font-size:13px}.accounts-table th{background:#f5f3ed}.accounts-total{display:flex;justify-content:space-between;gap:12px;margin-top:12px;padding:15px;border-radius:12px;background:#e6f4e8;font-weight:800}@media(max-width:600px){.schedule-status-legend button{min-height:40px;padding:7px 9px}.schedule-card-controls .booking-status-select{flex:1;min-width:0;width:100%;min-height:44px}.schedule-card-controls .schedule-edit-button{min-height:44px}.schedule-bulk-actions{align-items:stretch}.schedule-bulk-actions button{width:100%}.accounts-table th,.accounts-table td{padding:9px 7px;font-size:12px}}
+
+/* تحسينات واجهة الترحيب والأرشفة اليومية والحسابات */
+.compact-welcome{margin:0!important;font-size:15px!important;font-weight:700!important;text-align:right}.dashboard-top{padding:8px 0!important;margin:0 0 10px!important;border:0!important;background:transparent!important;min-height:0!important}.dashboard-top>div{margin-inline-end:auto}.dashboard-top #logoutButton{font-size:12px;min-height:34px;padding:6px 11px}.archive-day-button{width:100%;max-width:260px;color:#8f3333!important;background:#fff5f5!important;border-color:#e8c4c4!important}.archive-day-button:not(:disabled){cursor:pointer!important}.archive-day-button:disabled{cursor:not-allowed!important}.schedule-bulk-actions{justify-content:flex-start!important;padding:10px 0!important;border:0!important}.accounts-subtabs{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0;padding:8px;background:#fff;border:1px solid var(--color-border);border-radius:14px}.accounts-subtab{padding:9px 13px;border:1px solid var(--color-border);border-radius:10px;background:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer}.accounts-subtab[aria-selected="true"]{background:#e6f4e8;border-color:#b5d9ba}.accounts-entry-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0;padding:16px;border:1px solid var(--color-border);border-radius:14px;background:#fff}.accounts-entry-form label{display:grid;gap:6px;font-size:12px;font-weight:700}.accounts-entry-form input,.accounts-entry-form select{min-width:0;width:100%;min-height:42px;padding:8px 10px;border:1px solid var(--color-border);border-radius:9px;font:inherit}.accounts-entry-form button,.accounts-entry-form .message{grid-column:1/-1}.accounts-category-create{margin-top:20px;padding-top:14px;border-top:1px solid var(--color-border)}@media(max-width:600px){.accounts-entry-form{grid-template-columns:1fr}.accounts-entry-form button,.accounts-entry-form .message{grid-column:auto}.compact-welcome{font-size:14px!important}}
+
+
+/* قواعد استجابة محصورة بالموبايل حتى لا تغيّر تخطيط اللابتوب */
+.booking-requests-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:54px;margin-top:14px;padding:12px 16px;border:1px solid var(--color-border);border-radius:14px;background:#fff;color:var(--color-dark);font:inherit;font-weight:800;text-align:right;cursor:pointer}
+.booking-requests-toggle span{font-size:20px;transition:transform .2s ease}
+.booking-requests-toggle.is-open span{transform:rotate(180deg)}
+.schedule-date-label{border:0;cursor:pointer;font:inherit;font-size:12px}
+.booking-form-actions{display:flex;flex-wrap:wrap;gap:8px;grid-column:1/-1}
+.booking-form-actions button{flex:1 1 140px}
+.service-quick-field{display:grid;gap:7px;min-width:0}
+.service-quick-field input,.service-quick-select{width:100%;min-width:0;min-height:42px;padding:9px 11px;border:1px solid var(--color-border);border-radius:10px;background:#fff;color:var(--color-dark);font:inherit}
+@media(max-width:600px){
+ .admin-shell{width:calc(100% - 20px);max-width:100%}
+ .dashboard-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:7px;width:100%;min-width:0}
+ .dashboard-tab{min-width:0;width:100%;padding:9px 6px;font-size:13px;line-height:1.45;overflow-wrap:anywhere}
+ .dashboard-tabs .dashboard-tab:last-child:nth-child(odd){grid-column:1/-1}
+ .employee-section,.home-appointments-section,.doctor-archive-section,.employee-list,.schedule-booking-card{width:100%;min-width:0;max-width:100%}
+ .doctor-schedule-heading{display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:8px}
+ .doctor-schedule-heading h3{flex:1;min-width:0;font-size:17px}
+ .doctor-home-actions{display:flex;flex:0 0 auto;gap:5px}
+ .schedule-date-label{display:inline-flex;max-width:100%;white-space:normal;text-align:right;line-height:1.5}
+ .schedule-card-controls{width:100%}
+ .schedule-card-controls .booking-status-select{width:100%;min-width:0;font-size:14px}
+ .employee-form input,.employee-form select,.employee-form textarea,.booking-list-filters input,.booking-edit-grid input,.booking-edit-grid select,.schedule-filter-dialog input,.schedule-filter-dialog select{font-size:16px!important}
+ .booking-list-filters{grid-template-columns:minmax(0,1fr)}
+ .employee-list-actions{width:100%}
+ .accounts-entry-form{grid-template-columns:1fr}
+ .accounts-entry-form button,.accounts-entry-form .message{grid-column:auto}
+}
+
+.doctor-daily-expenses{margin-top:22px;padding-top:16px;border-top:1px solid var(--color-border)}
+.doctor-daily-expense-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:14px;border:1px solid var(--color-border);border-radius:12px;background:#fff}
+.doctor-daily-expense-form label{display:grid;gap:5px;font-size:12px;font-weight:700}
+.doctor-daily-expense-form input{width:100%;min-width:0;min-height:40px;padding:8px;border:1px solid var(--color-border);border-radius:8px;font:inherit}
+.doctor-daily-expense-form button,.doctor-daily-expense-form .message{grid-column:1/-1}
+.doctor-daily-expense-row{display:flex;justify-content:space-between;gap:12px;padding:11px 12px;border-bottom:1px solid var(--color-border);font-size:13px}
+@media(max-width:600px){.doctor-daily-expense-form{grid-template-columns:1fr}.doctor-daily-expense-form button,.doctor-daily-expense-form .message{grid-column:auto}}
+
+.doctor-accounts-date-label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700}
+.doctor-accounts-date-label input{min-height:38px;padding:5px 8px;border:1px solid var(--color-border);border-radius:8px;font:inherit}
+@media(max-width:600px){.doctor-accounts-date-label{flex-wrap:wrap}.doctor-accounts-date-label input{font-size:16px}}
+
+/* مصروفات الموظفين والتصفية المالية */
+.doctor-settlement-tools { margin-top: 22px; padding: 16px; border: 1px solid var(--color-border, #ddd); border-radius: 14px; }
+.doctor-settlement-tools h4, .doctor-settlement-tools h5 { margin: 14px 0 10px; }
+.settlement-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 14px 0; }
+.settlement-controls label { display: grid; gap: 6px; min-width: 180px; }
+.doctor-daily-expense-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--color-border, #ddd); }
+.doctor-daily-expense-row p { margin: 5px 0 0; }
+.doctor-daily-expense-row .booking-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.employee-permission-row select { max-width: 100%; min-width: 0; }
+@media (max-width: 640px) {
+  .doctor-settlement-tools { padding: 12px; }
+  .settlement-controls { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .settlement-controls label, .settlement-controls button { width: 100%; min-width: 0; }
+  .doctor-daily-expense-row { align-items: flex-start; }
+}
+
+/* أدوات تعديل الحجز والإشعارات ونافذة رقم الدور */
+.edit-booking-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  min-height: 38px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--color-dark);
+  font-size: 22px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.booking-notification-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #c62828;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: middle;
+}
+.booking-notification-badge:not([hidden]) { animation: booking-notification-pulse 1.8s ease-in-out infinite; }
+@keyframes booking-notification-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(198, 40, 40, .32); } 50% { box-shadow: 0 0 0 5px rgba(198, 40, 40, 0); } }
+@media (prefers-reduced-motion: reduce) { .booking-notification-badge:not([hidden]) { animation: none; } }
+.booking-notification-badge[hidden] { display: none !important; }
+.queue-number-dialog {
+  width: min(360px, calc(100% - 32px));
+  border: 0;
+  border-radius: 20px;
+  padding: 0;
+  color: var(--color-dark);
+  background: var(--color-light);
+  box-shadow: 0 24px 80px rgba(0,0,0,.24);
+}
+.queue-number-dialog::backdrop { background: rgba(16,20,25,.55); }
+.queue-number-dialog-content {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 26px 22px;
+  text-align: center;
+}
+.queue-number-dialog-content h2 { margin: 0; font-size: 20px; }
+.queue-number-dialog-content p { margin: 0; color: #777; }
+.queue-number-dialog-content strong { font-size: 56px; line-height: 1.2; }
+.queue-number-dialog-content button { width: 100%; min-height: 44px; }
+
+
+
+/* إبراز رقم الطلب على تبويب الحجوزات في لوحة الدكتور */
+.dashboard-tab .booking-notification-badge:not([hidden]){display:inline-flex!important;flex:0 0 auto;visibility:visible!important;margin-inline-start:4px;position:relative;z-index:1}
+
+/* إشعار واضح على تبويب الحجوزات وسجل نقل المواعيد */
+.dashboard-tab.has-pending-bookings{position:relative}
+.dashboard-tab.has-pending-bookings::after{content:"";position:absolute;top:7px;inset-inline-end:8px;width:8px;height:8px;border-radius:50%;background:#c62828;box-shadow:0 0 0 3px rgba(198,40,40,.12)}
+.reschedule-notice-card{border-inline-start:4px solid #b87922;background:#fffaf0;padding:14px 16px;margin-block:8px;border-radius:12px}
+.reschedule-notice-card>strong{display:block;margin-bottom:5px}
+.reschedule-notice-text{margin:0 0 5px;color:#8a5717;font-weight:800;font-size:13px}
+.reschedule-notice-card small{display:block;color:var(--color-muted);font-size:12px}
+#exportClinicExcelButton{align-self:end;min-height:42px;white-space:nowrap}
+@media(max-width:640px){#exportClinicExcelButton{width:100%}}
+
+/* Medical records and patient lookup */
+
+.patient-suggestions,.medical-patient-results,.medical-visit-history{display:grid;gap:8px;margin:10px 0 18px}.patient-suggestions button,.medical-patient-result{width:100%;text-align:right;border:1px solid rgba(17,20,26,.12);border-radius:12px;padding:10px 14px;background:#fff;color:inherit;cursor:pointer}.patient-suggestions button span,.medical-patient-result span{display:block;font-size:.9em;opacity:.75}.medical-records-section{display:grid;gap:14px}.medical-search-label{display:block;font-weight:700}.medical-patient-profile{border:1px solid rgba(17,20,26,.12);border-radius:16px;padding:16px;margin-top:12px}.medical-patient-summary{display:grid;gap:5px;padding-bottom:12px;border-bottom:1px solid rgba(17,20,26,.12)}.medical-visit-card{border:1px solid rgba(17,20,26,.12);border-radius:12px;padding:12px;margin:8px 0}.medical-visit-card h4{margin:0 0 8px}.medical-visit-card p{margin:5px 0;white-space:pre-wrap}.medical-visit-form{display:grid;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(17,20,26,.12)}.medical-visit-form label{display:grid;gap:5px;font-weight:600}.medical-visit-form input,.medical-visit-form select,.medical-visit-form textarea,.medical-search-label+input{width:100%;padding:10px;border:1px solid rgba(17,20,26,.18);border-radius:10px;background:#fff;color:inherit;font:inherit}.medical-vitals-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}@media(max-width:650px){.medical-vitals-grid{grid-template-columns:1fr}}
+
+
+/* Clinic management settings and private audit log */
+.clinic-management-section h4 {
+  margin: 24px 0 10px;
+}
+.clinic-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.clinic-settings-grid label,
+.clinic-dynamic-field,
+.clinic-logs-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+.clinic-settings-grid input,
+.clinic-settings-grid textarea,
+.clinic-dynamic-field input,
+.clinic-logs-toolbar select,
+.clinic-advanced-settings {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--color-dark);
+  padding: 10px 12px;
+}
+.clinic-settings-grid input[type="color"],
+.clinic-dynamic-field input[type="color"] {
+  min-height: 44px;
+  padding: 4px;
+}
+.clinic-settings-wide {
+  grid-column: 1 / -1;
+}
+.clinic-dynamic-list {
+  display: grid;
+  gap: 12px;
+  margin: 12px 0;
+}
+.clinic-dynamic-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: rgba(255,255,255,.65);
+}
+.clinic-status-row {
+  grid-template-columns: minmax(90px, .7fr) minmax(150px, 1.4fr) minmax(100px, .7fr);
+}
+.clinic-status-row > strong {
+  align-self: center;
+}
+.clinic-service-enabled {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.clinic-remove-button {
+  justify-self: start;
+}
+.clinic-advanced-settings {
+  direction: ltr;
+  text-align: left;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+}
+.clinic-logs-heading,
+.clinic-log-heading,
+.clinic-logs-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.clinic-logs-heading {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+.clinic-logs-toolbar {
+  justify-content: flex-start;
+  margin: 16px 0;
+}
+.clinic-logs-list {
+  display: grid;
+  gap: 10px;
+}
+.clinic-log-entry {
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-right: 4px solid var(--color-secondary);
+  border-radius: 12px;
+  background: #fff;
+}
+.clinic-log-error { border-right-color: #B45353; }
+.clinic-log-warning { border-right-color: #D97706; }
+.clinic-log-security { border-right-color: #8B7BB5; }
+.clinic-log-heading time {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.clinic-log-entry p {
+  margin: 5px 0 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .clinic-settings-grid,
+  .clinic-dynamic-row,
+  .clinic-status-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .clinic-logs-heading,
+  .clinic-log-heading,
+  .clinic-logs-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .clinic-settings-wide {
+    grid-column: auto;
+  }
+}
+
+
+/* Patient account picker */
+#patientAccountSearchResults { display: grid; gap: 8px; margin: 8px 0 14px; }
+#patientAccountSearchResults .medical-patient-result { width: 100%; text-align: right; cursor: pointer; border: 1px solid var(--border-color, #d9ddd8); border-radius: 10px; padding: 12px; background: var(--surface, #fff); color: inherit; font: inherit; }
+#patientAccountSelected { margin: 10px 0; }
+
+
+/* Doctor's visit card: clear hierarchy, spacing and stable open editing */
+.medical-booking-panel {
+  margin-top: 18px;
+  padding: clamp(16px, 2.5vw, 26px);
+  border: 1px solid #dfe5dc;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfa 100%);
+  box-shadow: 0 10px 28px rgba(24, 39, 24, .07);
+  color: var(--color-dark, #11141A);
+}
+.medical-booking-panel h4 { margin: 0 0 8px; font-size: 19px; line-height: 1.5; }
+.medical-booking-panel .muted-text { line-height: 1.8; }
+.medical-booking-form { display: grid; gap: 18px; margin-top: 18px; }
+.medical-booking-form .medical-vitals-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e5eadf;
+  border-radius: 14px;
+  background: #f4f8f1;
+}
+.medical-booking-field {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  color: #313a30;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.6;
+}
+.medical-booking-field input, .medical-booking-field textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 11px 13px;
+  border: 1px solid #d8dfd4;
+  border-radius: 11px;
+  outline: none;
+  background: #fff;
+  color: #182018;
+  font: inherit;
+  font-weight: 500;
+  line-height: 1.75;
+  box-shadow: 0 1px 2px rgba(17, 20, 26, .025);
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+.medical-booking-field textarea { min-height: 88px; resize: vertical; }
+.medical-booking-field input:focus, .medical-booking-field textarea:focus {
+  border-color: #7c9a70;
+  box-shadow: 0 0 0 3px rgba(124, 154, 112, .16);
+  background: #fff;
+}
+.medical-booking-field input:disabled, .medical-booking-field textarea:disabled {
+  background: #f0f2ef; color: #50584f; opacity: 1; cursor: not-allowed;
+}
+.medical-booking-actions { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 4px; }
+.medical-booking-actions button { flex: 1 1 180px; min-height: 48px; }
+.medical-complete-button { background: #2e7d43 !important; border-color: #2e7d43 !important; color: #fff !important; }
+.medical-complete-button:hover { background: #256837 !important; }
+.medical-visit-lock-note { margin: 0; padding: 12px 14px; border-radius: 10px; background: #edf8ee; color: #285a31; line-height: 1.8; }
+.booking-card.status-completed { background: #edf8ee; border-color: #9dccaa; }
+.booking-card.status-completed .booking-request-summary { border-radius: 10px; }
+.booking-card.status-completed .booking-request-badge { background: #cdebd1; color: #275a31; }
+@media (max-width: 650px) {
+  .medical-booking-panel { padding: 14px; border-radius: 14px; }
+  .medical-booking-form .medical-vitals-grid { grid-template-columns: minmax(0, 1fr); padding: 12px; }
+  .medical-booking-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .medical-booking-actions button { width: 100%; }
+  .medical-booking-field input,
+  .medical-booking-field textarea,
+  .medical-booking-field select {
+    font-size: 16px;
+  }
+  .medical-followup-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .medical-followup-grid > .medical-booking-field,
+  .medical-followup-grid .medical-booking-field input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+
+/* Doctor booking actions: separate appointment editing from the medical visit card. */
+.booking-card { position: relative; }
+.booking-edit-pencil {
+  position: absolute;
+  left: 8px;
+  right: auto;
+  top: 8px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-secondary, #bfd2af);
+  border-radius: 7px;
+  background: var(--color-light, #f9f5f1);
+  color: var(--color-dark, #11141a);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgb(17 20 26 / 8%);
+}
+.booking-request-main { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 9px; }
+.booking-patient-name { display: inline-block; }
+.booking-queue-number {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: #fff25c;
+  color: #11141a;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.booking-edit-pencil[hidden] { display: none; }
+.booking-edit-pencil:hover,
+.booking-edit-pencil:focus-visible {
+  background: var(--color-secondary, #bfd2af);
+  outline: 2px solid transparent;
+}
+.booking-request-summary { padding-inline-start: 12px; padding-left: 42px; }
+.booking-request-details.medical-only-view > .booking-edit-grid,
+.booking-request-details.medical-only-view > .booking-card-actions { display: none; }
+.medical-followup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.medical-followup-grid > .medical-booking-field {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.medical-followup-grid .medical-booking-field input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 640px) {
+  .medical-followup-grid { grid-template-columns: minmax(0, 1fr); }
+  .booking-edit-pencil { width: 24px; height: 24px; left: 6px; right: auto; top: 6px; font-size: 15px; }
+  .booking-request-summary { padding-inline-start: 8px; padding-left: 34px; }
+}
+
+
+/* Refined clinic dashboard: soft corners, calm motion, and clearer focus states. */
+:root {
+  --radius-control: 12px;
+  --radius-card: 18px;
+  --motion-fast: 180ms;
+  --motion-normal: 240ms;
+  --motion-ease: cubic-bezier(.2, .75, .25, 1);
+}
+.admin-shell button,
+.admin-shell input,
+.admin-shell select,
+.admin-shell textarea,
+.admin-shell .admin-card,
+.admin-shell .stat-card,
+.admin-shell .booking-card,
+.admin-shell .staff-tab,
+.admin-shell .admin-tab,
+.admin-shell .nav-item,
+.admin-shell dialog,
+.admin-shell .modal {
+  transition:
+    color var(--motion-fast) var(--motion-ease),
+    background-color var(--motion-fast) var(--motion-ease),
+    border-color var(--motion-fast) var(--motion-ease),
+    box-shadow var(--motion-fast) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease);
+}
+.admin-shell input:not([type="checkbox"]):not([type="radio"]),
+.admin-shell select,
+.admin-shell textarea,
+.admin-shell button,
+.admin-shell .staff-tab,
+.admin-shell .admin-tab,
+.admin-shell .nav-item {
+  border-radius: var(--radius-control);
+}
+.admin-shell .booking-card,
+.admin-shell .admin-card,
+.admin-shell .stat-card,
+.admin-shell .staff-expense-row,
+.admin-shell .patient-history-card,
+.admin-shell .medical-booking-panel {
+  border-radius: var(--radius-card);
+}
+.admin-shell button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.admin-shell button:active:not(:disabled) {
+  transform: translateY(0) scale(.985);
+}
+.admin-shell input:focus-visible,
+.admin-shell select:focus-visible,
+.admin-shell textarea:focus-visible,
+.admin-shell button:focus-visible,
+.admin-shell a:focus-visible {
+  outline: 2px solid var(--color-secondary, #BFD2AF);
+  outline-offset: 2px;
+}
+.admin-shell .staff-tab[aria-selected="true"],
+.admin-shell .admin-tab[aria-selected="true"],
+.admin-shell .nav-item[aria-current="page"] {
+  border-radius: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell *,
+  .admin-shell *::before,
+  .admin-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* تقويم مواعيد مخصص ومتجاوب للمس والاختيار السريع على الهاتف */
+.schedule-calendar-dialog{width:min(460px,calc(100vw - 24px));max-width:460px;padding:0;border:0;border-radius:22px;box-shadow:0 20px 70px rgba(17,20,26,.24);overflow:hidden}.schedule-calendar-dialog::backdrop{background:rgba(17,20,26,.48);backdrop-filter:blur(3px)}.schedule-calendar-dialog form{display:grid;gap:14px;padding:clamp(14px,4vw,22px);margin:0}.schedule-calendar-top{margin:0;gap:12px}.schedule-calendar-top h4{margin:0;font-size:18px}.schedule-calendar-shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.schedule-calendar-shortcuts button{min-height:42px;border:1px solid var(--color-border);border-radius:12px;background:#f5f7f1;color:var(--color-text);font:inherit;font-weight:700}.schedule-calendar-shortcuts button:nth-child(2){background:var(--color-accent);color:#191b20;border-color:transparent}.schedule-calendar-month-controls{display:grid;grid-template-columns:42px minmax(0,1fr) minmax(0,.8fr) 42px;gap:7px;align-items:center}.schedule-calendar-month-controls button{height:42px;border:1px solid var(--color-border);border-radius:12px;background:#fff;font-size:24px;line-height:1}.schedule-calendar-month-controls select{width:100%;min-width:0;height:42px;padding:5px 8px;border:1px solid var(--color-border);border-radius:10px;background:#fff;color:inherit;font:inherit;font-size:14px}.schedule-calendar-weekdays,.schedule-calendar-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;direction:rtl;text-align:center}.schedule-calendar-weekdays span{padding:5px 0;color:var(--color-muted);font-size:11px;font-weight:700}.schedule-calendar-days{grid-auto-rows:minmax(40px,auto)}.schedule-calendar-day{min-width:0;min-height:40px;padding:0;border:1px solid transparent;border-radius:12px;background:transparent;color:var(--color-text);font:inherit;font-size:14px;font-weight:600;touch-action:manipulation}.schedule-calendar-day.is-today{border-color:#8da67c;background:#edf4e8}.schedule-calendar-day.is-selected{background:var(--color-accent);border-color:var(--color-accent);color:#191b20;font-weight:800}.schedule-calendar-empty{min-height:40px}.schedule-calendar-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--color-muted);font-size:12px}.schedule-calendar-footer button{min-height:40px}@media(max-width:480px){.schedule-calendar-dialog{width:calc(100vw - 16px);max-width:none;border-radius:20px}.schedule-calendar-dialog form{gap:12px;padding:14px}.schedule-calendar-days{grid-auto-rows:minmax(42px,auto);gap:3px}.schedule-calendar-day{min-height:42px;border-radius:10px;font-size:15px}.schedule-calendar-weekdays span{font-size:10px}.schedule-calendar-month-controls{grid-template-columns:38px minmax(0,1fr) minmax(0,.72fr) 38px}.schedule-calendar-month-controls button{height:40px}}
+
+/* أيام التقويم دائرية، وعدد الحجوزات يظهر داخل شارة حمراء صغيرة */
+.schedule-calendar-day{position:relative;display:flex;align-items:center;justify-content:center;width:100%;aspect-ratio:1/1;min-height:0;border-radius:50%;line-height:1}.schedule-calendar-count{position:absolute;top:-3px;right:-2px;z-index:1;display:flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 3px;border:1px solid #fff;border-radius:999px;background:#d93036;color:#fff;font-size:10px;font-weight:800;line-height:1;direction:ltr}.schedule-calendar-day.is-selected .schedule-calendar-count{border-color:var(--color-accent);background:#c9232b;color:#fff}.schedule-calendar-day.is-today:not(.is-selected){background:#edf4e8}.schedule-calendar-empty{aspect-ratio:1/1;min-height:0}@media(max-width:480px){.schedule-calendar-day{min-height:0;aspect-ratio:1/1}.schedule-calendar-count{top:-2px;right:-2px;min-width:17px;height:17px;font-size:10px}}
+
+
+/* Clinic dashboard palette: navy, clean surfaces, and calm medical blue. */
+.admin-shell .primary-button,
+.admin-shell .brand-mark {
+  background: var(--color-dark);
+  color: #FFFFFF;
+}
+.admin-shell .panel,
+.admin-shell .modal,
+.admin-shell dialog {
+  border-color: var(--color-border);
+}
+.admin-shell button:focus-visible,
+.admin-shell a:focus-visible,
+.admin-shell input:focus-visible,
+.admin-shell select:focus-visible,
+.admin-shell textarea:focus-visible {
+  outline-color: var(--color-accent);
+}
+
+
+/* قائمة جانبية حديثة من اليمين مع انتقالات ثلاثية الأبعاد خفيفة */
+.admin-shell .dashboard-top{display:flex;align-items:center;justify-content:flex-start;gap:14px;margin-bottom:18px}
+.admin-shell .dashboard-top .compact-welcome{margin:0;min-width:0}
+.clinic-menu-toggle{display:inline-flex;align-items:center;justify-content:center;flex:0 0 46px;width:46px;height:46px;border:1px solid rgba(30,126,184,.22);border-radius:15px;background:#fff;color:#102B3B;box-shadow:0 8px 22px rgba(16,43,59,.08);font:inherit;font-size:25px;line-height:1;cursor:pointer;transition:transform .22s ease,background .22s ease,box-shadow .22s ease}
+.clinic-menu-toggle:hover{background:#EAF4FA;transform:translateY(-2px);box-shadow:0 12px 26px rgba(16,43,59,.13)}
+.clinic-menu-toggle:active{transform:scale(.94)}
+.clinic-menu-backdrop{position:fixed;inset:0;z-index:1098;background:rgba(11,28,39,.42);backdrop-filter:blur(4px);opacity:0;animation:clinic-backdrop-in .24s ease forwards}
+.clinic-menu-backdrop[hidden]{display:none!important}
+@keyframes clinic-backdrop-in{to{opacity:1}}
+.clinic-sidebar{position:fixed;z-index:1099;inset-block:0;inset-inline-start:auto;right:0;width:min(340px,88vw);height:100dvh;box-sizing:border-box;display:flex;flex-direction:column;gap:18px;padding:22px 16px 16px;overflow-y:auto;background:linear-gradient(160deg,#fff 0%,#F7F9FB 70%,#EAF4FA 100%);border-left:1px solid rgba(16,43,59,.1);border-radius:0 0 0 24px;box-shadow:-24px 0 70px rgba(16,43,59,.2);transform:translateX(105%) rotateY(-7deg);transform-origin:right center;visibility:hidden;transition:transform .34s cubic-bezier(.2,.8,.2,1),visibility .34s}
+.clinic-sidebar.is-open{transform:translateX(0) rotateY(0);visibility:visible}
+.clinic-sidebar-heading{display:flex;align-items:center;gap:11px;padding:4px 4px 18px;border-bottom:1px solid rgba(16,43,59,.1)}
+.clinic-sidebar-heading>div{display:grid;gap:3px;min-width:0}.clinic-sidebar-heading strong{font-size:16px;color:#102B3B}.clinic-sidebar-heading small{font-size:12px;color:#616161}
+.clinic-sidebar-mark{display:grid;place-items:center;flex:0 0 42px;width:42px;height:42px;border-radius:14px;background:#1E7EB8;color:#fff;font-size:23px;font-weight:800;box-shadow:0 8px 20px rgba(30,126,184,.24)}
+.clinic-menu-close{margin-inline-start:auto;flex:0 0 36px;width:36px;height:36px;border:0;border-radius:12px;background:#EAF4FA;color:#102B3B;font-size:25px;cursor:pointer}
+.admin-shell .clinic-sidebar .dashboard-tabs{display:flex;flex-direction:column;flex-wrap:nowrap;gap:7px;margin:0;padding:0;border:0;border-radius:0;background:transparent}
+.admin-shell .clinic-sidebar .dashboard-tab{display:flex;align-items:center;justify-content:flex-start;gap:9px;width:100%;min-height:46px;padding:11px 13px;border:1px solid transparent;border-radius:13px;background:transparent;color:#263746;text-align:right;font-weight:700;transition:background .2s ease,color .2s ease,transform .2s ease,border-color .2s ease}
+.admin-shell .clinic-sidebar .dashboard-tab::before{content:"";display:block;flex:0 0 5px;width:5px;height:5px;border-radius:50%;background:#9CB9C9;transition:height .2s ease,background .2s ease}
+.admin-shell .clinic-sidebar .dashboard-tab:hover{background:#EEF6FA;transform:translateX(-3px)}
+.admin-shell .clinic-sidebar .dashboard-tab[aria-selected="true"]{background:#E4F1F8;border-color:#C9E1EF;color:#102B3B;box-shadow:inset -3px 0 #1E7EB8}
+.admin-shell .clinic-sidebar .dashboard-tab[aria-selected="true"]::before{height:18px;border-radius:5px;background:#1E7EB8}
+.clinic-sidebar-footer{display:grid;gap:9px;margin-top:auto;padding-top:16px;border-top:1px solid rgba(16,43,59,.1)}
+.clinic-sidebar-logout{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:46px;border-radius:13px}
+.clinic-sidebar-site-link{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 12px;border:1px solid rgba(30,126,184,.16);border-radius:13px;background:#fff;color:#1E7EB8;text-decoration:none;font-weight:800;transition:background .2s ease,transform .2s ease}
+.clinic-sidebar-site-link:hover{background:#EAF4FA;transform:translateY(-1px)}
+.admin-shell .employee-section:not([hidden]){animation:clinic-panel-enter .42s cubic-bezier(.2,.75,.25,1) both;transform-origin:top center}
+@keyframes clinic-panel-enter{from{opacity:0;transform:perspective(1000px) rotateX(-4deg) translateY(13px) scale(.99);filter:blur(2px)}to{opacity:1;transform:perspective(1000px) rotateX(0) translateY(0) scale(1);filter:blur(0)}}
+@media(max-width:600px){.admin-shell .dashboard-top{align-items:center}.clinic-sidebar{width:min(330px,90vw);padding:18px 13px 13px}.clinic-menu-toggle{width:43px;height:43px;flex-basis:43px}}
+@media(prefers-reduced-motion:reduce){.clinic-sidebar,.clinic-menu-toggle,.clinic-sidebar *,.clinic-menu-backdrop,.admin-shell .employee-section:not([hidden]){animation:none!important;transition:none!important;filter:none!important;transform:none!important}}
+
+
+/* تطبيق الهوية البصرية الموحدة على لوحة الدكتور */
+body:has(#dashboardSection:not([hidden])){background:linear-gradient(135deg,#0B2433 0%,#102B3B 58%,#173E52 100%);padding:24px 18px 40px}
+.admin-shell:has(#dashboardSection:not([hidden])){width:min(1360px,100%)}
+.admin-shell .dashboard-panel{padding:0;border:0;background:transparent;box-shadow:none;overflow:visible}
+.admin-shell .dashboard-top{position:relative;display:flex;align-items:center;justify-content:flex-start;gap:18px;min-height:116px;margin:0 0 22px;padding:22px 26px;border:1px solid rgba(255,255,255,.12);border-radius:24px;background:linear-gradient(115deg,#102B3B 0%,#17455D 72%,#1E7EB8 150%);box-shadow:0 18px 40px rgba(3,18,27,.2);color:#fff;overflow:hidden}
+.admin-shell .dashboard-brand-copy{display:grid;gap:2px;min-width:0}
+.admin-shell .dashboard-brand-title{display:flex;align-items:center;gap:9px;color:#fff;font-size:clamp(19px,2.5vw,26px);font-weight:800;line-height:1.4}
+.admin-shell .dashboard-brand-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,.14);color:#BFE7FF;font-size:20px}
+.admin-shell .dashboard-brand-subtitle{color:#BFE7FF;font-size:13px;font-weight:700}
+.admin-shell .dashboard-welcome{margin:5px 0 0;color:rgba(255,255,255,.78);font-size:12px}
+.admin-shell .dashboard-welcome span{color:#fff;font-weight:800}
+.admin-shell .dashboard-header-symbol{display:grid;place-items:center;margin-inline-start:auto;flex:0 0 62px;width:62px;height:62px;border:1px solid rgba(255,255,255,.18);border-radius:20px;background:rgba(255,255,255,.08);color:#BFE7FF;font-size:34px;transform:rotate(-8deg)}
+.admin-shell .dashboard-top .clinic-menu-toggle{border-color:rgba(255,255,255,.18);background:#fff;color:#102B3B}
+.admin-shell .employee-section:not([hidden]){margin:0 0 22px;padding:clamp(18px,3vw,30px);border:1px solid #D7E1E8;border-top:1px solid #D7E1E8;border-radius:22px;background:#fff;box-shadow:0 14px 34px rgba(3,18,27,.12);color:#263746}
+.admin-shell .employee-section-heading h3,.admin-shell .employee-section-heading h4,.admin-shell .employee-list-heading h4{color:#102B3B}
+.admin-shell .employee-section-heading{padding-bottom:14px;border-bottom:1px solid #E3EBF0}
+.admin-shell .employee-section-heading h3{font-size:clamp(18px,2vw,23px)}
+.admin-shell .schedule-date-label{background:#EAF4FA;color:#17455D}
+.admin-shell .schedule-filter-button{border-color:#D7E1E8;color:#102B3B;background:#F7F9FB}
+.admin-shell .home-add-booking-button,.admin-shell .primary-button{background:#1E7EB8;color:#fff}
+.admin-shell .home-add-booking-button:hover,.admin-shell .primary-button:hover{background:#176A9D}
+.admin-shell .dashboard-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 24px}
+.admin-shell .dashboard-stat-card{display:flex;align-items:center;gap:15px;min-width:0;padding:19px 20px;border:1px solid #D7E7F0;border-radius:18px;background:linear-gradient(135deg,#fff 0%,#F7FBFD 100%);box-shadow:0 8px 22px rgba(16,43,59,.045)}
+.admin-shell .dashboard-stat-icon{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border-radius:15px;background:#EAF4FA;color:#1E7EB8;font-size:25px;font-weight:800}
+.admin-shell .dashboard-stat-completed .dashboard-stat-icon{background:#E7F6EC;color:#21834A}
+.admin-shell .dashboard-stat-card p{margin:0;color:#526674;font-size:13px;font-weight:700}
+.admin-shell .dashboard-stat-card strong{display:block;margin:0;color:#102B3B;font-size:clamp(27px,3vw,34px);font-weight:800;line-height:1.35;font-variant-numeric:tabular-nums}
+.admin-shell .dashboard-stat-card small{color:#1E7EB8;font-size:11px;font-weight:700}
+.admin-shell .dashboard-stat-completed small{color:#21834A}
+.admin-shell .schedule-status-legend button{border-color:#D7E1E8;color:#304654}
+.admin-shell .schedule-status-legend button.is-active{outline:2px solid #1E7EB8;outline-offset:1px}
+.admin-shell .schedule-card,.admin-shell .employee-card,.admin-shell .booking-card{border-color:#D7E1E8;border-radius:16px;box-shadow:0 5px 16px rgba(16,43,59,.045)}
+.admin-shell .schedule-card{position:relative;overflow:hidden}
+.admin-shell .schedule-card::before{content:"";position:absolute;inset-block:12px;inset-inline-start:0;width:4px;border-radius:0 5px 5px 0;background:#1E7EB8}
+.admin-shell .schedule-card.status-completed::before{background:#21834A}
+.admin-shell .schedule-card.status-waiting::before{background:#D99223}
+.admin-shell .schedule-card.status-postponed::before{background:#1E7EB8}
+.admin-shell .employee-form-card,.admin-shell .security-information,.admin-shell .accounts-content,.admin-shell .medical-patient-profile{border-radius:16px}
+@media(max-width:640px){body:has(#dashboardSection:not([hidden])){padding:12px 10px 26px}.admin-shell .dashboard-top{min-height:94px;gap:11px;padding:16px 14px;border-radius:18px}.admin-shell .dashboard-header-symbol{display:none}.admin-shell .dashboard-top .clinic-menu-toggle{flex-basis:42px;width:42px;height:42px}.admin-shell .dashboard-stats{gap:9px}.admin-shell .dashboard-stat-card{gap:9px;padding:13px 11px;border-radius:15px}.admin-shell .dashboard-stat-icon{flex-basis:36px;width:36px;height:36px;border-radius:11px;font-size:19px}.admin-shell .dashboard-stat-card p{font-size:11px}.admin-shell .dashboard-stat-card strong{font-size:25px}.admin-shell .dashboard-stat-card small{font-size:10px}.admin-shell .employee-section:not([hidden]){padding:16px 12px;border-radius:17px}}
+@media(max-width:380px){.admin-shell .dashboard-stats{grid-template-columns:1fr}.admin-shell .dashboard-stat-card{padding:12px 14px}}
+
+/* إصلاح الترويسة وتوزيع قياسات المريض في صف المواعيد */
+body:has(#dashboardSection:not([hidden])){padding:8px 18px 32px}
+.admin-shell .dashboard-top{display:flex;align-items:center;justify-content:flex-start;gap:16px;min-height:76px;margin:0 0 18px;padding:14px 18px}
+.admin-shell .dashboard-top .clinic-menu-toggle{position:relative;z-index:1;flex:0 0 44px;width:44px;height:44px}
+.admin-shell .dashboard-brand-copy{display:flex;align-items:center;min-width:0;flex:1;margin:0}
+.admin-shell .dashboard-welcome{margin:0!important;color:#fff;font-size:clamp(17px,2vw,23px);font-weight:800;line-height:1.5;overflow-wrap:anywhere}
+.booking-request-summary{display:grid;grid-template-columns:minmax(150px,1fr) minmax(210px,1.6fr) auto;align-items:center;gap:12px;padding:0 12px 0 38px!important;text-align:right}
+.booking-request-main{min-width:0;align-content:center}
+.booking-request-main small{line-height:1.6;overflow-wrap:anywhere}
+.booking-vitals{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:6px;min-width:0}
+.booking-vital-badge{display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:6px 9px;border:1px solid #D7E7F0;border-radius:10px;background:#F1F8FC;color:#17455D;font-size:12px;font-weight:800;line-height:1.45;white-space:normal}
+.booking-vital-badge>span:first-child{font-size:14px}
+@media(max-width:640px){
+ body:has(#dashboardSection:not([hidden])){padding:6px 10px 24px}
+ .admin-shell .dashboard-top{min-height:66px;gap:10px;padding:10px 12px;margin-bottom:14px;border-radius:16px}
+ .admin-shell .dashboard-top .clinic-menu-toggle{flex-basis:40px;width:40px;height:40px}
+ .admin-shell .dashboard-welcome{font-size:17px}
+ .booking-request-summary{grid-template-columns:minmax(0,1fr) auto;gap:9px;padding:0 8px 0 34px!important}
+ .booking-request-main{grid-column:1/-1;grid-row:1}
+ .booking-vitals{grid-column:1/-1;grid-row:2;justify-content:flex-start}
+ .booking-request-badge{grid-column:2;grid-row:1;align-self:start}
+ .booking-vital-badge{padding:5px 7px;font-size:11px}
+}
+@media(max-width:380px){.booking-request-summary{grid-template-columns:minmax(0,1fr)}.booking-request-main,.booking-vitals,.booking-request-badge{grid-column:1;grid-row:auto}.booking-request-badge{justify-self:start}}
+
+@media(max-width:640px){.booking-request-main{grid-column:1;grid-row:1}.booking-request-badge{grid-column:2;grid-row:1}}
+@media(max-width:380px){.booking-request-main,.booking-vitals,.booking-request-badge{grid-column:1;grid-row:auto}}
+
+
+/* ضبط كارت الدكتور: الدور بجوار الاسم، القياسات متجاورة، وحالة الكشف لا تزاحم زر التعديل. */
+.booking-request-summary {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto auto !important;
+  align-items: center;
+  gap: 8px !important;
+  padding: 0 10px 0 42px !important;
+  min-width: 0;
+}
+.booking-request-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 9px;
+  min-width: 0;
+}
+.booking-patient-name {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.booking-request-main small {
+  flex-basis: 100%;
+  min-width: 0;
+}
+.booking-vitals {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: nowrap !important;
+  gap: 5px;
+  min-width: 0;
+}
+.booking-vital-badge {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 5px 7px;
+  border-radius: 9px;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.booking-vital-badge > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.booking-vital-icon {
+  display: inline-flex;
+  flex: 0 0 18px;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+.booking-vital-icon svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+.booking-vital-pressure .booking-vital-icon { color: #D93036; }
+.booking-vital-weight .booking-vital-icon { color: #1E7EB8; }
+.booking-request-badge {
+  justify-self: end;
+  max-width: 94px;
+  padding: 5px 7px;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 1.3;
+}
+.booking-edit-pencil {
+  left: 7px;
+  right: auto;
+  top: 8px;
+  transform: none;
+  width: 27px;
+  height: 27px;
+}
+.booking-edit-pencil:hover,
+.booking-edit-pencil:focus-visible {
+  transform: none;
+}
+@media (max-width: 760px) {
+  .booking-request-summary {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 7px !important;
+    padding: 0 7px 0 36px !important;
+  }
+  .booking-request-main {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .booking-vitals {
+    grid-column: 1;
+    grid-row: 2;
+    flex-wrap: nowrap !important;
+    gap: 4px;
+  }
+  .booking-request-badge {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: center;
+    justify-self: end;
+  }
+  .booking-vital-badge {
+    gap: 3px;
+    padding: 4px 5px;
+    font-size: 10px;
+  }
+  .booking-vital-icon,
+  .booking-vital-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+  .booking-vital-icon { flex-basis: 16px; }
+  .booking-edit-pencil {
+    left: 6px;
+    top: 50%;
+  }
+}
+@media (max-width: 380px) {
+  .booking-request-summary {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+  }
+  .booking-request-main { grid-column: 1 / -1; }
+  .booking-vitals { grid-column: 1; }
+  .booking-request-badge { grid-column: 2; }
+}
+
+
+/* Manual booking form is shared by the home shortcut and Booking Management. */
+dialog.booking-create-dialog {
+  width: min(680px, calc(100% - 28px));
+  max-width: 680px;
+  max-height: min(88vh, 900px);
+  margin: auto;
+  padding: 18px;
+  border: 1px solid var(--border-color, rgba(17, 20, 26, .14));
+  border-radius: 18px;
+  background: var(--color-light, #F9F5F1);
+  color: var(--color-dark, #11141A);
+  overflow: auto;
+  box-sizing: border-box;
+}
+dialog.booking-create-dialog::backdrop {
+  background: rgba(17, 20, 26, .48);
+  backdrop-filter: blur(2px);
+}
+dialog.booking-create-dialog .booking-create-card {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+/* ملخص عهدة الموظف وتصفية الدكتور */
+.doctor-custody-panel{margin:18px 0;padding:16px;border:1px solid var(--color-border,#ddd);border-radius:14px;background:var(--color-light,#fff)}
+.doctor-custody-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.doctor-custody-heading h5{margin:0 0 6px}
+.doctor-custody-heading p{margin:0}
+.doctor-custody-status{display:grid;gap:10px;margin-top:12px}
+.doctor-custody-card{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:14px;border:1px solid var(--color-border,#ddd);border-radius:12px;background:#fff}
+.doctor-custody-card p{margin:5px 0 0}
+.doctor-custody-card strong{font-size:1.05rem}
+.doctor-custody-settle-button{background:#fff25c!important;color:#11141a!important;border:1px solid #d6ca42!important;font-weight:800}
+.doctor-custody-breakdown{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:10px}
+.doctor-custody-breakdown>div{padding:10px;border-radius:9px;background:#f9f5f1;display:grid;gap:5px}
+@media(max-width:600px){.doctor-custody-panel{padding:12px}.doctor-custody-heading{align-items:stretch;flex-direction:column}.doctor-custody-heading button{width:100%}.doctor-custody-card{align-items:stretch;flex-direction:column}}
+
+.doctor-settlement-history-card{display:grid;gap:10px;padding:14px;margin:10px 0;border:1px solid var(--color-border,#ddd);border-radius:12px;background:#fff}
+.doctor-settlement-history-head{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.doctor-settlement-history-card p{margin:0}
+.doctor-settlement-history-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.doctor-settlement-history-totals>div{display:grid;gap:5px;padding:10px;border-radius:9px;background:#f9f5f1}
+.doctor-settlement-history-totals span{font-size:.9rem;color:var(--color-muted,#666)}
+@media(max-width:560px){.doctor-settlement-history-totals{grid-template-columns:1fr}}

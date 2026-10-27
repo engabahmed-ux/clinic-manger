@@ -1,0 +1,36 @@
+name: Validate custody changes
+
+on:
+  push:
+    branches:
+      - feature/clinic-settings-logs
+    paths:
+      - "src/staff.js"
+      - "src/admin.js"
+      - "functions/api/doctor/custody.js"
+      - "staff.html"
+      - "staff.css"
+      - ".github/workflows/validate-custody.yml"
+  pull_request:
+    paths:
+      - "src/staff.js"
+      - "src/admin.js"
+      - "functions/api/doctor/custody.js"
+      - "staff.html"
+      - "staff.css"
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Check JavaScript syntax
+        run: |
+          node --check src/staff.js
+          node --check src/admin.js
+          node --check functions/api/doctor/custody.js
