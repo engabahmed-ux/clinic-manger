@@ -1,7 +1,7 @@
+
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const EXPECTED_PROJECT_ID = "clinics-manger";
 const STAFF_COLLECTION = "clinicStaff";
-const PATIENTS_COLLECTION = "clinicPatients";
 
 const FIREBASE_LOOKUP_URL =
   "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
@@ -13,11 +13,15 @@ const PERMISSION_KEYS = [
   "bookings",
   "patients",
   "medicalRecords",
-  "settings",
-  "accounts"
+  "settings"
 ];
 
 const PERMISSION_VALUES = ["none", "view", "edit"];
+
+// كاش توكن Google على مستوى الـ isolate (صالح 55 دقيقة)
+// بدل طلب توكن جديد مع كل طلب API.
+let cachedAccessToken = null;
+let cachedAccessTokenExpiry = 0;
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -91,7 +95,13 @@ function parseServiceAccount(env) {
 }
 
 async function createGoogleAccessToken(serviceAccount) {
-  const now = Math.floor(Date.now() / 1000);
+  const nowMs = Date.now();
+
+  if (cachedAccessToken && nowMs < cachedAccessTokenExpiry) {
+    return cachedAccessToken;
+  }
+
+  const now = Math.floor(nowMs / 1000);
 
   const header = {
     alg: "RS256",
@@ -159,6 +169,9 @@ async function createGoogleAccessToken(serviceAccount) {
   if (!result.access_token) {
     throw new Error("Google access token missing.");
   }
+
+  cachedAccessToken = result.access_token;
+  cachedAccessTokenExpiry = nowMs + 55 * 60 * 1000;
 
   return result.access_token;
 }
@@ -304,40 +317,6 @@ async function getStaffRecord(uid, env) {
   };
 }
 
-async function getPatientRecord(uid, env) {
-  const serviceAccount = parseServiceAccount(env);
-  const accessToken = await createGoogleAccessToken(serviceAccount);
-  const url =
-    "https://firestore.googleapis.com/v1/projects/" +
-    `${encodeURIComponent(serviceAccount.project_id)}/databases/(default)/documents/` +
-    `${PATIENTS_COLLECTION}/${encodeURIComponent(uid)}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: { "Authorization": `Bearer ${accessToken}` }
-  });
-
-  if (response.status === 404) return { exists: false };
-  if (!response.ok) {
-    const details = await response.text();
-    console.error("Patient document lookup failed:", response.status, details.slice(0, 500));
-    throw new Error("Unable to verify patient record.");
-  }
-
-  const document = await response.json();
-  const fields = document.fields || {};
-  const storedUid = fields.uid?.stringValue || "";
-  const role = fields.role?.stringValue || "";
-  const active = fields.active?.booleanValue === true;
-
-  if (storedUid !== uid || role !== "patient") return { exists: false };
-  return {
-    exists: true,
-    active,
-    displayName: fields.displayName?.stringValue || ""
-  };
-}
-
 async function handlePost({ request, env }) {
   if (!env.FIREBASE_API_KEY) {
     return jsonResponse(
@@ -417,32 +396,23 @@ async function handlePost({ request, env }) {
   try {
     const staff = await getStaffRecord(uid, env);
 
-    if (staff.exists) {
-      if (!staff.active) {
-        return jsonResponse(
-          { message: "حساب الموظف غير نشط. تواصل مع الدكتور." },
-          403
-        );
-      }
-
+    if (!staff.exists) {
       return jsonResponse({
-        accountType: "staff",
-        displayName: staff.displayName,
-        permissions: staff.permissions
+        accountType: "patient"
       });
     }
 
-    const patient = await getPatientRecord(uid, env);
-    if (!patient.exists || !patient.active) {
+    if (!staff.active) {
       return jsonResponse(
-        { message: "هذا الحساب غير مسجل كمريضة معتمدة في العيادة." },
+        { message: "حساب الموظف غير نشط. تواصل مع الدكتور." },
         403
       );
     }
 
     return jsonResponse({
-      accountType: "patient",
-      displayName: patient.displayName
+      accountType: "staff",
+      displayName: staff.displayName,
+      permissions: staff.permissions
     });
   } catch (error) {
     console.error("Account type resolution failed:", error);
