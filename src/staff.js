@@ -285,8 +285,8 @@ function renderArchive(){
   if(!archiveList)return;
   archiveList.replaceChildren();
   const day=archiveDateFilter.value,q=$("#staffArchiveSearch")?.value.trim().toLocaleLowerCase("ar")||"";
-  const rows=archiveLoadedRows.filter(b=>b.isArchived===true||b.isArchived==="true"||b.status==="archived"||b.status==="cancelled").filter(b=>(!day||String(b.appointmentDate||"").slice(0,10)===day)&&(!q||`${b.patientName||""} ${b.patientPhone||""} ${b.service||""}`.toLocaleLowerCase("ar").includes(q))).sort((a,b)=>(Date.parse(b.updatedAt||b.createdAt||"")||0)-(Date.parse(a.updatedAt||a.createdAt||"")||0));
-  if(!rows.length){archiveList.append(empty(archiveLoadedOnce?"لا توجد حجوزات مؤرشفة مطابقة في الصفحات المحمّلة. اضغط إظهار المزيد للبحث في حجوزات أقدم.":"جارٍ تحميل الأرشيف..."))}
+  const rows=archiveLoadedRows.filter(b=>(!day||String(b.appointmentDate||"").slice(0,10)===day)&&(!q||`${b.patientName||""} ${b.patientPhone||""} ${b.service||""}`.toLocaleLowerCase("ar").includes(q))).sort((a,b)=>(Date.parse(b.archivedAt||b.updatedAt||b.createdAt||"")||0)-(Date.parse(a.archivedAt||a.updatedAt||a.createdAt||"")||0));
+  if(!rows.length){archiveList.append(empty(!archiveLoadedOnce?"جارٍ تحميل الأرشيف...":archiveHasMore?"لا توجد نتائج مطابقة في الدفعة الحالية؛ اضغط إظهار المزيد لمتابعة البحث.":"لا توجد حجوزات أو مواعيد مؤرشفة تطابق الفلتر الحالي."))}
   else for(const booking of rows)archiveList.append(makeAppointmentCard(booking,true));
   if(archiveLoadMore){archiveLoadMore.hidden=!archiveHasMore;archiveLoadMore.disabled=archiveLoading||!archiveHasMore;archiveLoadMore.textContent=archiveLoading?"جارٍ تحميل المزيد...":"إظهار المزيد"}
 }
