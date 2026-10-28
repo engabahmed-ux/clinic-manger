@@ -300,6 +300,7 @@ let verificationRequestNumber = 0;
 let allBookings = [];
 let bookingsLoaded = false;
 let bookingSyncCursor = new Date(Date.now() - 1000).toISOString();
+let bookingDataUserUid = "";
 let currentAccountAccess = null;
 
 function showMessage(element, message, type = "error") {
@@ -2165,10 +2166,25 @@ onAuthStateChanged(auth, async (user) => {
   const requestNumber = ++verificationRequestNumber;
 
   if (!user) {
+    bookingDataUserUid = "";
+    bookingsLoaded = false;
+    allBookings = [];
+    bookingSyncCursor = new Date(Date.now() - 1000).toISOString();
+    fallbackPollDelayMs = 60000;
+    nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
     clinicRealtime.close();
     showLogin();
     setLoginBusy(false);
     return;
+  }
+
+  if (bookingDataUserUid !== user.uid) {
+    bookingDataUserUid = user.uid;
+    bookingsLoaded = false;
+    allBookings = [];
+    bookingSyncCursor = new Date(Date.now() - 1000).toISOString();
+    fallbackPollDelayMs = 60000;
+    nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
   }
 
   clinicRealtime.connect();
