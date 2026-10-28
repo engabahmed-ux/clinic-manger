@@ -109,7 +109,7 @@ async function verifyUser(request, env) {
   }
   const fields = doc.fields || {};
   const role = fields.role?.stringValue || "";
-  const active = fields.active?.booleanValue !== false;
+  const active = fields.active?.booleanValue === true;
   const permissions = decodeFields(fields.permissions?.mapValue?.fields || {});
   if (role !== "staff" || !active) return { ok: false, status: 403, message: "هذا الحساب ليس حساب موظف نشطًا." };
   return { ok: true, accountType: "staff", uid: user.localId, displayName: fields.displayName?.stringValue || user.email || "موظف", permission: permissions.settings || "none" };
