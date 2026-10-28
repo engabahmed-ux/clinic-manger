@@ -1301,6 +1301,7 @@ async function loadBookings() {
   try {
     const result = await bookingApiRequest("list");
     allBookings = Array.isArray(result.bookings) ? result.bookings : [];
+    if (typeof result.syncCursor === "string") bookingSyncCursor = result.syncCursor;
     bookingsLoaded = true;
     fallbackPollDelayMs = 60000;
     nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
@@ -1351,7 +1352,7 @@ async function syncBookingChanges({ fallback = false } = {}) {
       allBookings = [...merged.values()];
     }
 
-    bookingSyncCursor = checkpoint;
+    bookingSyncCursor = typeof result.nextSince === "string" ? result.nextSince : checkpoint;
     const changed = JSON.stringify(allBookings) !== previousSnapshot;
     fallbackPollDelayMs = fallback && !changed
       ? Math.min(fallbackPollDelayMs * 2, 300000)
