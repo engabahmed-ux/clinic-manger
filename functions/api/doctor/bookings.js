@@ -476,6 +476,40 @@ async function listBookings(projectId, accessToken) {
     .sort((a, b) => (Date.parse(a.createdAt || "") || 0) - (Date.parse(b.createdAt || "") || 0));
 }
 
+async function listBookingChanges(projectId, accessToken, since) {
+  const result = await firestoreRequest(
+    projectId,
+    accessToken,
+    ":runQuery",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: BOOKINGS_COLLECTION }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "updatedAt" },
+              op: "GREATER_THAN_OR_EQUAL",
+              value: { stringValue: since }
+            }
+          },
+          orderBy: [
+            { field: { fieldPath: "updatedAt" }, direction: "ASCENDING" }
+          ]
+        }
+      })
+    }
+  );
+
+  return (Array.isArray(result) ? result : [])
+    .filter((item) => item.document)
+    .map((item) => decodeBooking(item.document))
+    .sort((a, b) =>
+      (Date.parse(a.updatedAt || "") || 0) - (Date.parse(b.updatedAt || "") || 0) ||
+      a.id.localeCompare(b.id)
+    );
+}
+
 
 async function isFinancialPeriodClosed(projectId, accessToken, dateValue, employeeUid = "") {
   const date = String(dateValue || "").slice(0,10);
@@ -871,10 +905,10 @@ async function onRequestInternal(context) {
 
   const action = data?.action;
 
-  if (action === "list" && !["view","edit"].includes(access.permission)) return jsonResponse({ message:"لم تمنح صلاحية عرض الحجوزات." },403);
+  if (["list", "changesSince"].includes(action) && !["view","edit"].includes(access.permission)) return jsonResponse({ message:"لم تمنح صلاحية عرض الحجوزات." },403);
   if (action === "listDailyAccounts" && !["view","edit"].includes(access.accountsPermission)) return jsonResponse({ message:"لم تمنح صلاحية عرض حسابات اليوم." },403);
   if (action === "updatePaidAmount" && access.accountsPermission !== "edit") return jsonResponse({ message:"لا تملك صلاحية تعديل المدفوعات." },403);
-  if (!["list","listDailyAccounts","updatePaidAmount"].includes(action) && access.permission !== "edit") return jsonResponse({ message:"صلاحية العرض فقط؛ لا يمكنك تعديل الحجوزات." },403);
+  if (!["list","changesSince","listDailyAccounts","updatePaidAmount"].includes(action) && access.permission !== "edit") return jsonResponse({ message:"صلاحية العرض فقط؛ لا يمكنك تعديل الحجوزات." },403);
 
   try {
     switch (action) {
@@ -930,6 +964,29 @@ async function onRequestInternal(context) {
         const booking = decodeBooking(updated);
         return jsonResponse({ booking:{ id:booking.id, paidAmount:booking.paidAmount, paymentEnteredByUid:booking.paymentEnteredByUid, paymentEnteredByName:booking.paymentEnteredByName } });
       }
+      case "changesSince": {
+        const since = typeof data.since === "string" ? data.since : "";
+        if (!since || since.length > 40 || Number.isNaN(Date.parse(since))) {
+          return jsonResponse({ message: "وقت مزامنة الحجوزات غير صحيح." }, 400);
+        }
+        let bookings = await listBookingChanges(
+          serviceAccount.project_id,
+          accessToken,
+          since
+        );
+        bookings = bookings.map(booking => {
+          if (booking.status !== "completed" || Number(booking.paidAmount) > 0) return booking;
+          const fee = Number(booking.completedFee) || Number(booking.servicePrice) || 0;
+          return fee > 0 ? { ...booking, paidAmount: fee.toFixed(2) } : booking;
+        });
+        return jsonResponse({
+          bookings,
+          accountType: access.accountType,
+          permission: access.permission,
+          since
+        });
+      }
+
       case "list": {
         let bookings = await listBookings(
           serviceAccount.project_id,
