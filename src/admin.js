@@ -128,9 +128,26 @@ const app =
 
 const auth = getAuth(app);
 let realtimeConnected = false;
+let realtimeEverConnected = false;
+let bookingRefreshTimer = null;
+let fallbackPollDelayMs = 60000;
+let nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
+
+function scheduleBookingRefresh() {
+  if (bookingRefreshTimer) clearTimeout(bookingRefreshTimer);
+  bookingRefreshTimer = setTimeout(() => {
+    bookingRefreshTimer = null;
+    if (isLoadingBookings) {
+      scheduleBookingRefresh();
+      return;
+    }
+    if (typeof loadBookings === "function") loadBookings();
+  }, 150);
+}
+
 const clinicRealtime = createClinicRealtime(auth, event => {
   if (event.startsWith("booking_")) {
-    if (typeof loadBookings === "function" && (!currentAccountAccess?.accountType || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings))) loadBookings();
+    if (typeof loadBookings === "function" && (!currentAccountAccess?.accountType || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings))) scheduleBookingRefresh();
   } else if (event === "accounts_changed" || event === "custody_changed") {
     if (doctorAccountsSection && !doctorAccountsSection.hidden) {
       if (event === "accounts_changed") {
@@ -154,7 +171,13 @@ const clinicRealtime = createClinicRealtime(auth, event => {
       }).catch(() => {});
     if (!employeeManagementSection?.hidden && typeof loadEmployees === "function") loadEmployees();
   }
-}, connected => { realtimeConnected = connected; });
+}, connected => {
+  const wasConnected = realtimeConnected;
+  realtimeConnected = connected;
+  if (!connected) nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
+  if (connected && wasConnected === false && realtimeEverConnected && typeof loadBookings === "function") loadBookings();
+  if (connected) realtimeEverConnected = true;
+});
 
 const $ = (selector, parent = document) =>
   parent.querySelector(selector);
@@ -1261,13 +1284,28 @@ function hasOpenBookingCard() {
   );
 }
 
-async function loadBookings() {
+async function loadBookings({ fallback = false } = {}) {
   if (isLoadingBookings || !bookingList) return;
+  if (bookingRefreshTimer) {
+    clearTimeout(bookingRefreshTimer);
+    bookingRefreshTimer = null;
+  }
   isLoadingBookings = true;
   hideMessage(bookingListMessage); hideMessage(dailyAppointmentsMessage);
   try {
     const result = await bookingApiRequest("list");
-    allBookings = Array.isArray(result.bookings) ? result.bookings : [];
+    const nextBookings = Array.isArray(result.bookings) ? result.bookings : [];
+    if (fallback) {
+      const previousSnapshot = JSON.stringify(allBookings);
+      const nextSnapshot = JSON.stringify(nextBookings);
+      fallbackPollDelayMs = previousSnapshot === nextSnapshot
+        ? Math.min(fallbackPollDelayMs * 2, 300000)
+        : 60000;
+    } else {
+      fallbackPollDelayMs = 60000;
+    }
+    nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
+    allBookings = nextBookings;
     openDoctorScheduleCalendar?.refresh?.();
     updatePendingBookingBadge();
     renderPendingBookings(); renderDailyAppointments(); renderDoctorArchive();
@@ -1287,7 +1325,10 @@ setInterval(() => {
   if (document.hidden || !auth.currentUser) return;
   const isStaff = currentAccountAccess?.accountType === "staff";
   if (isStaff && !["view", "edit"].includes(currentAccountAccess?.permissions?.bookings)) return;
-  if (!realtimeConnected && !hasOpenBookingCard()) loadBookings();
+  if (!realtimeConnected && Date.now() >= nextFallbackPollAt && !hasOpenBookingCard()) {
+    nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
+    loadBookings({ fallback: true });
+  }
   if (Date.now() - lastDashboardRefreshAt >= 15000) {
     lastDashboardRefreshAt = Date.now();
     // Account panels refresh when opened and after their own save/actions.
@@ -1297,7 +1338,10 @@ setInterval(() => {
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && auth.currentUser) {
     const isStaff = currentAccountAccess?.accountType === "staff";
-    if ((!realtimeConnected && (!isStaff || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings))) && !hasOpenBookingCard()) loadBookings();
+    if ((!realtimeConnected && (!isStaff || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings))) && !hasOpenBookingCard()) {
+      nextFallbackPollAt = Date.now();
+      loadBookings({ fallback: true });
+    }
     lastDashboardRefreshAt = Date.now();
     // Account panels refresh when opened and after their own save/actions.
     if (!employeeManagementSection?.hidden && !isStaff) loadEmployees();
