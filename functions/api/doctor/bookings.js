@@ -510,6 +510,53 @@ async function listBookingChanges(projectId, accessToken, since) {
     );
 }
 
+async function listCompletedBookingsForDate(projectId, accessToken, date) {
+  const target = new Date(`${date}T00:00:00.000Z`);
+  const lowerBound = new Date(target.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const upperBound = new Date(target.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  const result = await firestoreRequest(
+    projectId,
+    accessToken,
+    ":runQuery",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: BOOKINGS_COLLECTION }],
+          where: {
+            compositeFilter: {
+              op: "AND",
+              filters: [
+                {
+                  fieldFilter: {
+                    field: { fieldPath: "completedAt" },
+                    op: "GREATER_THAN_OR_EQUAL",
+                    value: { stringValue: lowerBound }
+                  }
+                },
+                {
+                  fieldFilter: {
+                    field: { fieldPath: "completedAt" },
+                    op: "LESS_THAN",
+                    value: { stringValue: upperBound }
+                  }
+                }
+              ]
+            }
+          },
+          orderBy: [
+            { field: { fieldPath: "completedAt" }, direction: "ASCENDING" }
+          ]
+        }
+      })
+    }
+  );
+
+  return (Array.isArray(result) ? result : [])
+    .filter((item) => item.document)
+    .map((item) => decodeBooking(item.document));
+}
+
 
 async function isFinancialPeriodClosed(projectId, accessToken, dateValue, employeeUid = "") {
   const date = String(dateValue || "").slice(0,10);
@@ -915,7 +962,7 @@ async function onRequestInternal(context) {
       case "listDailyAccounts": {
         const date = typeof data.date === "string" ? data.date : "";
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
-        const bookings = await listBookings(serviceAccount.project_id, accessToken);
+        const bookings = await listCompletedBookingsForDate(serviceAccount.project_id, accessToken, date);
         // Daily accounts include only visits completed on the selected Cairo-local date.
         // Exclude archived/cancelled records even if legacy data still has completion fields.
         const daily = bookings.filter(b =>
