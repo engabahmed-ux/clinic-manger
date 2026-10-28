@@ -1016,6 +1016,7 @@ async function onRequestInternal(context) {
         if (!since || since.length > 40 || Number.isNaN(Date.parse(since))) {
           return jsonResponse({ message: "وقت مزامنة الحجوزات غير صحيح." }, 400);
         }
+        const nextSince = new Date(Date.now() - 1000).toISOString();
         let bookings = await listBookingChanges(
           serviceAccount.project_id,
           accessToken,
@@ -1030,11 +1031,13 @@ async function onRequestInternal(context) {
           bookings,
           accountType: access.accountType,
           permission: access.permission,
-          since
+          since,
+          nextSince
         });
       }
 
       case "list": {
+        const syncCursor = new Date(Date.now() - 1000).toISOString();
         let bookings = await listBookings(
           serviceAccount.project_id,
           accessToken
@@ -1056,7 +1059,8 @@ async function onRequestInternal(context) {
         return jsonResponse({
           bookings,
           accountType: access.accountType,
-          permission: access.permission
+          permission: access.permission,
+          syncCursor
         });
       }
 
