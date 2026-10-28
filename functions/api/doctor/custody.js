@@ -186,7 +186,7 @@ export async function onRequestPost(context) {
   let input = {};
   try { input = await context.request.clone().json(); } catch {}
   const result = await onRequestPostInternal(context);
-  if (result.ok && input.action && input.action !== "status") {
+  if (result.ok && input.action && !["status", "doctorStatus"].includes(input.action)) {
     const notification = publishClinicRealtime(context.env, "custody_changed");
     if (typeof context.waitUntil === "function") context.waitUntil(notification);
     else void notification;
