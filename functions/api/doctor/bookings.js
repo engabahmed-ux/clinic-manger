@@ -455,6 +455,102 @@ function validateBooking(data, partial = false) {
 }
 
 
+async function listArchivePage(projectId, accessToken, cursor = null, pageSize = 10) {
+  const limit = Math.max(5, Math.min(20, Number(pageSize) || 10));
+  const documentName = id => `projects/${projectId}/databases/(default)/documents/${BOOKINGS_COLLECTION}/${id}`;
+  const run = async (kind) => {
+    if (cursor && !cursor[kind]) return [];
+    const saved = cursor?.[kind] || null;
+    const query = {
+      from: [{ collectionId: BOOKINGS_COLLECTION }],
+      orderBy: kind === "primary"
+        ? [
+            { field: { fieldPath: "updatedAt" }, direction: "DESCENDING" },
+            { field: { fieldPath: "__name__" }, direction: "DESCENDING" }
+          ]
+        : [
+            { field: { fieldPath: "archivedRescheduleHistory" }, direction: "ASCENDING" },
+            { field: { fieldPath: "updatedAt" }, direction: "DESCENDING" },
+            { field: { fieldPath: "__name__" }, direction: "DESCENDING" }
+          ],
+      limit
+    };
+    if (kind === "primary") {
+      query.where = {
+        compositeFilter: {
+          op: "OR",
+          filters: [
+            { fieldFilter: { field: { fieldPath: "isArchived" }, op: "EQUAL", value: { stringValue: "true" } } },
+            { fieldFilter: { field: { fieldPath: "status" }, op: "IN", value: { arrayValue: { values: [{ stringValue: "archived" }, { stringValue: "cancelled" }] } } } }
+          ]
+        }
+      };
+      if (saved) query.startAt = { before: false, values: [
+        { stringValue: saved.updatedAt || "" },
+        { referenceValue: documentName(saved.id) }
+      ] };
+    } else {
+      query.where = { fieldFilter: {
+        field: { fieldPath: "archivedRescheduleHistory" },
+        op: "NOT_EQUAL",
+        value: { stringValue: "[]" }
+      } };
+      if (saved) query.startAt = { before: false, values: [
+        { stringValue: saved.history || "[]" },
+        { stringValue: saved.updatedAt || "" },
+        { referenceValue: documentName(saved.id) }
+      ] };
+    }
+    const result = await firestoreRequest(projectId, accessToken, ":runQuery", {
+      method: "POST",
+      body: JSON.stringify({ structuredQuery: query })
+    });
+    return (Array.isArray(result) ? result : []).filter(item => item.document).map(item => item.document);
+  };
+  const [primaryDocs, historyDocs] = await Promise.all([run("primary"), run("history")]);
+  const cursorFor = (kind, docs) => {
+    if (docs.length < limit) return null;
+    const doc = docs[docs.length - 1], booking = decodeBooking(doc);
+    return kind === "primary"
+      ? { id: booking.id, updatedAt: booking.updatedAt }
+      : { id: booking.id, updatedAt: booking.updatedAt, history: booking.archivedRescheduleHistory || "[]" };
+  };
+  const rows = [];
+  for (const doc of primaryDocs) {
+    const booking = decodeBooking(doc);
+    if (booking.isArchived || ["archived", "cancelled"].includes(booking.status)) {
+      rows.push({ ...booking, isArchivedOccurrence: false });
+    }
+  }
+  for (const doc of historyDocs) {
+    const booking = decodeBooking(doc);
+    let history = [];
+    try { history = JSON.parse(booking.archivedRescheduleHistory || "[]"); } catch {}
+    if (!Array.isArray(history)) continue;
+    for (const entry of history) {
+      if (!entry || !/^\\d{4}-\\d{2}-\\d{2}$/.test(entry.fromDate || "") || !/^\\d{4}-\\d{2}-\\d{2}$/.test(entry.toDate || "")) continue;
+      rows.push({
+        ...booking,
+        appointmentDate: entry.fromDate,
+        queueNumber: entry.fromQueueNumber || booking.queueNumber,
+        status: "postponed",
+        isArchived: true,
+        isArchivedOccurrence: true,
+        archivedAt: entry.archivedAt || "",
+        archivedByUid: entry.archivedByUid || "",
+        archivedByName: entry.archivedByName || "",
+        rescheduleToDate: entry.toDate
+      });
+    }
+  }
+  rows.sort((a, b) =>
+    (Date.parse(b.archivedAt || b.updatedAt || b.createdAt || "") || 0) -
+    (Date.parse(a.archivedAt || a.updatedAt || a.createdAt || "") || 0)
+  );
+  const nextCursor = { primary: cursorFor("primary", primaryDocs), history: cursorFor("history", historyDocs) };
+  return { rows, nextCursor: nextCursor.primary || nextCursor.history ? nextCursor : null };
+}
+
 async function listBookings(projectId, accessToken) {
   const result = await firestoreRequest(
     projectId,
@@ -952,10 +1048,10 @@ async function onRequestInternal(context) {
 
   const action = data?.action;
 
-  if (["list", "changesSince"].includes(action) && !["view","edit"].includes(access.permission)) return jsonResponse({ message:"لم تمنح صلاحية عرض الحجوزات." },403);
+  if (["list", "changesSince", "archiveList"].includes(action) && !["view","edit"].includes(access.permission)) return jsonResponse({ message:"لم تمنح صلاحية عرض الحجوزات." },403);
   if (action === "listDailyAccounts" && !["view","edit"].includes(access.accountsPermission)) return jsonResponse({ message:"لم تمنح صلاحية عرض حسابات اليوم." },403);
   if (action === "updatePaidAmount" && access.accountsPermission !== "edit") return jsonResponse({ message:"لا تملك صلاحية تعديل المدفوعات." },403);
-  if (!["list","changesSince","listDailyAccounts","updatePaidAmount"].includes(action) && access.permission !== "edit") return jsonResponse({ message:"صلاحية العرض فقط؛ لا يمكنك تعديل الحجوزات." },403);
+  if (!["list","changesSince","archiveList","listDailyAccounts","updatePaidAmount"].includes(action) && access.permission !== "edit") return jsonResponse({ message:"صلاحية العرض فقط؛ لا يمكنك تعديل الحجوزات." },403);
 
   try {
     switch (action) {
@@ -1011,6 +1107,20 @@ async function onRequestInternal(context) {
         const booking = decodeBooking(updated);
         return jsonResponse({ booking:{ id:booking.id, paidAmount:booking.paidAmount, paymentEnteredByUid:booking.paymentEnteredByUid, paymentEnteredByName:booking.paymentEnteredByName } });
       }
+      case "archiveList": {
+        let cursor = data.cursor && typeof data.cursor === "object" && !Array.isArray(data.cursor) ? data.cursor : null;
+        if (cursor) {
+          for (const key of ["primary", "history"]) {
+            const item = cursor[key];
+            if (item && (!/^[A-Za-z0-9_-]{1,150}$/.test(String(item.id || "")) || String(item.updatedAt || "").length > 40)) {
+              return jsonResponse({ message: "مؤشر صفحة الأرشيف غير صحيح." }, 400);
+            }
+          }
+        }
+        const page = await listArchivePage(serviceAccount.project_id, accessToken, cursor, data.limit);
+        return jsonResponse({ rows: page.rows, nextCursor: page.nextCursor, hasMore: !!page.nextCursor });
+      }
+
       case "changesSince": {
         const since = typeof data.since === "string" ? data.since : "";
         if (!since || since.length > 40 || Number.isNaN(Date.parse(since))) {
