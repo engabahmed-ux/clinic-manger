@@ -169,6 +169,7 @@ async function loadStaffCustody(){
       custodyStateElement.textContent="لا توجد عهدة نشطة";
       message(custodyMessageElement,"لا توجد عهدة نشطة حاليًا.",true);
     }
+    renderStaffAccountsHandoverNote(selectedDate);
   }catch(e){message(custodyMessageElement,e.message||"تعذر تحميل العهدة.",true)}
 }
 function message(el,text,error=false){if(!el)return;el.textContent=text;el.hidden=!text;el.classList.toggle("error",error)}
@@ -285,6 +286,18 @@ async function dailyAccountsRequest(action,data={}){const user=auth.currentUser;
 function staffMoney(value){return new Intl.NumberFormat("ar-EG",{maximumFractionDigits:2}).format(Number(value)||0)+" ج.م"}
 let loadingDailyAccounts=false,dailyAccountsRefreshRequested=false;async function loadDailyAccounts(){if(loadingDailyAccounts){dailyAccountsRefreshRequested=true;return}if(!accountsSection||accountsSection.hidden||!["view","edit"].includes(currentAccount?.permissions?.accounts))return;loadingDailyAccounts=true;const date=accountsDate?.value||todayISO();if(accountsDate)accountsDate.value=date;if(accountsMonth&&!accountsMonth.value)accountsMonth.value=date.slice(0,7);message(accountsMessage,"");if(accountsBookings)accountsBookings.replaceChildren(empty("جارٍ تحميل حسابات اليوم..."));try{const [bookingResult,expenseResult]=await Promise.all([bookingsRequest("listDailyAccounts",{date}),dailyAccountsRequest("listDailyExpenses",{date})]);const rows=Array.isArray(bookingResult.bookings)?bookingResult.bookings:[];dailyExpenses=Array.isArray(expenseResult.expenses)?expenseResult.expenses:[];renderDailyAccounts(rows);await loadMonthlyExpenses();await loadStaffCustody()}catch(error){if(accountsBookings)accountsBookings.replaceChildren(empty(error.message||"تعذر تحميل الحسابات."));message(accountsMessage,error.message||"تعذر تحميل حسابات اليوم.",true)}finally{loadingDailyAccounts=false;if(dailyAccountsRefreshRequested){dailyAccountsRefreshRequested=false;void loadDailyAccounts()}}}
 async function loadMonthlyExpenses(){if(!monthlyExpensesList||!["view","edit"].includes(currentAccount?.permissions?.accounts))return;const month=accountsMonth?.value||todayISO().slice(0,7);if(accountsMonth)accountsMonth.value=month;try{const result=await dailyAccountsRequest("listMonthlyExpenses",{month});const rows=Array.isArray(result.expenses)?result.expenses:[];monthlyExpensesList.replaceChildren();if(!rows.length){monthlyExpensesList.append(empty("لا توجد مصروفات مسجلة لهذا الشهر."));return}for(const item of rows){const row=document.createElement("div");row.className="staff-expense-row";const description=document.createElement("span");description.textContent=item.date+" · "+item.description+(item.notes?" · "+item.notes:"")+" · "+({pending:"بانتظار اعتماد الدكتور",approved:"معتمد ومخصوم",rejected:"مرفوض وغير محتسب"}[item.status||"approved"]||"");const amount=document.createElement("strong");amount.textContent=(item.status==="rejected"?"":"− ")+staffMoney(item.amount);row.append(description,amount);monthlyExpensesList.append(row)}}catch(error){monthlyExpensesList.replaceChildren(empty(error.message||"تعذر تحميل مصروفات الشهر."))}}
+function renderStaffAccountsHandoverNote(selectedDate=accountsDate?.value||todayISO()){
+  const note=$("#staffAccountsHandoverNote");if(!note)return;
+  const handedOver=custodyHandoverDate===selectedDate&&custodyHandoverRecorded;
+  const settledHandover=custodySettledHandoverDate===selectedDate&&custodySettledHandoverRecorded;
+  const expectedToday=selectedDate===todayISO()&&custodySessionActive&&staffCurrentCustodyExpected()>0;
+  const items=[
+    handedOver?"مبلغ مسلّم بانتظار تصفية الدكتور = "+staffMoney(custodyHandoverPaid):"",
+    expectedToday?"المبلغ المتوقع تسليمه عند الخروج = "+staffMoney(staffCurrentCustodyExpected()):"",
+    settledHandover?"تمت تصفية سابقة بمبلغ = "+staffMoney(custodySettledHandoverAmount):""
+  ].filter(Boolean);
+  note.hidden=items.length===0;note.textContent=items.join(" · ");
+}
 function renderDailyAccounts(rows){
   if(!accountsBookings)return;
   accountsBookings.replaceChildren();
@@ -315,7 +328,7 @@ function renderDailyAccounts(rows){
   if(accountsCompletedTotal)accountsCompletedTotal.textContent=money(completedTotal);
   if(accountsPaidTotal)accountsPaidTotal.textContent=money(completedTotal);
   if(accountsExpenseTotal)accountsExpenseTotal.textContent=money(expenseTotal);
-  accountsReceiptsTotal=completedTotal;accountsExpensesTotal=expenseTotal;if(selectedDate===todayISO()){custodyReceiptsTotal=completedTotal;custodyExpensesTotal=expenseTotal}if(accountsNetTotal)accountsNetTotal.textContent=money(completedTotal-expenseTotal);renderStaffCustodyExpected();const handoverNote=$("#staffAccountsHandoverNote");if(handoverNote){const handedOver=custodyHandoverDate===selectedDate&&custodyHandoverRecorded;const settledHandover=custodySettledHandoverDate===selectedDate&&custodySettledHandoverRecorded;handoverNote.hidden=!handedOver&&!settledHandover;handoverNote.textContent=[handedOver?"مبلغ بانتظار التصفية = "+money(custodyHandoverPaid):"",settledHandover?"تمت تصفية سابقة بمبلغ = "+money(custodySettledHandoverAmount):""].filter(Boolean).join(" · ")}
+  accountsReceiptsTotal=completedTotal;accountsExpensesTotal=expenseTotal;if(selectedDate===todayISO()){custodyReceiptsTotal=completedTotal;custodyExpensesTotal=expenseTotal}if(accountsNetTotal)accountsNetTotal.textContent=money(completedTotal-expenseTotal);renderStaffCustodyExpected();renderStaffAccountsHandoverNote(selectedDate);
   if(expensesList){
     expensesList.replaceChildren();
     if(!dailyExpenses.length)expensesList.append(empty("لا توجد مصروفات مسجلة لهذا اليوم."));
