@@ -141,7 +141,7 @@ function scheduleBookingRefresh() {
       scheduleBookingRefresh();
       return;
     }
-    if (typeof loadBookings === "function") loadBookings();
+    if (typeof syncBookingChanges === "function") syncBookingChanges();
   }, 150);
 }
 
@@ -175,7 +175,7 @@ const clinicRealtime = createClinicRealtime(auth, event => {
   const wasConnected = realtimeConnected;
   realtimeConnected = connected;
   if (!connected) nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
-  if (connected && wasConnected === false && realtimeEverConnected && typeof loadBookings === "function") loadBookings();
+  if (connected && wasConnected === false && realtimeEverConnected && typeof syncBookingChanges === "function") syncBookingChanges();
   if (connected) realtimeEverConnected = true;
 });
 
@@ -299,6 +299,8 @@ let isCreatingBooking = false;
 let isCreatingPatient = false;
 let verificationRequestNumber = 0;
 let allBookings = [];
+let bookingsLoaded = false;
+let bookingSyncCursor = new Date(Date.now() - 1000).toISOString();
 let currentAccountAccess = null;
 
 function showMessage(element, message, type = "error") {
@@ -1284,28 +1286,25 @@ function hasOpenBookingCard() {
   );
 }
 
-async function loadBookings({ fallback = false } = {}) {
+async function loadBookings() {
   if (isLoadingBookings || !bookingList) return;
+  if (bookingsLoaded) {
+    await syncBookingChanges();
+    return;
+  }
   if (bookingRefreshTimer) {
     clearTimeout(bookingRefreshTimer);
     bookingRefreshTimer = null;
   }
+  bookingSyncCursor = new Date(Date.now() - 1000).toISOString();
   isLoadingBookings = true;
   hideMessage(bookingListMessage); hideMessage(dailyAppointmentsMessage);
   try {
     const result = await bookingApiRequest("list");
-    const nextBookings = Array.isArray(result.bookings) ? result.bookings : [];
-    if (fallback) {
-      const previousSnapshot = JSON.stringify(allBookings);
-      const nextSnapshot = JSON.stringify(nextBookings);
-      fallbackPollDelayMs = previousSnapshot === nextSnapshot
-        ? Math.min(fallbackPollDelayMs * 2, 300000)
-        : 60000;
-    } else {
-      fallbackPollDelayMs = 60000;
-    }
+    allBookings = Array.isArray(result.bookings) ? result.bookings : [];
+    bookingsLoaded = true;
+    fallbackPollDelayMs = 60000;
     nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
-    allBookings = nextBookings;
     openDoctorScheduleCalendar?.refresh?.();
     updatePendingBookingBadge();
     renderPendingBookings(); renderDailyAppointments(); renderDoctorArchive();
@@ -1319,6 +1318,60 @@ async function loadBookings({ fallback = false } = {}) {
     isLoadingBookings = false;
   }
 }
+
+async function syncBookingChanges({ fallback = false } = {}) {
+  if (!bookingList) return;
+  if (isLoadingBookings) {
+    scheduleBookingRefresh();
+    return;
+  }
+  if (!bookingsLoaded) {
+    await loadBookings();
+    return;
+  }
+  if (bookingRefreshTimer) {
+    clearTimeout(bookingRefreshTimer);
+    bookingRefreshTimer = null;
+  }
+
+  const previousSnapshot = JSON.stringify(allBookings);
+  const checkpoint = new Date(Date.now() - 1000).toISOString();
+  isLoadingBookings = true;
+  try {
+    const result = await bookingApiRequest("changesSince", { since: bookingSyncCursor });
+    const changedBookings = Array.isArray(result.bookings) ? result.bookings : [];
+    if (changedBookings.length) {
+      const merged = new Map(allBookings.map(booking => [booking.id, booking]));
+      for (const booking of changedBookings) {
+        if (booking.status === "completed" && !(Number(booking.paidAmount) > 0)) {
+          const fee = Number(booking.completedFee) || Number(booking.servicePrice) || 0;
+          if (fee > 0) booking.paidAmount = fee.toFixed(2);
+        }
+        merged.set(booking.id, booking);
+      }
+      allBookings = [...merged.values()];
+    }
+
+    bookingSyncCursor = checkpoint;
+    const changed = JSON.stringify(allBookings) !== previousSnapshot;
+    fallbackPollDelayMs = fallback && !changed
+      ? Math.min(fallbackPollDelayMs * 2, 300000)
+      : 60000;
+    nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
+
+    if (changed) {
+      openDoctorScheduleCalendar?.refresh?.();
+      updatePendingBookingBadge();
+      renderPendingBookings(); renderDailyAppointments(); renderDoctorArchive();
+      if (doctorAccountsSection?.hidden) renderDoctorAccounts();
+    }
+  } catch (error) {
+    console.error("تعذر مزامنة تغييرات الحجوزات:", error);
+    nextFallbackPollAt = Date.now() + Math.min(fallbackPollDelayMs * 2, 300000);
+  } finally {
+    isLoadingBookings = false;
+  }
+}
 // Keep dashboard data in sync with actions from the public site and other sessions.
 let lastDashboardRefreshAt = 0;
 setInterval(() => {
@@ -1327,7 +1380,7 @@ setInterval(() => {
   if (isStaff && !["view", "edit"].includes(currentAccountAccess?.permissions?.bookings)) return;
   if (!realtimeConnected && Date.now() >= nextFallbackPollAt && !hasOpenBookingCard()) {
     nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
-    loadBookings({ fallback: true });
+    syncBookingChanges({ fallback: true });
   }
   if (Date.now() - lastDashboardRefreshAt >= 15000) {
     lastDashboardRefreshAt = Date.now();
@@ -1340,7 +1393,7 @@ document.addEventListener("visibilitychange", () => {
     const isStaff = currentAccountAccess?.accountType === "staff";
     if ((!realtimeConnected && (!isStaff || ["view", "edit"].includes(currentAccountAccess?.permissions?.bookings))) && !hasOpenBookingCard()) {
       nextFallbackPollAt = Date.now();
-      loadBookings({ fallback: true });
+      syncBookingChanges({ fallback: true });
     }
     lastDashboardRefreshAt = Date.now();
     // Account panels refresh when opened and after their own save/actions.
