@@ -1220,3 +1220,21 @@ body:has(#staffDashboard:not([hidden])){background:linear-gradient(135deg,#0B243
 .staff-custody-dialog .staff-booking-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media(max-width:760px){.staff-accounts-summary-four{grid-template-columns:repeat(2,minmax(0,1fr))}.staff-custody-quick-card{min-height:82px}}
 @media(max-width:480px){.staff-custody-dialog{width:calc(100vw - 20px)}.staff-custody-dialog-content{padding:15px;gap:12px}}
+
+
+/* تفاصيل الحجز المؤرشف للقراءة فقط */
+.staff-archive-booking-clickable{cursor:pointer;transition:border-color .16s ease,box-shadow .16s ease}
+.staff-archive-booking-clickable:hover,.staff-archive-booking-clickable:focus-visible{border-color:var(--staff-accent,#b7c9a8);box-shadow:0 8px 24px rgba(16,20,25,.08);outline:none}
+.archive-details-dialog{width:min(760px,calc(100% - 24px));max-width:760px;max-height:88vh;border:1px solid var(--staff-border,#dedbd5);border-radius:18px;padding:0;color:var(--staff-dark,#191b20);background:var(--staff-surface,#fff);box-shadow:0 24px 80px rgba(0,0,0,.24)}
+.archive-details-dialog::backdrop{background:rgba(16,20,25,.58)}
+.archive-details-panel{display:flex;flex-direction:column;max-height:88vh;overflow:hidden}
+.archive-details-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--staff-border,#dedbd5);background:#fff}
+.archive-details-header h3{margin:0;font-size:18px}
+.archive-details-close{flex:0 0 auto}
+.archive-details-body{display:grid;gap:14px;overflow:auto;padding:16px}
+.archive-details-section{min-width:0;border:1px solid var(--staff-border,#dedbd5);border-radius:12px;padding:14px;background:#fff}
+.archive-details-section h4{margin:0 0 10px;font-size:14px}
+.archive-details-section dl{display:grid;grid-template-columns:minmax(120px,.42fr) minmax(0,1fr);gap:8px 14px;margin:0}
+.archive-details-section dt{color:var(--staff-muted,#68675f);font-size:12px;font-weight:700}
+.archive-details-section dd{min-width:0;margin:0;overflow-wrap:anywhere;white-space:pre-wrap;font-size:13px}
+@media(max-width:560px){.archive-details-dialog{width:calc(100% - 16px);max-height:92vh}.archive-details-panel{max-height:92vh}.archive-details-header{padding:12px}.archive-details-body{padding:10px}.archive-details-section dl{grid-template-columns:1fr;gap:4px}.archive-details-section dd{margin-bottom:8px}}
