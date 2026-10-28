@@ -155,7 +155,7 @@ async function onRequestInternal({request,env}){
       if(!validId(bookingId))return jsonResponse({message:"رقم الحجز غير صحيح."},400);
       const bookingDoc=await firestore(account.project_id,token,"/"+BOOKINGS_COLLECTION+"/"+encodeURIComponent(bookingId));
       if(!bookingDoc)return jsonResponse({message:"الحجز غير موجود."},404);
-      const bf=bookingDoc.fields||{}, status=read(bf,"status")||"pending", isArchived=read(bf,"isArchived")==="true";
+      const bf=bookingDoc.fields||{}, status=read(bf,"status")||"pending", isArchived=bf.isArchived?.booleanValue===true||read(bf,"isArchived")==="true";
       let archivedOccurrence=false, rescheduleToDate="";
       if(!isArchived&&!["archived","cancelled"].includes(status)&&occurrenceDate){
         let archivedHistory=[];try{archivedHistory=JSON.parse(read(bf,"archivedRescheduleHistory")||"[]");}catch{}
