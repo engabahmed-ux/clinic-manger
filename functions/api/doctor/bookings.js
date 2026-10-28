@@ -528,7 +528,7 @@ async function listArchivePage(projectId, accessToken, cursor = null, pageSize =
     try { history = JSON.parse(booking.archivedRescheduleHistory || "[]"); } catch {}
     if (!Array.isArray(history)) continue;
     for (const entry of history) {
-      if (!entry || !/^\\d{4}-\\d{2}-\\d{2}$/.test(entry.fromDate || "") || !/^\\d{4}-\\d{2}-\\d{2}$/.test(entry.toDate || "")) continue;
+      if (!entry || !/^\d{4}-\d{2}-\d{2}$/.test(entry.fromDate || "") || !/^\d{4}-\d{2}-\d{2}$/.test(entry.toDate || "")) continue;
       rows.push({
         ...booking,
         appointmentDate: entry.fromDate,
