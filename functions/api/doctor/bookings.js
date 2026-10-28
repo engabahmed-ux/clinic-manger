@@ -510,10 +510,14 @@ async function listArchivePage(projectId, accessToken, cursor = null, pageSize =
       : { id: booking.id, history: booking.archivedRescheduleHistory || "[]" };
   };
   const rows = [];
+  const compactBooking = booking => {
+    const { rescheduleHistory, archivedRescheduleHistory, ...compact } = booking;
+    return compact;
+  };
   for (const doc of primaryDocs) {
     const booking = decodeBooking(doc);
     if (booking.isArchived || ["archived", "cancelled"].includes(booking.status)) {
-      rows.push({ ...booking, isArchivedOccurrence: false });
+      rows.push({ ...compactBooking(booking), isArchivedOccurrence: false });
     }
   }
   for (const doc of historyDocs) {
@@ -524,7 +528,7 @@ async function listArchivePage(projectId, accessToken, cursor = null, pageSize =
     for (const entry of history) {
       if (!entry || !/^\d{4}-\d{2}-\d{2}$/.test(entry.fromDate || "") || !/^\d{4}-\d{2}-\d{2}$/.test(entry.toDate || "")) continue;
       rows.push({
-        ...booking,
+        ...compactBooking(booking),
         appointmentDate: entry.fromDate,
         queueNumber: entry.fromQueueNumber || booking.queueNumber,
         status: "postponed",
