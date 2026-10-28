@@ -128,7 +128,6 @@ const app =
 
 const auth = getAuth(app);
 let realtimeConnected = false;
-let realtimeEverConnected = false;
 let bookingRefreshTimer = null;
 let fallbackPollDelayMs = 60000;
 let nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
@@ -175,8 +174,8 @@ const clinicRealtime = createClinicRealtime(auth, event => {
   const wasConnected = realtimeConnected;
   realtimeConnected = connected;
   if (!connected) nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
-  if (connected && wasConnected === false && realtimeEverConnected && typeof syncBookingChanges === "function") syncBookingChanges();
-  if (connected) realtimeEverConnected = true;
+  if (connected && !wasConnected && bookingsLoaded && typeof syncBookingChanges === "function") syncBookingChanges();
+  if (connected && !wasConnected && !employeeManagementSection?.hidden && currentAccountAccess?.accountType === "doctor" && typeof loadEmployees === "function") loadEmployees();
 });
 
 const $ = (selector, parent = document) =>
@@ -1373,7 +1372,6 @@ async function syncBookingChanges({ fallback = false } = {}) {
   }
 }
 // Keep dashboard data in sync with actions from the public site and other sessions.
-let lastDashboardRefreshAt = 0;
 setInterval(() => {
   if (document.hidden || !auth.currentUser) return;
   const isStaff = currentAccountAccess?.accountType === "staff";
@@ -1381,11 +1379,6 @@ setInterval(() => {
   if (!realtimeConnected && Date.now() >= nextFallbackPollAt && !hasOpenBookingCard()) {
     nextFallbackPollAt = Date.now() + fallbackPollDelayMs;
     syncBookingChanges({ fallback: true });
-  }
-  if (Date.now() - lastDashboardRefreshAt >= 15000) {
-    lastDashboardRefreshAt = Date.now();
-    // Account panels refresh when opened and after their own save/actions.
-    if (!employeeManagementSection?.hidden && !isStaff) loadEmployees();
   }
 }, 5000);
 document.addEventListener("visibilitychange", () => {
@@ -1395,8 +1388,6 @@ document.addEventListener("visibilitychange", () => {
       nextFallbackPollAt = Date.now();
       syncBookingChanges({ fallback: true });
     }
-    lastDashboardRefreshAt = Date.now();
-    // Account panels refresh when opened and after their own save/actions.
     if (!employeeManagementSection?.hidden && !isStaff) loadEmployees();
   }
 });
