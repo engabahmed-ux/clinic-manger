@@ -137,18 +137,63 @@ async function onRequestInternal({request,env}){
   if(request.method!=="POST")return jsonResponse({message:"طريقة الطلب غير مسموحة."},405);
   if(!(request.headers.get("Content-Type")||"").toLowerCase().includes("application/json"))return jsonResponse({message:"نوع محتوى الطلب غير مدعوم."},415);
   let data;try{const raw=await request.text();if(raw.length>20000)return jsonResponse({message:"حجم الطلب أكبر من المسموح."},413);data=JSON.parse(raw);}catch{return jsonResponse({message:"صيغة الطلب غير صحيحة."},400);}
-  if(!data||typeof data!=="object"||Array.isArray(data)||!["search","resolve","history","saveVisit"].includes(data.action))return jsonResponse({message:"الإجراء المطلوب غير معروف."},400);
+  if(!data||typeof data!=="object"||Array.isArray(data)||!["search","resolve","history","saveVisit","bookingDetails"].includes(data.action))return jsonResponse({message:"الإجراء المطلوب غير معروف."},400);
   const user=await verifyUser(request,env);if(!user.ok)return jsonResponse({message:user.message},user.status);
   let account,token,access;try{account=parseServiceAccount(env);token=await accessToken(account);access=await accessFor(user,account.project_id,token);}catch(error){console.error("Medical records authorization failed:",error);return jsonResponse({message:"تعذر التحقق من صلاحيات السجلات الطبية."},503);}
   if(!access.ok)return jsonResponse({message:access.message},access.status);
   if(data.action==="search"&&!canSearch(access))return jsonResponse({message:"لا تملك صلاحية البحث في ملفات المرضى."},403);
   if(data.action==="resolve"&&!canResolve(access)&&!(data.patientId&&canSearch(access)))return jsonResponse({message:"لا تملك صلاحية ربط الحجز بملف مريض."},403);
   if(data.action==="history"&&!canViewRecords(access))return jsonResponse({message:"لا تملك صلاحية عرض السجلات الطبية."},403);
+  if(data.action==="bookingDetails"&&access.accountType!=="doctor"&&!["view","edit"].includes(access.permissions.bookings))return jsonResponse({message:"لا تملك صلاحية عرض تفاصيل الحجز."},403);
   if(data.action==="saveVisit"&&!canEditRecords(access))return jsonResponse({message:"تحتاج إلى صلاحية تعديل السجلات الطبية."},403);
   try{
     if(data.action==="search"){const query=String(data.query||"").trim();if(query.length>120)return jsonResponse({message:"نص البحث أطول من المسموح."},400);return jsonResponse({patients:await searchPatients(account.project_id,token,query)});}
     if(data.action==="resolve"){if(data.patientId&&!canResolve(access)){const patient=await findPatient(account.project_id,token,String(data.patientId));return patient?jsonResponse({patient}):jsonResponse({message:"ملف المريض غير موجود."},404);}const patient=await resolvePatient(account.project_id,token,data,access);return jsonResponse({patient});}
     if(data.action==="history"){if(!validId(data.patientId))return jsonResponse({message:"رقم ملف المريض غير صحيح."},400);return jsonResponse(await getPatientHistory(account.project_id,token,data.patientId));}
+    if(data.action==="bookingDetails"){
+      const bookingId=String(data.bookingId||""), occurrenceDate=String(data.occurrenceDate||"").slice(0,10);
+      if(!validId(bookingId))return jsonResponse({message:"رقم الحجز غير صحيح."},400);
+      const bookingDoc=await firestore(account.project_id,token,"/"+BOOKINGS_COLLECTION+"/"+encodeURIComponent(bookingId));
+      if(!bookingDoc)return jsonResponse({message:"الحجز غير موجود."},404);
+      const bf=bookingDoc.fields||{}, status=read(bf,"status")||"pending", isArchived=read(bf,"isArchived")==="true";
+      let archivedOccurrence=false, rescheduleToDate="";
+      if(!isArchived&&!["archived","cancelled"].includes(status)&&occurrenceDate){
+        let archivedHistory=[];try{archivedHistory=JSON.parse(read(bf,"archivedRescheduleHistory")||"[]");}catch{}
+        const entry=Array.isArray(archivedHistory)?archivedHistory.find(item=>item&&item.fromDate===occurrenceDate&&/^\\d{4}-\\d{2}-\\d{2}$/.test(item.toDate||"")):null;
+        if(!entry)return jsonResponse({message:"هذا الموعد غير موجود في الأرشيف."},404);
+        archivedOccurrence=true;rescheduleToDate=entry.toDate;
+      }else if(!isArchived&&!["archived","cancelled"].includes(status)){
+        return jsonResponse({message:"هذا الحجز غير مؤرشف."},404);
+      }
+      const booking={
+        id:bookingId,patientName:read(bf,"patientName"),patientPhone:read(bf,"patientPhone"),
+        appointmentDate:archivedOccurrence?occurrenceDate:read(bf,"appointmentDate"),
+        currentAppointmentDate:read(bf,"appointmentDate"),service:read(bf,"service"),
+        servicePrice:read(bf,"servicePrice"),paidAmount:read(bf,"paidAmount"),
+        completedFee:read(bf,"completedFee"),completedAt:read(bf,"completedAt"),
+        status,queueNumber:read(bf,"queueNumber"),notes:read(bf,"notes"),
+        bloodPressure:read(bf,"bloodPressure"),weight:read(bf,"weight"),bloodSugar:read(bf,"bloodSugar"),
+        preVisitNotes:read(bf,"preVisitNotes"),createdAt:read(bf,"createdAt"),updatedAt:read(bf,"updatedAt"),
+        archivedAt:read(bf,"archivedAt"),archivedByName:read(bf,"archivedByName"),
+        isArchivedOccurrence:archivedOccurrence,rescheduleToDate
+      };
+      let visit=null,patient=null;
+      if(canViewRecords(access)){
+        const visitResult=await firestore(account.project_id,token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{
+          from:[{collectionId:VISITS_COLLECTION}],
+          where:{fieldFilter:{field:{fieldPath:"bookingId"},op:"EQUAL",value:str(bookingId)}},
+          limit:1
+        }})});
+        const visitDoc=Array.isArray(visitResult)?visitResult.find(item=>item.document)?.document:null;
+        if(visitDoc){
+          visit=decodeVisit(visitDoc);
+          const patientId=visit.patientId||read(bf,"patientId");
+          if(patientId&&validId(patientId))patient=await findPatient(account.project_id,token,patientId);
+        }
+      }
+      return jsonResponse({booking,visit,patient,medicalRecordsVisible:canViewRecords(access)});
+    }
+
     const patientId=String(data.patientId||""),bookingId=String(data.bookingId||"");
     if(!validId(patientId)||!validId(bookingId))return jsonResponse({message:"حدد ملف المريض والحجز المرتبط بالكشف."},400);
     const patient=await findPatient(account.project_id,token,patientId);if(!patient)return jsonResponse({message:"ملف المريض غير موجود."},404);
