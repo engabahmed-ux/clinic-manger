@@ -1052,8 +1052,9 @@ let archiveLoading = false;
 let archiveRequestVersion = 0;
 
 async function loadArchivePage(reset = false) {
-  if (!doctorArchiveList || archiveLoading) return;
+  if (!doctorArchiveList || (archiveLoading && !reset)) return;
   if (reset) {
+    archiveLoading = false;
     archiveRequestVersion += 1;
     archiveLoadedRows = [];
     archiveNextCursor = null;
