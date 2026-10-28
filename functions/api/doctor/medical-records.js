@@ -148,7 +148,7 @@ async function onRequestInternal({request,env}){
   if(data.action==="saveVisit"&&!canEditRecords(access))return jsonResponse({message:"تحتاج إلى صلاحية تعديل السجلات الطبية."},403);
   try{
     if(data.action==="search"){const query=String(data.query||"").trim();if(query.length>120)return jsonResponse({message:"نص البحث أطول من المسموح."},400);return jsonResponse({patients:await searchPatients(account.project_id,token,query)});}
-    if(data.action==="resolve"){if(data.patientId&&!canResolve(access)){const patient=await findPatient(account.project_id,token,String(data.patientId));return patient?jsonResponse({patient}):jsonResponse({message:"ملف المريض غير موجود."},404);}const patient=await resolvePatient(account.project_id,token,data,access);return jsonResponse({patient});}
+    if(data.action==="resolve"){if(data.patientId&&!canResolve(access)){const patient=await findPatient(account.project_id,token,String(data.patientId));return patient?jsonResponse({patient:{id:patient.id,patientNumber:patient.patientNumber,displayName:patient.displayName,phone:patient.phone}}):jsonResponse({message:"ملف المريض غير موجود."},404);}const patient=await resolvePatient(account.project_id,token,data,access);return jsonResponse({patient});}
     if(data.action==="history"){if(!validId(data.patientId))return jsonResponse({message:"رقم ملف المريض غير صحيح."},400);return jsonResponse(await getPatientHistory(account.project_id,token,data.patientId));}
     if(data.action==="bookingDetails"){
       const bookingId=String(data.bookingId||""), occurrenceDate=String(data.occurrenceDate||"").slice(0,10);
