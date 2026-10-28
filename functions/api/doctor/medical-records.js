@@ -185,11 +185,9 @@ async function onRequestInternal({request,env}){
           limit:1
         }})});
         const visitDoc=Array.isArray(visitResult)?visitResult.find(item=>item.document)?.document:null;
-        if(visitDoc){
-          visit=decodeVisit(visitDoc);
-          const patientId=visit.patientId||read(bf,"patientId");
-          if(patientId&&validId(patientId))patient=await findPatient(account.project_id,token,patientId);
-        }
+        if(visitDoc) visit=decodeVisit(visitDoc);
+        const patientId=visit?.patientId||read(bf,"patientId");
+        if(patientId&&validId(patientId))patient=await findPatient(account.project_id,token,patientId);
       }
       return jsonResponse({booking,visit,patient,medicalRecordsVisible:canViewRecords(access)});
     }
