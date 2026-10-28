@@ -50,7 +50,7 @@ async function authenticate(request,env) {
 }
 async function readDoc(ctx,id){return dec(await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+encodeURIComponent(id)));}
 async function createRecord(ctx,id,record){return fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+encodeURIComponent(id)+"?currentDocument.exists=false",{method:"PATCH",body:JSON.stringify(enc(record))});}
-async function listCustodyRecords(ctx){const result=await fs(ctx.project,ctx.token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:COLLECTION}]}})});return (Array.isArray(result)?result:[]).filter(x=>x.document).map(x=>dec(x.document));}
+async function listCustodyRecords(ctx,types=["custodyHandover","custodyDoctorSettlement"]){const results=await Promise.all(types.map(type=>fs(ctx.project,ctx.token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:COLLECTION}],where:{fieldFilter:{field:{fieldPath:"type"},op:"EQUAL",value:sv(type)}}}})})));return results.flatMap(result=>Array.isArray(result)?result:[]).filter(x=>x.document).map(x=>dec(x.document));}
 async function onRequestPostInternal({request,env}) {
   let data;try{const raw=await request.text();if(raw.length>12000)return reply({message:"حجم الطلب أكبر من المسموح."},413);data=JSON.parse(raw);}catch{return reply({message:"صيغة الطلب غير صحيحة."},400);}
   let ctx;try{ctx=await authenticate(request,env);}catch(e){console.error("Custody auth error",e);return reply({message:"تعذر التحقق من الجلسة."},503);}
@@ -100,8 +100,7 @@ async function onRequestPostInternal({request,env}) {
       if(!history.previousEmployeeUid||!history.closedAt)return reply({message:"لا توجد عهدة مسلّمة تنتظر التصفية."},409);
       if(history.settledAt)return reply({message:"تمت تصفية هذه العهدة بالفعل.",settlement:history},409);
       const handoverDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(history.closedAt));
-      const expenseQuery=await fs(ctx.project,ctx.token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:COLLECTION}]}})});
-      const custodyRecords=(Array.isArray(expenseQuery)?expenseQuery:[]).filter(x=>x.document).map(x=>dec(x.document));
+      const custodyRecords=await listCustodyRecords(ctx,["dailyExpense","custodyDoctorSettlement","custodyHandover"]);
       const pending=custodyRecords.filter(x=>x.type==="dailyExpense"&&x.enteredBy===history.previousEmployeeUid&&x.date===handoverDate&&(x.status||"approved")==="pending");
       if(pending.length)return reply({message:"لا يمكن تصفية العهدة قبل معالجة المصروفات المعلقة للموظف."},409);
       const settlements=custodyRecords.filter(x=>x.type==="custodyDoctorSettlement"&&x.employeeUid===history.previousEmployeeUid&&cairoDate(x.previousHandoverAt)===handoverDate&&String(x.previousHandoverAt||"")<String(history.closedAt||"")).sort((a,b)=>String(b.previousHandoverAt||"").localeCompare(String(a.previousHandoverAt||"")));
