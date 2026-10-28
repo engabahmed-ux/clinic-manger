@@ -464,14 +464,10 @@ async function listArchivePage(projectId, accessToken, cursor = null, pageSize =
     const query = {
       from: [{ collectionId: BOOKINGS_COLLECTION }],
       orderBy: kind === "primary"
-        ? [
-            { field: { fieldPath: "updatedAt" }, direction: "DESCENDING" },
-            { field: { fieldPath: "__name__" }, direction: "DESCENDING" }
-          ]
+        ? [{ field: { fieldPath: "__name__" }, direction: "ASCENDING" }]
         : [
             { field: { fieldPath: "archivedRescheduleHistory" }, direction: "ASCENDING" },
-            { field: { fieldPath: "updatedAt" }, direction: "DESCENDING" },
-            { field: { fieldPath: "__name__" }, direction: "DESCENDING" }
+            { field: { fieldPath: "__name__" }, direction: "ASCENDING" }
           ],
       limit
     };
@@ -486,7 +482,6 @@ async function listArchivePage(projectId, accessToken, cursor = null, pageSize =
         }
       };
       if (saved) query.startAt = { before: false, values: [
-        { stringValue: saved.updatedAt || "" },
         { referenceValue: documentName(saved.id) }
       ] };
     } else {
@@ -497,7 +492,6 @@ async function listArchivePage(projectId, accessToken, cursor = null, pageSize =
       } };
       if (saved) query.startAt = { before: false, values: [
         { stringValue: saved.history || "[]" },
-        { stringValue: saved.updatedAt || "" },
         { referenceValue: documentName(saved.id) }
       ] };
     }
@@ -512,8 +506,8 @@ async function listArchivePage(projectId, accessToken, cursor = null, pageSize =
     if (docs.length < limit) return null;
     const doc = docs[docs.length - 1], booking = decodeBooking(doc);
     return kind === "primary"
-      ? { id: booking.id, updatedAt: booking.updatedAt }
-      : { id: booking.id, updatedAt: booking.updatedAt, history: booking.archivedRescheduleHistory || "[]" };
+      ? { id: booking.id }
+      : { id: booking.id, history: booking.archivedRescheduleHistory || "[]" };
   };
   const rows = [];
   for (const doc of primaryDocs) {
@@ -1112,7 +1106,8 @@ async function onRequestInternal(context) {
         if (cursor) {
           for (const key of ["primary", "history"]) {
             const item = cursor[key];
-            if (item && (!/^[A-Za-z0-9_-]{1,150}$/.test(String(item.id || "")) || String(item.updatedAt || "").length > 40)) {
+            if (item && (!/^[A-Za-z0-9_-]{1,150}$/.test(String(item.id || "")) ||
+                (key === "history" && (typeof item.history !== "string" || item.history.length > 16000)))) {
               return jsonResponse({ message: "مؤشر صفحة الأرشيف غير صحيح." }, 400);
             }
           }
