@@ -1079,6 +1079,7 @@ async function loadArchivePage(reset = false) {
     renderDoctorArchive();
   } catch (error) {
     if (requestVersion === archiveRequestVersion) {
+      archiveHasMore = true;
       showMessage(archiveExportMessage, error.message || "تعذر تحميل الأرشيف.");
       renderDoctorArchive();
     }
@@ -1167,7 +1168,7 @@ async function showArchiveBookingDetails(booking) {
       ["تاريخ الموعد المؤرشف", data.appointmentDate ? formatRequestDate(data.appointmentDate) : ""],
       ["تاريخ الموعد الحالي", data.isArchivedOccurrence && data.currentAppointmentDate ? formatRequestDate(data.currentAppointmentDate) : ""],
       ["رقم الدور", booking.queueNumber || data.queueNumber],
-      ["الخدمة", data.service], ["الحالة", bookingStatusLabel(data.status)],
+      ["الخدمة", data.service], ["الحالة", bookingStatusLabel(booking.isArchivedOccurrence ? booking.status : data.status)],
       ["قيمة الكشف", data.servicePrice ? doctorMoney(data.servicePrice) : ""],
       ["المبلغ المسجل", data.paidAmount ? doctorMoney(data.paidAmount) : ""],
       ["وقت إتمام الكشف", data.completedAt ? formatSubmittedAt(data.completedAt) : ""],
