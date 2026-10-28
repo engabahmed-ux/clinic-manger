@@ -1754,3 +1754,60 @@ a:focus-visible {
     animation-iteration-count: 1 !important;
   }
 }
+
+
+/* Read-only details for archived clinic bookings */
+.archive-booking-clickable { cursor: pointer; }
+.archive-booking-clickable:focus-visible { outline: 3px solid var(--clinic-accent, #b7d6a4); outline-offset: 3px; }
+.archive-details-dialog {
+  width: min(760px, calc(100% - 24px));
+  max-width: 760px;
+  max-height: min(86vh, 900px);
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  color: var(--text-color, #222);
+  background: var(--card-bg, #fff);
+  box-shadow: 0 24px 80px rgba(0,0,0,.28);
+}
+.archive-details-dialog::backdrop { background: rgba(15, 23, 42, .58); }
+.archive-details-panel { max-height: inherit; overflow: auto; padding: 20px; }
+.archive-details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  top: -20px;
+  z-index: 1;
+  margin: -20px -20px 18px;
+  padding: 16px 20px;
+  background: var(--card-bg, #fff);
+  border-bottom: 1px solid rgba(120, 130, 140, .22);
+}
+.archive-details-header h3 { margin: 0; font-size: 1.15rem; }
+.archive-details-close { flex: 0 0 auto; }
+.archive-details-section {
+  margin: 0 0 16px;
+  padding: 14px;
+  border: 1px solid rgba(120, 130, 140, .2);
+  border-radius: 14px;
+  background: var(--surface-bg, #fafafa);
+}
+.archive-details-section h4 { margin: 0 0 12px; font-size: 1rem; }
+.archive-details-section dl {
+  display: grid;
+  grid-template-columns: minmax(120px, .7fr) minmax(0, 1.3fr);
+  gap: 9px 14px;
+  margin: 0;
+}
+.archive-details-section dt { color: var(--muted-color, #667085); font-weight: 600; }
+.archive-details-section dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+#doctorArchiveLoadMore { display: block; margin: 18px auto 0; min-width: 150px; }
+#doctorArchiveLoadMore[hidden] { display: none; }
+@media (max-width: 520px) {
+  .archive-details-panel { padding: 14px; }
+  .archive-details-header { top: -14px; margin: -14px -14px 14px; padding: 13px 14px; }
+  .archive-details-section dl { grid-template-columns: 1fr; gap: 3px; }
+  .archive-details-section dd { margin-bottom: 9px; }
+}
