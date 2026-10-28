@@ -159,7 +159,7 @@ async function onRequestInternal({request,env}){
       let archivedOccurrence=false, rescheduleToDate="";
       if(!isArchived&&!["archived","cancelled"].includes(status)&&occurrenceDate){
         let archivedHistory=[];try{archivedHistory=JSON.parse(read(bf,"archivedRescheduleHistory")||"[]");}catch{}
-        const entry=Array.isArray(archivedHistory)?archivedHistory.find(item=>item&&item.fromDate===occurrenceDate&&/^\\d{4}-\\d{2}-\\d{2}$/.test(item.toDate||"")):null;
+        const entry=Array.isArray(archivedHistory)?archivedHistory.find(item=>item&&item.fromDate===occurrenceDate&&/^\d{4}-\d{2}-\d{2}$/.test(item.toDate||"")):null;
         if(!entry)return jsonResponse({message:"هذا الموعد غير موجود في الأرشيف."},404);
         archivedOccurrence=true;rescheduleToDate=entry.toDate;
       }else if(!isArchived&&!["archived","cancelled"].includes(status)){
