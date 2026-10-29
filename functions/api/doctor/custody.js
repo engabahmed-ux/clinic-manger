@@ -87,8 +87,9 @@ async function onRequestPostInternal({request,env}) {
         const boundary=String(settlements[0]?.previousHandoverAt||"");
         const pending=handovers.filter(x=>x.previousEmployeeUid===lastHandover.previousEmployeeUid&&String(x.date||cairoDate(x.createdAt))===date&&(!boundary||String(x.createdAt||"")>boundary)&&String(x.createdAt||"")<=String(lastHandover.closedAt||""));
         if(pending.length){
-          lastHandover.totalHandedOverAmount=pending.reduce((sum,x)=>sum+(Number(x.actualAmount)||0),0).toFixed(2);
-          lastHandover.totalExpectedAmount=pending.reduce((sum,x)=>sum+(Number(x.expectedAmount)||0),0).toFixed(2);
+          const latestPending=pending.slice().sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))[0];
+          lastHandover.totalHandedOverAmount=Number(latestPending.actualAmount||0).toFixed(2);
+          lastHandover.totalExpectedAmount=Number(latestPending.expectedAmount||0).toFixed(2);
         }
       }
       return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,lastHandover,previousSettlement:history.settledAt?{employeeUid:history.previousEmployeeUid,employeeName:history.previousEmployeeName||"الموظف",settledAt:history.settledAt,settledByName:history.settledByName||"الدكتور"}:null,handovers});
@@ -107,7 +108,8 @@ async function onRequestPostInternal({request,env}) {
       const settlements=custodyRecords.filter(x=>x.type==="custodyDoctorSettlement"&&x.employeeUid===history.previousEmployeeUid&&cairoDate(x.previousHandoverAt)===handoverDate&&String(x.previousHandoverAt||"")<String(history.closedAt||"")).sort((a,b)=>String(b.previousHandoverAt||"").localeCompare(String(a.previousHandoverAt||"")));
       const settlementBoundary=String(settlements[0]?.previousHandoverAt||"");
       const pendingHandovers=custodyRecords.filter(x=>x.type==="custodyHandover"&&x.previousEmployeeUid===history.previousEmployeeUid&&String(x.date||cairoDate(x.createdAt))===handoverDate&&(!settlementBoundary||String(x.createdAt||"")>settlementBoundary)&&String(x.createdAt||"")<=String(history.closedAt||""));
-      const amount=pendingHandovers.length?pendingHandovers.reduce((sum,x)=>sum+(Number(x.actualAmount)||0),0):Number(history.totalHandedOverAmount??history.nextOpeningAmount??0);
+      const latestPendingHandover=pendingHandovers.slice().sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))[0];
+      const amount=latestPendingHandover?Number(latestPendingHandover.actualAmount||0):Number(history.nextOpeningAmount??history.totalHandedOverAmount??0);
       const now=new Date().toISOString();
       const settlement={type:"custodyDoctorSettlement",employeeUid:history.previousEmployeeUid,employeeName:history.previousEmployeeName||"الموظف",amount:amount.toFixed(2),status:"settled",settledByUid:ctx.uid,settledByName:"الدكتور",settledAt:now,previousHandoverAt:history.closedAt,baselineReceipts:String(history.baselineReceipts||"0"),baselineExpenses:String(history.baselineExpenses||"0"),createdAt:now};
       const id="custody-doctor-settlement-"+Date.now()+"-"+crypto.randomUUID().replace(/-/g,"").slice(0,8);
