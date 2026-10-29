@@ -35,7 +35,7 @@ const sv=v=>({stringValue:String(v??"")});
 function enc(o){const fields={};for(const [k,v] of Object.entries(o)) if(v!==undefined&&v!==null) fields[k]=typeof v==="number"?{integerValue:String(v)}:typeof v==="boolean"?{booleanValue:v}:sv(v);return {fields};}
 function dec(d){const f=d?.fields||{},o={id:d?.name?.split("/").pop()};for(const[k,v]of Object.entries(f))o[k]=v.stringValue??v.integerValue??v.booleanValue??"";return o;}
 function cairoDate(value){if(!value)return"";const d=new Date(value);if(Number.isNaN(d.getTime()))return String(value).slice(0,10);const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(d),v=Object.fromEntries(p.map(x=>[x.type,x.value]));return `${v.year}-${v.month}-${v.day}`;}
-function validSameDayOwnHandover(history,uid,now){const amount=Number(history.totalHandedOverAmount??history.nextOpeningAmount??0),expected=Number(history.expectedAmount||0),dailyNet=Math.max(0,Number(history.baselineReceipts||0)-Number(history.baselineExpenses||0));return history.previousEmployeeUid===uid&&cairoDate(history.closedAt||"")===cairoDate(now)&&amount+0.009>=expected&&amount+0.009>=dailyNet;}
+function validSameDayOwnHandover(history,uid,now){const amount=Number(history.nextOpeningAmount??history.totalHandedOverAmount??0),expected=Number(history.expectedAmount||0),dailyNet=Math.max(0,Number(history.baselineReceipts||0)-Number(history.baselineExpenses||0));return history.previousEmployeeUid===uid&&cairoDate(history.closedAt||"")===cairoDate(now)&&amount+0.009>=expected&&amount+0.009>=dailyNet;}
 async function authenticate(request,env) {
   if(!env.FIREBASE_API_KEY||!env.FIREBASE_SERVICE_ACCOUNT_JSON) return {error:"إعدادات التحقق غير مكتملة.",status:503};
   const m=(request.headers.get("Authorization")||"").match(/^Bearer\s+(\S+)$/i);if(!m||m[1].length>8192)return {error:"يلزم تسجيل الدخول.",status:401};
@@ -142,7 +142,7 @@ async function onRequestPostInternal({request,env}) {
       if(!history.settledAt&&history.previousEmployeeUid&&history.closedAt&&!data.acceptHandover){
         return reply({message:"توجد عهدة مسلّمة من الموظف السابق وتحتاج تأكيد استلامك.",pendingHandover:{previousEmployeeName:history.previousEmployeeName||"الموظف السابق",actualAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.nextOpeningAmount||"0.00"),notes:history.notes||"",closedAt:history.closedAt||""}},409);
       }
-      // Start at zero unless the employee explicitly accepts an incoming handover.
+      // Carry forward the outstanding cash until the doctor settles it.
       const sameDayHandover=Boolean(history.closedAt&&cairoDate(history.closedAt)===cairoDate(now));
       const opening=history.previousEmployeeUid&&history.closedAt&&!history.settledAt?Number(history.nextOpeningAmount??history.totalHandedOverAmount??0):0;
       // Carry forward today's receipt/expense baseline across employee switches and doctor settlement.
