@@ -144,12 +144,11 @@ async function onRequestPostInternal({request,env}) {
       }
       // Start at zero unless the employee explicitly accepts an incoming handover.
       const sameDayHandover=Boolean(history.closedAt&&cairoDate(history.closedAt)===cairoDate(now));
-      const sameDayOwnHandover=validSameDayOwnHandover(history,ctx.uid,now);
       const opening=history.previousEmployeeUid&&history.closedAt&&!history.settledAt?Number(history.nextOpeningAmount??history.totalHandedOverAmount??0):0;
       // Carry forward today's receipt/expense baseline across employee switches and doctor settlement.
       // This excludes receipts already present before the new session from the next handover amount.
-      const baselineReceipts=data.acceptHandover||sameDayHandover?Number(history.baselineReceipts||0):0;
-      const baselineExpenses=data.acceptHandover||sameDayHandover?Number(history.baselineExpenses||0):0;
+      const baselineReceipts=sameDayHandover?Number(history.baselineReceipts||0):0;
+      const baselineExpenses=sameDayHandover?Number(history.baselineExpenses||0):0;
       const record={type:"custodySession",status:"active",employeeUid:ctx.uid,employeeName:ctx.name,openingAmount:opening.toFixed(2),expectedAmount:opening.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),handoverAccepted:Boolean(data.acceptHandover),notes:"",startedAt:now,updatedAt:now};
       const made=await createRecord(ctx,LOCK_ID,record);
       if(made?.__conflict)return reply({message:"بدأ موظف آخر جلسة في نفس اللحظة. حدّث الصفحة وحاول مرة أخرى."},409);
@@ -162,7 +161,6 @@ async function onRequestPostInternal({request,env}) {
       if(lock.employeeUid!==ctx.uid)return reply({message:"هذه العهدة تخص موظفًا آخر."},403);
       const actual=Number(data.actualAmount),sessionExpected=Number(lock.expectedAmount||0),expected=Number(data.expectedAmount??sessionExpected),baselineReceipts=Number(data.baselineReceipts||0),baselineExpenses=Number(data.baselineExpenses||0),notes=String(data.notes||"").trim();
       if(!Number.isFinite(actual)||actual<0||actual>99999999||!Number.isFinite(expected)||expected<0||expected>99999999||!Number.isFinite(baselineReceipts)||baselineReceipts<0||!Number.isFinite(baselineExpenses)||baselineExpenses<0||notes.length>1000||(Math.abs(actual-expected)>0.009&&!notes))return reply({message:"أدخل المبلغ الفعلي، وأضف ملاحظة توضح أي فرق بين المتوقع والفعلي."},400);
-      const existingRecords=await listCustodyRecords(ctx);
       const sessionStamp=Date.parse(lock.startedAt||"");
       const id="custody-handover-"+ctx.uid+"-"+(Number.isFinite(sessionStamp)?sessionStamp:Date.now())+"-"+cairoDate(now).replace(/-/g,"");
       const record={type:"custodyHandover",previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,sessionExpectedAmount:sessionExpected.toFixed(2),expectedAmount:expected.toFixed(2),actualAmount:actual.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),difference:(actual-expected).toFixed(2),notes,date:cairoDate(now),createdAt:now};
