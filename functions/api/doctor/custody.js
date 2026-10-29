@@ -128,7 +128,10 @@ async function onRequestPostInternal({request,env}) {
         return reply({message:"توجد عهدة مسلّمة من الموظف السابق وتحتاج تأكيد استلامك.",pendingHandover:{previousEmployeeName:history.previousEmployeeName||"الموظف السابق",actualAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.nextOpeningAmount||"0.00"),notes:history.notes||"",closedAt:history.closedAt||""}},409);
       }
       // Start at zero unless the employee explicitly accepts an incoming handover.
-      const sameDayOwnHandover=history.previousEmployeeUid===ctx.uid&&cairoDate(history.closedAt||"")===cairoDate(now);
+      const previousHandoverAmount=Number(history.totalHandedOverAmount??history.nextOpeningAmount??0);
+      const previousHandoverExpected=Number(history.expectedAmount||0);
+      const previousDailyNet=Math.max(0,Number(history.baselineReceipts||0)-Number(history.baselineExpenses||0));
+      const sameDayOwnHandover=history.previousEmployeeUid===ctx.uid&&cairoDate(history.closedAt||"")===cairoDate(now)&&previousHandoverAmount+0.009>=previousHandoverExpected&&previousHandoverAmount+0.009>=previousDailyNet;
       const opening=data.acceptHandover?Number(history.nextOpeningAmount||0):0;
       const baselineReceipts=data.acceptHandover||sameDayOwnHandover?Number(history.baselineReceipts||0):0;
       const baselineExpenses=data.acceptHandover||sameDayOwnHandover?Number(history.baselineExpenses||0):0;
