@@ -662,9 +662,9 @@ async function isFinancialPeriodClosed(projectId, accessToken, dateValue, employ
         from: [{ collectionId: "clinicAccountRecords" }],
         where: {
           fieldFilter: {
-            field: { fieldPath: "type" },
+            field: { fieldPath: "employeeUid" },
             op: "EQUAL",
-            value: { stringValue: "settlement" }
+            value: { stringValue: employeeUid }
           }
         }
       }
