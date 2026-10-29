@@ -50,6 +50,7 @@ function decode(document){const fields=document?.fields||{};return {id:(document
 function decodeVisit(document){const f=document?.fields||{};return {id:(document?.name||"").split("/").pop(),patientId:read(f,"patientId"),bookingId:read(f,"bookingId"),visitDate:read(f,"visitDate"),queueNumber:read(f,"queueNumber"),bloodPressure:read(f,"bloodPressure"),weight:read(f,"weight"),bloodSugar:read(f,"bloodSugar"),preVisitNotes:read(f,"preVisitNotes"),diagnosis:read(f,"diagnosis"),clinicalNotes:read(f,"clinicalNotes"),treatment:read(f,"treatment"),followUp:read(f,"followUp"),followUpNotes:read(f,"followUpNotes"),followUpDays:read(f,"followUpDays"),followUpDate:read(f,"followUpDate"),createdAt:read(f,"createdAt"),updatedAt:read(f,"updatedAt"),createdByName:read(f,"createdByName")};}
 function fieldsFrom(value,keys){const fields={};for(const key of keys)fields[key]=str(value[key]);return {fields};}
 async function collection(projectId,token,name){const result=await firestore(projectId,token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:name}]}})});return (Array.isArray(result)?result:[]).filter(x=>x.document).map(x=>x.document);}
+async function queryCollectionByStringField(projectId,token,name,fieldPath,value,limit=1){const result=await firestore(projectId,token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:name}],where:{fieldFilter:{field:{fieldPath},op:"EQUAL",value:str(value)}},limit}})});return (Array.isArray(result)?result:[]).filter(x=>x.document).map(x=>x.document);}
 async function verifyUser(request,env){
   if(!env.FIREBASE_API_KEY)return {ok:false,status:503,message:"خدمة التحقق غير مهيأة."};
   const match=(request.headers.get("Authorization")||"").match(/^Bearer\s+(\S+)$/i);
@@ -206,7 +207,7 @@ async function onRequestInternal({request,env}){
     if(visit.followUpDays && (!/^\d{1,4}$/.test(visit.followUpDays)||Number(visit.followUpDays)>3650))return jsonResponse({message:"عدد أيام المتابعة غير صحيح."},400);
     if(visit.followUpDate && (!/^\d{4}-\d{2}-\d{2}$/.test(visit.followUpDate)||Number.isNaN(Date.parse(visit.followUpDate+"T12:00:00"))))return jsonResponse({message:"تاريخ المتابعة غير صحيح."},400);
     if(visit.weight && (!/^\d{1,3}(\.\d{1,2})?$/.test(visit.weight)||Number(visit.weight)<0||Number(visit.weight)>500))return jsonResponse({message:"قيمة الوزن غير صحيحة."},400);
-    const now=new Date().toISOString(),existing=(await collection(account.project_id,token,VISITS_COLLECTION)).map(decodeVisit).find(v=>v.bookingId===bookingId);
+    const now=new Date().toISOString(),existing=(await queryCollectionByStringField(account.project_id,token,VISITS_COLLECTION,"bookingId",bookingId,1)).map(decodeVisit)[0]||null;
     if(existing&&existing.patientId!==patientId)return jsonResponse({message:"هذا الكشف مرتبط بملف مريض آخر ولا يمكن نقله."},409);
     visit.updatedAt=now;visit.createdAt=existing?.createdAt||now;
     let saved;
