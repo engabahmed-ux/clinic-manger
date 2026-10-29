@@ -70,7 +70,7 @@ async function onRequestPostInternal({request,env}) {
       const settlementBoundary=String(latestSettlement?.previousHandoverAt||"");
       const pendingHandovers=dayHandovers.filter(x=>!settlementBoundary||String(x.createdAt||"")>settlementBoundary);
       const latestHandover=pendingHandovers.slice().sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))[0]||null;
-      const handover=latestHandover?{actualAmount:pendingHandovers.reduce((sum,x)=>sum+(Number(x.actualAmount)||0),0).toFixed(2),totalHandedOverAmount:pendingHandovers.reduce((sum,x)=>sum+(Number(x.actualAmount)||0),0).toFixed(2),lastHandoverAmount:String(latestHandover.actualAmount||"0.00"),expectedAmount:pendingHandovers.reduce((sum,x)=>sum+(Number(x.expectedAmount)||0),0).toFixed(2),previousEmployeeName:latestHandover.previousEmployeeName||ctx.name,closedAt:latestHandover.createdAt||"",notes:latestHandover.notes||"",date:handoverDate,baselineReceipts:String(latestHandover.baselineReceipts||"0.00"),baselineExpenses:String(latestHandover.baselineExpenses||"0.00")}:null;
+      const handover=latestHandover?{actualAmount:String(latestHandover.actualAmount||"0.00"),totalHandedOverAmount:String(latestHandover.actualAmount||"0.00"),lastHandoverAmount:String(latestHandover.actualAmount||"0.00"),expectedAmount:String(latestHandover.expectedAmount||"0.00"),previousEmployeeName:latestHandover.previousEmployeeName||ctx.name,closedAt:latestHandover.createdAt||"",notes:latestHandover.notes||"",date:handoverDate,baselineReceipts:String(latestHandover.baselineReceipts||"0.00"),baselineExpenses:String(latestHandover.baselineExpenses||"0.00")}:null;
       const settledHandover=latestSettlement?{amount:String(latestSettlement.amount||"0.00"),settledAt:latestSettlement.settledAt||"",date:handoverDate}:null;
       return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,uid:ctx.uid,role:ctx.role,handover,settledHandover});
     }
@@ -88,8 +88,9 @@ async function onRequestPostInternal({request,env}) {
         const pending=handovers.filter(x=>x.previousEmployeeUid===lastHandover.previousEmployeeUid&&String(x.date||cairoDate(x.createdAt))===date&&(!boundary||String(x.createdAt||"")>boundary)&&String(x.createdAt||"")<=String(lastHandover.closedAt||""));
         if(pending.length){
           const latestPending=pending.slice().sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))[0];
-          lastHandover.totalHandedOverAmount=pending.reduce((sum,x)=>sum+(Number(x.actualAmount)||0),0).toFixed(2);
-          lastHandover.totalExpectedAmount=pending.reduce((sum,x)=>sum+(Number(x.expectedAmount)||0),0).toFixed(2);
+          lastHandover.totalHandedOverAmount=String(latestPending.actualAmount||"0.00");
+          lastHandover.totalExpectedAmount=String(latestPending.expectedAmount||"0.00");
+          lastHandover.nextOpeningAmount=String(latestPending.actualAmount||"0.00");
         }
       }
       return reply({active:lock.status==="active",session:lock.status==="active"?lock:null,lastHandover,previousSettlement:history.settledAt?{employeeUid:history.previousEmployeeUid,employeeName:history.previousEmployeeName||"الموظف",settledAt:history.settledAt,settledByName:history.settledByName||"الدكتور"}:null,handovers});
@@ -109,7 +110,7 @@ async function onRequestPostInternal({request,env}) {
       const settlementBoundary=String(settlements[0]?.previousHandoverAt||"");
       const pendingHandovers=custodyRecords.filter(x=>x.type==="custodyHandover"&&x.previousEmployeeUid===history.previousEmployeeUid&&String(x.date||cairoDate(x.createdAt))===handoverDate&&(!settlementBoundary||String(x.createdAt||"")>settlementBoundary)&&String(x.createdAt||"")<=String(history.closedAt||""));
       const latestPendingHandover=pendingHandovers.slice().sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")))[0];
-      const amount=pendingHandovers.length?pendingHandovers.reduce((sum,x)=>sum+(Number(x.actualAmount)||0),0):Number(history.nextOpeningAmount??history.totalHandedOverAmount??0);
+      const amount=latestPendingHandover?Number(latestPendingHandover.actualAmount)||0:Number(history.nextOpeningAmount??history.totalHandedOverAmount??0);
       const now=new Date().toISOString();
       const settlement={type:"custodyDoctorSettlement",employeeUid:history.previousEmployeeUid,employeeName:history.previousEmployeeName||"الموظف",amount:amount.toFixed(2),status:"settled",settledByUid:ctx.uid,settledByName:"الدكتور",settledAt:now,previousHandoverAt:history.closedAt,baselineReceipts:String(history.baselineReceipts||"0"),baselineExpenses:String(history.baselineExpenses||"0"),createdAt:now};
       const id="custody-doctor-settlement-"+Date.now()+"-"+crypto.randomUUID().replace(/-/g,"").slice(0,8);
@@ -138,13 +139,13 @@ async function onRequestPostInternal({request,env}) {
         return reply({active:true,session:lock,alreadyActive:true});
       }
       const history=await readDoc(ctx,"custody-last-closed");
-      if(!history.settledAt&&history.previousEmployeeUid&&history.previousEmployeeUid!==ctx.uid&&history.acceptedByUid!==ctx.uid&&!data.acceptHandover){
+      if(!history.settledAt&&history.previousEmployeeUid&&history.closedAt&&!data.acceptHandover){
         return reply({message:"توجد عهدة مسلّمة من الموظف السابق وتحتاج تأكيد استلامك.",pendingHandover:{previousEmployeeName:history.previousEmployeeName||"الموظف السابق",actualAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.nextOpeningAmount||"0.00"),notes:history.notes||"",closedAt:history.closedAt||""}},409);
       }
       // Start at zero unless the employee explicitly accepts an incoming handover.
       const sameDayHandover=Boolean(history.closedAt&&cairoDate(history.closedAt)===cairoDate(now));
       const sameDayOwnHandover=validSameDayOwnHandover(history,ctx.uid,now);
-      const opening=data.acceptHandover?Number(history.nextOpeningAmount||0):0;
+      const opening=history.previousEmployeeUid&&history.closedAt&&!history.settledAt?Number(history.nextOpeningAmount??history.totalHandedOverAmount??0):0;
       // Carry forward today's receipt/expense baseline across employee switches and doctor settlement.
       // This excludes receipts already present before the new session from the next handover amount.
       const baselineReceipts=data.acceptHandover||sameDayHandover?Number(history.baselineReceipts||0):0;
@@ -162,12 +163,8 @@ async function onRequestPostInternal({request,env}) {
       const actual=Number(data.actualAmount),sessionExpected=Number(lock.expectedAmount||0),expected=Number(data.expectedAmount??sessionExpected),baselineReceipts=Number(data.baselineReceipts||0),baselineExpenses=Number(data.baselineExpenses||0),notes=String(data.notes||"").trim();
       if(!Number.isFinite(actual)||actual<0||actual>99999999||!Number.isFinite(expected)||expected<0||expected>99999999||!Number.isFinite(baselineReceipts)||baselineReceipts<0||!Number.isFinite(baselineExpenses)||baselineExpenses<0||notes.length>1000||(Math.abs(actual-expected)>0.009&&!notes))return reply({message:"أدخل المبلغ الفعلي، وأضف ملاحظة توضح أي فرق بين المتوقع والفعلي."},400);
       const existingRecords=await listCustodyRecords(ctx);
-      const priorSettlements=existingRecords.filter(x=>x.type==="custodyDoctorSettlement"&&x.employeeUid===ctx.uid&&cairoDate(x.previousHandoverAt)===cairoDate(now)).sort((a,b)=>String(b.previousHandoverAt||"").localeCompare(String(a.previousHandoverAt||"")));
-      const settlementBoundary=String(priorSettlements[0]?.previousHandoverAt||"");
-      const priorHandovers=existingRecords.filter(x=>x.type==="custodyHandover"&&x.previousEmployeeUid===ctx.uid&&String(x.date||cairoDate(x.createdAt))===cairoDate(now)&&(!settlementBoundary||String(x.createdAt||"")>settlementBoundary));
-      const totalHandedOver=priorHandovers.reduce((sum,x)=>sum+(Number(x.actualAmount)||0),0)+actual;
-      const totalExpectedHandedOver=priorHandovers.reduce((sum,x)=>sum+(Number(x.expectedAmount)||0),0)+expected;
-      const id="custody-handover-"+Date.now()+"-"+crypto.randomUUID().replace(/-/g,"").slice(0,8);
+      const sessionStamp=Date.parse(lock.startedAt||"");
+      const id="custody-handover-"+ctx.uid+"-"+(Number.isFinite(sessionStamp)?sessionStamp:Date.now())+"-"+cairoDate(now).replace(/-/g,"");
       const record={type:"custodyHandover",previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,sessionExpectedAmount:sessionExpected.toFixed(2),expectedAmount:expected.toFixed(2),actualAmount:actual.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),difference:(actual-expected).toFixed(2),notes,date:cairoDate(now),createdAt:now};
       const made=await createRecord(ctx,id,record);if(made?.__conflict)return reply({message:"تعذر تسجيل التسليم. حاول مرة أخرى."},409);
       const closed={...lock,status:"closed",actualAmount:actual.toFixed(2),difference:(actual-expected).toFixed(2),notes,closedAt:now,updatedAt:now};
@@ -178,7 +175,7 @@ async function onRequestPostInternal({request,env}) {
       if(archived?.__conflict)return reply({message:"تم إغلاق العهدة لكن تعذر حفظ نسخة الأرشيف. راجع الدكتور قبل بدء عهدة جديدة."},503);
       const removed=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+LOCK_ID,{method:"DELETE"});
       if(removed?.__conflict)return reply({message:"تم تسجيل التسليم لكن تعذر تحرير قفل الجلسة. راجع الدكتور."},409);
-      const summary={type:"custodyHandoverSummary",nextOpeningAmount:actual.toFixed(2),totalHandedOverAmount:totalHandedOver.toFixed(2),expectedAmount:totalExpectedHandedOver.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,notes,closedAt:now,date:cairoDate(now),settledAt:"",settledByUid:"",settledByName:"",settlementId:""};const summaryMask=Object.keys(summary).map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");await fs(ctx.project,ctx.token,"/"+COLLECTION+"/custody-last-closed?"+summaryMask,{method:"PATCH",body:JSON.stringify(enc(summary))});
+      const summary={type:"custodyHandoverSummary",nextOpeningAmount:actual.toFixed(2),totalHandedOverAmount:actual.toFixed(2),expectedAmount:expected.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,notes,closedAt:now,date:cairoDate(now),settledAt:"",settledByUid:"",settledByName:"",settlementId:""};const summaryMask=Object.keys(summary).map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");await fs(ctx.project,ctx.token,"/"+COLLECTION+"/custody-last-closed?"+summaryMask,{method:"PATCH",body:JSON.stringify(enc(summary))});
       return reply({closed:true,expectedAmount:expected.toFixed(2),actualAmount:actual.toFixed(2),difference:(actual-expected).toFixed(2)});
     }
     if(action==="addCash") {
