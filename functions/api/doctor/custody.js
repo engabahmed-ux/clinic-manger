@@ -35,6 +35,7 @@ const sv=v=>({stringValue:String(v??"")});
 function enc(o){const fields={};for(const [k,v] of Object.entries(o)) if(v!==undefined&&v!==null) fields[k]=typeof v==="number"?{integerValue:String(v)}:typeof v==="boolean"?{booleanValue:v}:sv(v);return {fields};}
 function dec(d){const f=d?.fields||{},o={id:d?.name?.split("/").pop()};for(const[k,v]of Object.entries(f))o[k]=v.stringValue??v.integerValue??v.booleanValue??"";return o;}
 function cairoDate(value){if(!value)return"";const d=new Date(value);if(Number.isNaN(d.getTime()))return String(value).slice(0,10);const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(d),v=Object.fromEntries(p.map(x=>[x.type,x.value]));return `${v.year}-${v.month}-${v.day}`;}
+function validSameDayOwnHandover(history,uid,now){const amount=Number(history.totalHandedOverAmount??history.nextOpeningAmount??0),expected=Number(history.expectedAmount||0),dailyNet=Math.max(0,Number(history.baselineReceipts||0)-Number(history.baselineExpenses||0));return history.previousEmployeeUid===uid&&cairoDate(history.closedAt||"")===cairoDate(now)&&amount+0.009>=expected&&amount+0.009>=dailyNet;}
 async function authenticate(request,env) {
   if(!env.FIREBASE_API_KEY||!env.FIREBASE_SERVICE_ACCOUNT_JSON) return {error:"إعدادات التحقق غير مكتملة.",status:503};
   const m=(request.headers.get("Authorization")||"").match(/^Bearer\s+(\S+)$/i);if(!m||m[1].length>8192)return {error:"يلزم تسجيل الدخول.",status:401};
@@ -122,16 +123,24 @@ async function onRequestPostInternal({request,env}) {
       if(ctx.role!=="staff")return reply({message:"هذه العملية متاحة للموظف فقط."},403);
       const lock=await readDoc(ctx,LOCK_ID);
       if(lock.status==="active"&&lock.employeeUid!==ctx.uid)return reply({message:"يوجد موظف آخر مسجل الدخول. يجب أن ينهي جلسته ويسلّم العهدة أولًا.",activeSession:{employeeName:lock.employeeName,expectedAmount:lock.expectedAmount||"0",notes:lock.notes||""}},409);
-      if(lock.status==="active"&&lock.employeeUid===ctx.uid){return reply({active:true,session:lock,alreadyActive:true});}
+      if(lock.status==="active"&&lock.employeeUid===ctx.uid){
+        const history=await readDoc(ctx,"custody-last-closed");
+        const staleBaseline=!lock.handoverAccepted&&!validSameDayOwnHandover(history,ctx.uid,now)&&(Number(lock.baselineReceipts||0)>0||Number(lock.baselineExpenses||0)>0);
+        if(staleBaseline){
+          const corrected={...lock,baselineReceipts:"0.00",baselineExpenses:"0.00",updatedAt:now};
+          const patchFields=["baselineReceipts","baselineExpenses","updatedAt"].map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");
+          const saved=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+LOCK_ID+"?"+patchFields,{method:"PATCH",body:JSON.stringify(enc(corrected))});
+          if(saved?.__conflict)return reply({message:"تغيرت بيانات العهدة بالتزامن. حدّث الصفحة وحاول مرة أخرى."},409);
+          return reply({active:true,session:corrected,alreadyActive:true,baselineCorrected:true});
+        }
+        return reply({active:true,session:lock,alreadyActive:true});
+      }
       const history=await readDoc(ctx,"custody-last-closed");
       if(!history.settledAt&&history.previousEmployeeUid&&history.previousEmployeeUid!==ctx.uid&&history.acceptedByUid!==ctx.uid&&!data.acceptHandover){
         return reply({message:"توجد عهدة مسلّمة من الموظف السابق وتحتاج تأكيد استلامك.",pendingHandover:{previousEmployeeName:history.previousEmployeeName||"الموظف السابق",actualAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.nextOpeningAmount||"0.00"),notes:history.notes||"",closedAt:history.closedAt||""}},409);
       }
       // Start at zero unless the employee explicitly accepts an incoming handover.
-      const previousHandoverAmount=Number(history.totalHandedOverAmount??history.nextOpeningAmount??0);
-      const previousHandoverExpected=Number(history.expectedAmount||0);
-      const previousDailyNet=Math.max(0,Number(history.baselineReceipts||0)-Number(history.baselineExpenses||0));
-      const sameDayOwnHandover=history.previousEmployeeUid===ctx.uid&&cairoDate(history.closedAt||"")===cairoDate(now)&&previousHandoverAmount+0.009>=previousHandoverExpected&&previousHandoverAmount+0.009>=previousDailyNet;
+      const sameDayOwnHandover=validSameDayOwnHandover(history,ctx.uid,now);
       const opening=data.acceptHandover?Number(history.nextOpeningAmount||0):0;
       const baselineReceipts=data.acceptHandover||sameDayOwnHandover?Number(history.baselineReceipts||0):0;
       const baselineExpenses=data.acceptHandover||sameDayOwnHandover?Number(history.baselineExpenses||0):0;
