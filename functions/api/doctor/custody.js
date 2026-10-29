@@ -142,10 +142,13 @@ async function onRequestPostInternal({request,env}) {
         return reply({message:"توجد عهدة مسلّمة من الموظف السابق وتحتاج تأكيد استلامك.",pendingHandover:{previousEmployeeName:history.previousEmployeeName||"الموظف السابق",actualAmount:String(history.nextOpeningAmount||"0.00"),expectedAmount:String(history.nextOpeningAmount||"0.00"),notes:history.notes||"",closedAt:history.closedAt||""}},409);
       }
       // Start at zero unless the employee explicitly accepts an incoming handover.
+      const sameDayHandover=Boolean(history.closedAt&&cairoDate(history.closedAt)===cairoDate(now));
       const sameDayOwnHandover=validSameDayOwnHandover(history,ctx.uid,now);
       const opening=data.acceptHandover?Number(history.nextOpeningAmount||0):0;
-      const baselineReceipts=data.acceptHandover||sameDayOwnHandover?Number(history.baselineReceipts||0):0;
-      const baselineExpenses=data.acceptHandover||sameDayOwnHandover?Number(history.baselineExpenses||0):0;
+      // Carry forward today's receipt/expense baseline across employee switches and doctor settlement.
+      // This excludes receipts already present before the new session from the next handover amount.
+      const baselineReceipts=data.acceptHandover||sameDayHandover?Number(history.baselineReceipts||0):0;
+      const baselineExpenses=data.acceptHandover||sameDayHandover?Number(history.baselineExpenses||0):0;
       const record={type:"custodySession",status:"active",employeeUid:ctx.uid,employeeName:ctx.name,openingAmount:opening.toFixed(2),expectedAmount:opening.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),handoverAccepted:Boolean(data.acceptHandover),notes:"",startedAt:now,updatedAt:now};
       const made=await createRecord(ctx,LOCK_ID,record);
       if(made?.__conflict)return reply({message:"بدأ موظف آخر جلسة في نفس اللحظة. حدّث الصفحة وحاول مرة أخرى."},409);
