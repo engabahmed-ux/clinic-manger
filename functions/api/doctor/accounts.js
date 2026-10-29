@@ -160,12 +160,16 @@ export async function onRequestPost({ request, env }) {
       const date = String(data.date || "");
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
       const expensesRecords = await listRecords(projectId, token, "dailyExpense");
-      const expenses = expensesRecords.filter(x => x.date === date)
+      const dailyExpenseRecords = expensesRecords.filter(x => x.date === date);
+      const custodyTotalExpenses = dailyExpenseRecords
+        .filter(x => (x.status || "approved") === "approved")
+        .reduce((sum, x) => sum + (Number(x.amount) || 0), 0);
+      const expenses = dailyExpenseRecords
         .filter(x => verified.accountType === "doctor" || !x.enteredBy || x.enteredBy === verified.uid)
         .map(x => ({ id:x.id, description:x.personName, amount:x.amount, date:x.date, notes:x.notes, createdAt:x.createdAt,
           status:x.status || "approved", enteredBy:x.enteredBy, enteredByName:x.enteredByName,
           approvedByName:x.approvedByName, approvedAt:x.approvedAt, reviewedByName:x.reviewedByName, reviewedAt:x.reviewedAt, rejectionReason:x.rejectionReason }));
-      return jsonResponse({ expenses, date, accountType:verified.accountType, expenseMode:verified.expenseMode || "auto" });
+      return jsonResponse({ expenses, date, custodyTotalExpenses:custodyTotalExpenses.toFixed(2), accountType:verified.accountType, expenseMode:verified.expenseMode || "auto" });
     }
     if (data.action === "listMonthlyExpenses") {
       const month = String(data.month || "");
