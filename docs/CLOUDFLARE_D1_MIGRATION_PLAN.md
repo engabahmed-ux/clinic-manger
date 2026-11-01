@@ -62,8 +62,8 @@
 
 ### Stage 3 — D1 sandbox and backend adapter
 - [x] Created dedicated D1 database `clinic-manger-migration-sandbox` (UUID `d34dbe2f-b45e-40a6-9bb0-7e8b526b117f`) for migration testing only.
-- [ ] Add a D1 binding to a non-production preview configuration only; binding has not been changed because existing preview secrets/config must not be overwritten.
-- [ ] Implement a small server-only database adapter and health/schema checks.
+- [x] Added `CLINIC_DB` binding to the Pages preview environment only and re-read the configuration to verify all existing preview secret names and compatibility settings were preserved; production has no D1 binding.
+- [x] Added server-only D1 adapter `functions/_shared/d1.js` and doctor-only diagnostic endpoint `functions/api/doctor/d1-health.js`; authenticated runtime verification is pending.
 - [ ] Add explicit query limits, pagination, prepared statements, and indexes.
 - [ ] Keep existing Firebase-backed routes working until each route has parity tests.
 - Acceptance: migrations apply cleanly in a disposable environment; no production binding or secret changed.
@@ -120,13 +120,15 @@
 - The free-tier quota is not an uptime guarantee; quota exhaustion and database failures must be handled explicitly.
 
 ## Implementation log
-- 2026-11-01: Created isolated branch and this migration plan. Initial infrastructure inspection was read-only. No D1 database created yet; no production code, database, secrets, or traffic changed.
+- 2026-11-01: Created isolated branch and migration plan. No production code, database, secrets, or traffic changed.
 
 
 ## Progress update — 2026-11-01
 - Created branch `feature/cloudflare-d1-migration` from `feature/firestore-read-optimization`.
 - Added `docs/CLOUDFLARE_D1_AUDIT.md` with the observed collection-to-table mapping, route inventory, and migration risks.
 - Added `migrations/0001_initial_schema.sql`; successfully applied it to the isolated D1 sandbox and verified table/index inventory.
-- Added `functions/_shared/d1.js`; it is not yet wired into existing application routes.
-- No real clinic data was copied, and no production Pages bindings, Firebase resources, or main-branch files were changed.
-- Before the first application route can use D1, configure a preview-only D1 binding without replacing existing environment secrets, then add parity tests and port a low-risk feature.
+- Added `functions/_shared/d1.js` and a doctor-UID-restricted diagnostic route at `functions/api/doctor/d1-health.js`. The endpoint uses the existing Firebase API-key setting only to validate the signed-in user; it returns schema version and table counts, not patient data.
+- Added the `CLINIC_DB` D1 binding to Pages preview only. Verified that the preview's existing secret names and compatibility settings remained unchanged; production still has no D1 binding.
+- The new preview deployment `https://47df37f8.clinic-manger.pages.dev` completed build and deploy successfully.
+- No real clinic data was copied, and no production Pages bindings, Firebase resources, production traffic, or `main`-branch files were changed.
+- Next gate: verify unauthenticated requests are rejected and the doctor-only endpoint returns the expected D1 schema/counts; then add parity tests before selecting the first existing read-only feature for migration.
