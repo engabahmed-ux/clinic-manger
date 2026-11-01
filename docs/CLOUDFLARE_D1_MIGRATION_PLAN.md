@@ -41,7 +41,7 @@
 ## Work plan and acceptance gates
 
 ### Stage 1 — Complete code and data-flow audit
-- [ ] Inventory every Firestore collection, document shape, query, write, transaction, batch, and server timestamp usage.
+- [x] Inventory the main Firestore collections and their primary consumers; field-by-field audit remains in progress for less common flows.
 - [ ] Inventory every Firebase Authentication flow, staff/doctor permission check, patient portal flow, and user lifecycle operation.
 - [ ] Inventory all API actions and browser call sites; record response shapes and error handling.
 - [ ] Trace booking statuses, queue numbering, postponement/rescheduling, archive rules, and calendar counts.
@@ -53,16 +53,16 @@
 
 ### Stage 2 — Data model and migration design
 - [ ] Design normalized tables and indexes based on actual code and document shapes, not assumptions.
-- [ ] Define IDs, foreign keys, uniqueness rules, nullability, status constraints, and timestamp representation.
+- [x] Draft initial table IDs, defaults, indexed filters, and ISO timestamp representation; final schema review remains open.
 - [ ] Define transaction boundaries for booking updates and financial operations.
 - [ ] Define idempotency rules for repeated requests and concurrent updates.
 - [ ] Define privacy-safe logs and retention requirements.
-- [ ] Create reversible SQL migrations and synthetic seed/test fixtures.
+- [x] Create initial SQL migration file and apply it to the isolated D1 sandbox; reversible down-migration and fixture suite remain to be added.
 - Acceptance: schema reviewed against all real code paths; no production data copied.
 
 ### Stage 3 — D1 sandbox and backend adapter
-- [ ] Create a dedicated D1 database for migration testing only.
-- [ ] Add a D1 binding to the preview configuration only.
+- [x] Created dedicated D1 database `clinic-manger-migration-sandbox` (UUID `d34dbe2f-b45e-40a6-9bb0-7e8b526b117f`) for migration testing only.
+- [ ] Add a D1 binding to a non-production preview configuration only; binding has not been changed because existing preview secrets/config must not be overwritten.
 - [ ] Implement a small server-only database adapter and health/schema checks.
 - [ ] Add explicit query limits, pagination, prepared statements, and indexes.
 - [ ] Keep existing Firebase-backed routes working until each route has parity tests.
@@ -121,3 +121,12 @@
 
 ## Implementation log
 - 2026-11-01: Created isolated branch and this migration plan. Initial infrastructure inspection was read-only. No D1 database created yet; no production code, database, secrets, or traffic changed.
+
+
+## Progress update — 2026-11-01
+- Created branch `feature/cloudflare-d1-migration` from `feature/firestore-read-optimization`.
+- Added `docs/CLOUDFLARE_D1_AUDIT.md` with the observed collection-to-table mapping, route inventory, and migration risks.
+- Added `migrations/0001_initial_schema.sql`; successfully applied it to the isolated D1 sandbox and verified table/index inventory.
+- Added `functions/_shared/d1.js`; it is not yet wired into existing application routes.
+- No real clinic data was copied, and no production Pages bindings, Firebase resources, or main-branch files were changed.
+- Before the first application route can use D1, configure a preview-only D1 binding without replacing existing environment secrets, then add parity tests and port a low-risk feature.
