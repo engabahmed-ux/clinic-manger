@@ -130,5 +130,7 @@
 - Added `functions/_shared/d1.js` and a doctor-UID-restricted diagnostic route at `functions/api/doctor/d1-health.js`. The endpoint uses the existing Firebase API-key setting only to validate the signed-in user; it returns schema version and table counts, not patient data.
 - Added the `CLINIC_DB` D1 binding to Pages preview only. Verified that the preview's existing secret names and compatibility settings remained unchanged; production still has no D1 binding.
 - The new preview deployment `https://47df37f8.clinic-manger.pages.dev` completed build and deploy successfully.
+- Queried the isolated D1 database through Cloudflare's D1 API: migration version `0001_initial_schema` is present, all expected tables exist, and the bookings/medical-patients/medical-visits/account-records counts are all zero. This confirms no real clinic data was copied.
+- Re-read the Pages project config after the binding change: `CLINIC_DB` exists in preview only; the three pre-existing preview secret names and compatibility date are unchanged; production has no D1 binding and its secret names are unchanged.
 - No real clinic data was copied, and no production Pages bindings, Firebase resources, production traffic, or `main`-branch files were changed.
 - Next gate: verify unauthenticated requests are rejected and the doctor-only endpoint returns the expected D1 schema/counts; then add parity tests before selecting the first existing read-only feature for migration.
