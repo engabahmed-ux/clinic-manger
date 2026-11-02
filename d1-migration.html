@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>نقل بيانات العيادة إلى Cloudflare D1</title>
+  <style>
+    :root{font-family:Tahoma,Arial,sans-serif;color:#17202a;background:#f4f6f8}
+    *{box-sizing:border-box}
+    body{margin:0;padding:20px}
+    main{max-width:820px;margin:0 auto}
+    .card{background:#fff;border:1px solid #e3e8ed;border-radius:18px;padding:22px;margin:0 0 16px;box-shadow:0 8px 28px #1525360a}
+    h1{font-size:24px;margin:0 0 10px}
+    h2{font-size:18px;margin:0 0 12px}
+    p{line-height:1.8;color:#4b5563}
+    .warning{border-right:5px solid #e0a22d;background:#fff8e8;padding:12px 14px;border-radius:10px;color:#684c12}
+    label{display:block;font-size:14px;margin:12px 0 6px}
+    input[type=email],input[type=password]{width:100%;padding:13px;border:1px solid #ccd5dd;border-radius:10px;font-size:16px}
+    .check{display:flex;gap:10px;align-items:flex-start;line-height:1.7}
+    .check input{margin-top:6px}
+    button{border:0;border-radius:11px;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer;background:#173b57;color:white;margin:6px 0 0}
+    button.secondary{background:#e9eef2;color:#233746}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .row>*{flex:1}
+    #status,#progress{white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f9fb;border:1px solid #e3e8ed;border-radius:10px;padding:12px;min-height:42px;line-height:1.7}
+    #progress{max-height:280px;overflow:auto;font-size:13px}
+    .hidden{display:none!important}
+    .muted{font-size:13px;color:#667482}
+    .good{color:#12683b}.bad{color:#a72a2a}
+    @media(max-width:560px){body{padding:10px}.card{padding:16px}h1{font-size:21px}.row{display:block}}
+  </style>
+</head>
+<body>
+<main>
+  <section class="card">
+    <h1>نقل بيانات العيادة إلى Cloudflare D1</h1>
+    <p>أداة نقل مستقلة لفرع الاختبار فقط. تنسخ البيانات من Firestore إلى قاعدة D1 التجريبية دون تعديل أو حذف أي بيانات في Firebase، ولا تغيّر الموقع الرئيسي.</p>
+    <div class="warning">تنبيه: قراءة بيانات Firebase أثناء النقل قد تستهلك قراءات حسب عدد المستندات. شغّل النقل مرة واحدة واترك الصفحة مفتوحة حتى تنتهي، ويمكن استكماله بعد انقطاع الاتصال.</div>
+    <p class="muted">لأمان البيانات الطبية، تسجيل الدخول والتحقق من هوية الطبيب يتمان قبل السماح بالنسخ. كلمة المرور تُرسل مباشرة إلى Firebase من متصفحك ولا تُرسل إلى هذا الخادم أو تُحفظ في هذه الصفحة.</p>
+  </section>
+
+  <section class="card" id="loginCard">
+    <h2>دخول الطبيب</h2>
+    <label for="email">البريد الإلكتروني</label>
+    <input id="email" type="email" autocomplete="username">
+    <label for="password">كلمة المرور</label>
+    <input id="password" type="password" autocomplete="current-password">
+    <div class="row">
+      <button id="loginBtn">تسجيل الدخول والتحقق</button>
+    </div>
+    <div id="loginMessage" class="muted" role="status"></div>
+  </section>
+
+  <section class="card hidden" id="migrationCard">
+    <h2>حالة قاعدة البيانات</h2>
+    <div id="identity" class="muted"></div>
+    <div id="status">لم يتم فحص قاعدة D1 بعد.</div>
+    <div class="row">
+      <button id="refreshBtn" class="secondary">فحص الحالة</button>
+      <button id="logoutBtn" class="secondary">تسجيل الخروج</button>
+    </div>
+    <hr style="border:0;border-top:1px solid #e7ebef;margin:20px 0">
+    <h2>نسخ البيانات</h2>
+    <p>ينقل هذا الإجراء المستندات الموجودة في مجموعات العيادة المحددة إلى جداول D1 باستخدام معرّفاتها الأصلية، ويمكن إعادة تشغيله بأمان نسبيًا لأن النسخ يستخدم upsert بدل إنشاء نسخ مكررة. لا يبدّل التطبيق لاستخدام D1 تلقائيًا.</p>
+    <label class="check"><input id="confirm" type="checkbox"><span>أؤكد أنني أريد نسخ بيانات مشروع العيادة إلى قاعدة Cloudflare D1 التجريبية، وأفهم أن هذا الإجراء سيقرأ مستندات Firebase.</span></label>
+    <div class="row">
+      <button id="startBtn" disabled>ابدأ / استكمل النقل</button>
+      <button id="statusBtn" class="secondary">تحديث أعداد D1</button>
+    </div>
+    <div id="progress" aria-live="polite">لم يبدأ النقل.</div>
+  </section>
+</main>
+<script type="module">
+  import { FIREBASE_CONFIG } from "./src/config/firebase-config.js";
+  import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  const app = getApps().find(item => item.name === "[DEFAULT]") || initializeApp(FIREBASE_CONFIG);
+  const auth = getAuth(app);
+  const $ = id => document.getElementById(id);
+  const loginCard = $("loginCard");
+  const migrationCard = $("migrationCard");
+  const loginMessage = $("loginMessage");
+  const statusBox = $("status");
+  const progressBox = $("progress");
+  const confirmBox = $("confirm");
+  const startBtn = $("startBtn");
+  const checkpointKey = "clinic-d1-migration-preview-v1";
+  const collections = [
+    "clinicSettings/current",
+    "clinicStaff",
+    "clinicBookings",
+    "clinicPatients",
+    "clinicPatientUsernames",
+    "clinicMedicalPatients",
+    "clinicMedicalVisits",
+    "clinicAccountRecords",
+    "clinicLogs"
+  ];
+  let busy = false;
+
+  function writeProgress(message) {
+    progressBox.textContent += (progressBox.textContent ? "\n" : "") + message;
+    progressBox.scrollTop = progressBox.scrollHeight;
+  }
+  function readCheckpoint() {
+    try { return JSON.parse(localStorage.getItem(checkpointKey) || "null"); } catch { return null; }
+  }
+  function saveCheckpoint(value) { localStorage.setItem(checkpointKey, JSON.stringify(value)); }
+  function token() {
+    if (!auth.currentUser) throw new Error("سجّل الدخول أولًا.");
+    return auth.currentUser.getIdToken();
+  }
+  async function api(body) {
+    const idToken = await token();
+    const response = await fetch("/api/doctor/d1-migration", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + idToken },
+      body: JSON.stringify(body)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.ok !== true) throw new Error(result.message || "تعذر تنفيذ الطلب (" + response.status + ").");
+    return result;
+  }
+  function showSignedIn() {
+    loginCard.classList.add("hidden");
+    migrationCard.classList.remove("hidden");
+    $("identity").textContent = "تم تسجيل الدخول: " + (auth.currentUser?.email || "حساب الطبيب");
+    refreshStatus().catch(error => { statusBox.textContent = error.message; });
+  }
+  async function refreshStatus() {
+    const result = await api({ action: "status" });
+    statusBox.textContent = "قاعدة البيانات: " + result.database + "\n" + Object.entries(result.counts || {}).map(([key, value]) => key + ": " + value).join("\n");
+  }
+  $("loginBtn").addEventListener("click", async () => {
+    $("loginBtn").disabled = true;
+    loginMessage.textContent = "جارٍ التحقق...";
+    try {
+      const email = $("email").value.trim();
+      const password = $("password").value;
+      if (!email || !password) throw new Error("أدخل البريد الإلكتروني وكلمة المرور.");
+      await signInWithEmailAndPassword(auth, email, password);
+      await api({ action: "status" });
+      $("password").value = "";
+      loginMessage.textContent = "";
+      showSignedIn();
+    } catch (error) {
+      loginMessage.textContent = error.message || "فشل تسجيل الدخول أو الحساب ليس حساب الطبيب المعتمد.";
+    } finally {
+      $("loginBtn").disabled = false;
+    }
+  });
+  $("refreshBtn").addEventListener("click", async () => {
+    try { await refreshStatus(); } catch (error) { statusBox.textContent = error.message; }
+  });
+  $("statusBtn").addEventListener("click", async () => {
+    try { await refreshStatus(); writeProgress("تم تحديث أعداد D1."); } catch (error) { writeProgress("خطأ: " + error.message); }
+  });
+  confirmBox.addEventListener("change", () => { startBtn.disabled = !confirmBox.checked || busy; });
+  $("logoutBtn").addEventListener("click", async () => {
+    await signOut(auth);
+    migrationCard.classList.add("hidden");
+    loginCard.classList.remove("hidden");
+    loginMessage.textContent = "تم تسجيل الخروج.";
+  });
+
+  startBtn.addEventListener("click", async () => {
+    if (busy || !confirmBox.checked) return;
+    busy = true;
+    startBtn.disabled = true;
+    progressBox.textContent = "";
+    let checkpoint = readCheckpoint() || { index: 0, pageToken: null, totals: {} };
+    if (!Number.isInteger(checkpoint.index) || checkpoint.index < 0 || checkpoint.index > collections.length) checkpoint = { index: 0, pageToken: null, totals: {} };
+    try {
+      for (let i = checkpoint.index; i < collections.length; i++) {
+        const collection = collections[i];
+        let pageToken = i === checkpoint.index ? checkpoint.pageToken : null;
+        writeProgress("بدء/استكمال: " + collection);
+        while (true) {
+          const result = await api({
+            action: "import-page",
+            collection,
+            pageSize: 50,
+            pageToken,
+            confirm: "IMPORT_TO_D1_PREVIEW"
+          });
+          checkpoint.totals[collection] = (checkpoint.totals[collection] || 0) + result.imported;
+          writeProgress(collection + ": تم نسخ " + result.imported + " مستند في هذه الدفعة.");
+          if (result.done) {
+            checkpoint.index = i + 1;
+            checkpoint.pageToken = null;
+            saveCheckpoint(checkpoint);
+            break;
+          }
+          pageToken = result.nextPageToken;
+          checkpoint.index = i;
+          checkpoint.pageToken = pageToken;
+          saveCheckpoint(checkpoint);
+        }
+      }
+      checkpoint.index = collections.length;
+      checkpoint.pageToken = null;
+      checkpoint.completedAt = new Date().toISOString();
+      saveCheckpoint(checkpoint);
+      writeProgress("اكتملت عملية النسخ لكل المجموعات المحددة. جارٍ فحص أعداد D1...");
+      await refreshStatus();
+      writeProgress("انتهى النقل. لم يتم تغيير مصدر قراءة التطبيق؛ ما زال يحتاج اختبار تطابق البيانات ثم تحويل المسارات تدريجيًا.");
+    } catch (error) {
+      saveCheckpoint(checkpoint);
+      writeProgress("توقفت العملية لحماية البيانات: " + error.message);
+      writeProgress("تم حفظ نقطة الاستكمال محليًا في هذا المتصفح. يمكنك إصلاح السبب ثم الضغط على استكمل النقل.");
+    } finally {
+      busy = false;
+      startBtn.disabled = !confirmBox.checked;
+    }
+  });
+</script>
+</body>
+</html>
