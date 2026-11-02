@@ -97,6 +97,7 @@ function camel(snake) { return snake.replace(/_([a-z])/g, (_, char) => char.toUp
 function rawField(payload, column) {
   const aliases = {
     record_type: ["recordType", "type"],
+    permissions_json: ["permissions", "permissionsJson"],
     person_name: ["personName", "person"],
     employee_uid: ["employeeUid", "employeeId"],
     employee_name: ["employeeName"],
@@ -192,7 +193,7 @@ export async function onRequestPost({ request, env }) {
     if (action !== "import-page") return json({ ok: false, message: "إجراء غير مدعوم." }, 400);
     if (body.confirm !== "IMPORT_TO_D1_PREVIEW") return json({ ok: false, message: "يلزم تأكيد النقل إلى قاعدة الاختبار." }, 400);
     const collection = String(body.collection || "");
-    const pageSize = Math.min(50, Math.max(1, Number(body.pageSize) || 25));
+    const pageSize = Math.min(25, Math.max(1, Number(body.pageSize) || 25));
     const pageToken = typeof body.pageToken === "string" ? body.pageToken : "";
     const account = parseServiceAccount(env);
     const accessToken = await googleAccessToken(account);
