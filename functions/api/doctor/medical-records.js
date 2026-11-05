@@ -28,92 +28,9 @@ function decodeBookingRow(row) {
   const pick=(camel,snake,fallback="")=>p[camel]??row?.[snake]??fallback;
   return {...p,id:row?.id||p.id||"",patientName:pick("patientName","patient_name"),patientId:pick("patientId","patient_id"),patientPhone:pick("patientPhone","patient_phone"),appointmentDate:pick("appointmentDate","appointment_date"),service:pick("service","service"),servicePrice:pick("servicePrice","service_price","0"),paidAmount:pick("paidAmount","paid_amount","0"),completedFee:pick("completedFee","completed_fee"),completedAt:pick("completedAt","completed_at"),status:pick("status","status","pending"),queueNumber:pick("queueNumber","queue_number"),notes:pick("notes","notes"),bloodPressure:pick("bloodPressure","blood_pressure"),weight:pick("weight","weight"),bloodSugar:pick("bloodSugar","blood_sugar"),preVisitNotes:pick("preVisitNotes","pre_visit_notes"),createdAt:pick("createdAt","created_at"),updatedAt:pick("updatedAt","updated_at"),archivedAt:pick("archivedAt","archived_at"),archivedByName:pick("archivedByName","archived_by_name"),archivedRescheduleHistory:pick("archivedRescheduleHistory","archived_reschedule_history_json","[]"),isArchived:Number(row?.is_archived)===1||p.isArchived===true};
 }
-function norm(value){return String(value||"").normalize("NFKC").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/\s+/g," ").trim().toLocaleLowerCase("ar");}
-function normPhone(value){return String(value||"").replace(/\D/g,"");}
-function decode(document){const fields=document?.fields||{};return {id:(document?.name||"").split("/").pop(),patientNumber:read(fields,"patientNumber"),displayName:read(fields,"displayName"),phone:read(fields,"phone"),gender:read(fields,"gender"),birthDate:read(fields,"birthDate"),notes:read(fields,"notes"),createdAt:read(fields,"createdAt"),updatedAt:read(fields,"updatedAt")};}
-function decodeVisit(document){const f=document?.fields||{};return {id:(document?.name||"").split("/").pop(),patientId:read(f,"patientId"),bookingId:read(f,"bookingId"),visitDate:read(f,"visitDate"),queueNumber:read(f,"queueNumber"),bloodPressure:read(f,"bloodPressure"),weight:read(f,"weight"),bloodSugar:read(f,"bloodSugar"),preVisitNotes:read(f,"preVisitNotes"),diagnosis:read(f,"diagnosis"),clinicalNotes:read(f,"clinicalNotes"),treatment:read(f,"treatment"),followUp:read(f,"followUp"),followUpNotes:read(f,"followUpNotes"),followUpDays:read(f,"followUpDays"),followUpDate:read(f,"followUpDate"),createdAt:read(f,"createdAt"),updatedAt:read(f,"updatedAt"),createdByName:read(f,"createdByName")};}
-function fieldsFrom(value,keys){const fields={};for(const key of keys)fields[key]=str(value[key]);return {fields};}
-async function verifyUser(request,env){
-  if(!env.FIREBASE_API_KEY)return {ok:false,status:503,message:"خدمة التحقق غير مهيأة."};
-  const match=(request.headers.get("Authorization")||"").match(/^Bearer\\s+(\\S+)$/i);
-  if(!match||match[1].length>8192)return {ok:false,status:401,message:"يلزم تسجيل الدخول."};
-  const response=await fetch(LOOKUP_URL+"?key="+encodeURIComponent(env.FIREBASE_API_KEY),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:match[1]})});
-  if(!response.ok)return {ok:false,status:401,message:"جلسة الدخول غير صالحة. سجّل الدخول مجددًا."};
-  const result=await response.json(),user=result.users?.[0];
-  return user?.localId?{ok:true,uid:user.localId,email:user.email||""}:{ok:false,status:401,message:"تعذر التحقق من الحساب."};
-}
-async function accessFor(user,env){
-  if(user.uid===DOCTOR_ADMIN_UID)return {ok:true,accountType:"doctor",uid:user.uid,displayName:"الدكتور",permissions:{bookings:"edit",patients:"edit",medicalRecords:"edit"}};
-  const database=getClinicDatabase(env);
-  const row=await d1First(database,"SELECT role, active, display_name, permissions_json FROM staff WHERE uid = ? LIMIT 1",[user.uid]);
-  if(!row||row.role!=="staff"||Number(row.active)!==1)return {ok:false,status:403,message:"حساب الموظف غير نشط أو غير معتمد."};
-  let permissions={};try{permissions=JSON.parse(row.permissions_json||"{}");}catch{}
-  const p={bookings:permissions.bookings||"none",patients:permissions.patients||"none",medicalRecords:permissions.medicalRecords||"none"};
-  if(!["view","edit"].some(v=>p.bookings===v||p.patients===v||p.medicalRecords===v))return {ok:false,status:403,message:"لا تملك صلاحية الوصول إلى ملفات المرضى."};
-  return {ok:true,accountType:"staff",uid:user.uid,displayName:row.display_name||"الموظف",permissions:p};
-}
-async function allPatients(env){return (await d1All(getClinicDatabase(env),"SELECT * FROM medical_patients ORDER BY created_at ASC")).map(decode);}
-async function allBookings(env){return (await d1All(getClinicDatabase(env),"SELECT * FROM bookings ORDER BY created_at ASC")).map(row=>{let p={};try{p=JSON.parse(row.source_payload_json||"{}");}catch{}return {...p,id:row.id,patientName:p.patientName??row.patient_name??"",patientId:p.patientId??row.patient_id??"",patientPhone:p.patientPhone??row.patient_phone??"",appointmentDate:p.appointmentDate??row.appointment_date??"",service:p.service??row.service??"",status:p.status??row.status??"",bloodPressure:p.bloodPressure??row.blood_pressure??"",weight:p.weight??row.weight??"",bloodSugar:p.bloodSugar??row.blood_sugar??"",preVisitNotes:p.preVisitNotes??row.pre_visit_notes??"",createdAt:p.createdAt??row.created_at??""};});}
-async function findPatient(env,id){if(!validId(id))return null;const row=await d1First(getClinicDatabase(env),"SELECT * FROM medical_patients WHERE id = ? LIMIT 1",[id]);return row?decode(row):null;}
-async function savePatient(env,patient){
-  const db=getClinicDatabase(env),now=new Date().toISOString(),id=crypto.randomUUID();
-  const data={...patient,id,patientNumber:patient.patientNumber||"P-"+Math.random().toString(36).slice(2,8).toUpperCase(),createdAt:patient.createdAt||now,updatedAt:now};
-  await d1Run(db,"INSERT INTO medical_patients (id,patient_number,display_name,phone,gender,birth_date,notes,created_at,updated_at,source_payload_json) VALUES (?,?,?,?,?,?,?,?,?,?)",
-    [id,data.patientNumber,data.displayName,data.phone,data.gender,data.birthDate,data.notes,data.createdAt,data.updatedAt,JSON.stringify(data)]);
-  return data;
-}
-async function updateBookingPatient(env,booking,patientId){
-  const db=getClinicDatabase(env),payload={...booking,patientId};
-  await d1Run(db,"UPDATE bookings SET patient_id = ?, source_payload_json = ? WHERE id = ?",[patientId,JSON.stringify(payload),booking.id]);
-}
-async function resolvePatient(env,data){
-  let patient=data.patientId?await findPatient(env,String(data.patientId)):null;
-  if(data.patientId&&!patient)throw new Error("ملف المريض المحدد لم يعد موجودًا. ابحث عنه مرة أخرى.");
-  let name=String(data.patientName||"").trim(),phone=String(data.patientPhone||"").trim();
-  if(!patient){
-    const legacyBookingId=String(data.legacyBookingId||"");
-    if(validId(legacyBookingId)&&(name.length<2||phone.length<5)){
-      const legacy=(await allBookings(env)).find(b=>b.id===legacyBookingId);
-      if(name.length<2)name=String(legacy?.patientName||"").trim();
-      if(phone.length<5)phone=String(legacy?.patientPhone||"").trim();
-    }
-    if(name.length<2||name.length>120||phone.length<5||phone.length>40)throw new Error("أدخل اسم المريض ورقم هاتف صحيحًا.");
-    const docs=await allPatients(env),found=docs.find(p=>norm(p.displayName)===norm(name)&&normPhone(p.phone)===normPhone(phone));
-    patient=found||await savePatient(env,{displayName:name,phone,gender:String(data.gender||""),birthDate:String(data.birthDate||""),notes:""});
-  }
-  const bookings=await allBookings(env);
-  for(const booking of bookings){
-    if(booking.status==="completed"||booking.patientId||norm(booking.patientName)!==norm(patient.displayName)||normPhone(booking.patientPhone)!==normPhone(patient.phone))continue;
-    await updateBookingPatient(env,booking,patient.id);
-  }
-  return patient;
-}
-async function searchPatients(env,query){
-  const q=norm(query);if(q.length<1)return [];
-  const [patientDocs,bookingDocs]=await Promise.all([allPatients(env),allBookings(env)]);
-  const result=new Map();
-  for(const p of patientDocs)if(norm(p.displayName).includes(q)||norm(p.phone).includes(q)||norm(p.patientNumber).includes(q))result.set(p.id,{...p,legacy:false});
-  for(const booking of bookingDocs){
-    const name=booking.patientName||"",phone=booking.patientPhone||"",id=booking.patientId||"";
-    if(!name||(!norm(name).includes(q)&&!norm(phone).includes(q)))continue;
-    if(id){if(!result.has(id)){const p=await findPatient(env,id);if(p)result.set(id,{...p,legacy:false});}continue;}
-    const exists=[...result.values()].some(p=>norm(p.displayName)===norm(name)&&normPhone(p.phone)===normPhone(phone));
-    if(exists)continue;
-    const key=norm(name)+"|"+normPhone(phone);
-    if(!result.has(key))result.set(key,{id:"",legacyBookingId:booking.id,displayName:name,phone,patientNumber:"",legacy:true});
-  }
-  return [...result.values()].filter(p=>norm(p.displayName).includes(q)||norm(p.phone).includes(q)||norm(p.patientNumber).includes(q)).slice(0,20);
-}
-async function getPatientHistory(env,patientId){
-  const patient=await findPatient(env,patientId);if(!patient)throw new Error("ملف المريض غير موجود.");
-  const db=getClinicDatabase(env);
-  const [visitRows,bookings]=await Promise.all([d1All(db,"SELECT * FROM medical_visits WHERE patient_id = ? ORDER BY visit_date DESC, created_at DESC",[patientId]),allBookings(env)]);
-  const visits=visitRows.map(decodeVisit);
-  const linked=bookings.filter(b=>b.patientId===patientId||(!b.patientId&&norm(b.patientName)===norm(patient.displayName)&&normPhone(b.patientPhone)===normPhone(patient.phone)));
-  const historyBookings=linked.map(b=>({id:b.id,appointmentDate:b.appointmentDate,patientName:b.patientName,patientPhone:b.patientPhone,service:b.service,status:b.status,bloodPressure:b.bloodPressure,weight:b.weight,bloodSugar:b.bloodSugar,preVisitNotes:b.preVisitNotes,createdAt:b.createdAt}));
-  return {patient,visits,bookings:historyBookings};
-}
-
+function norm(value){return String(value||"").normalize("NFKC").replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/\\s+/g," ").trim().toLocaleLowerCase("ar");}
+function normPhone(value){return String(value||"").replace(/\\D/g,"");}
+function validId(value){return typeof value==="string"&&/^[A-Za-z0-9_-]{1,150}$/.test(value);}
 function canSearch(access){return access.accountType==="doctor"||["view","edit"].some(v=>access.permissions.bookings===v||access.permissions.patients===v||access.permissions.medicalRecords===v);}
 function canResolve(access){return access.accountType==="doctor"||access.permissions.bookings==="edit"||access.permissions.patients==="edit"||access.permissions.medicalRecords==="edit";}
 function canViewRecords(access){return access.accountType==="doctor"||["view","edit"].includes(access.permissions.medicalRecords);}
