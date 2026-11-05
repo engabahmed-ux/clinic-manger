@@ -1,7 +1,4 @@
-const EXPECTED_PROJECT_ID = "clinics-manger";
-const USERNAMES_COLLECTION = "clinicPatientUsernames";
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
-const GOOGLE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
+import { getClinicDatabase, d1First } from "../../_shared/d1.js";
 const FIREBASE_SIGNIN_URL = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword";
 
 function jsonResponse(body, status = 200) {
@@ -15,18 +12,6 @@ function jsonResponse(body, status = 200) {
     }
   });
 }
-function b64url(bytes) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-function b64text(value) { return b64url(new TextEncoder().encode(value)); }
-function privateKeyBytes(pem) {
-  const raw = atob(pem.replace(/-----BEGIN PRIVATE KEY-----/g, "").replace(/-----END PRIVATE KEY-----/g, "").replace(/\s/g, ""));
-  const bytes = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
-  return bytes;
-}
 function normalizeUsername(value) {
   return String(value || "").normalize("NFKC")
     .replace(/[\u064B-\u065F\u0670]/g, "")
@@ -36,30 +21,6 @@ function normalizeUsername(value) {
 function validUsername(value) {
   return value.length >= 3 && value.length <= 40 &&
     /^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u.test(value);
-}
-function parseServiceAccount(env) {
-  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) throw new Error("Missing service account secret.");
-  const account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
-  if (account.project_id !== EXPECTED_PROJECT_ID || !account.client_email || !account.private_key) throw new Error("Invalid service account.");
-  return account;
-}
-async function googleAccessToken(account) {
-  const now = Math.floor(Date.now() / 1000);
-  const unsigned = [
-    b64text(JSON.stringify({ alg: "RS256", typ: "JWT" })),
-    b64text(JSON.stringify({ iss: account.client_email, scope: GOOGLE_SCOPE, aud: GOOGLE_TOKEN_URL, iat: now, exp: now + 3600 }))
-  ].join(".");
-  const key = await crypto.subtle.importKey("pkcs8", privateKeyBytes(account.private_key), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
-  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned));
-  const response = await fetch(GOOGLE_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: unsigned + "." + b64url(new Uint8Array(signature)) })
-  });
-  if (!response.ok) throw new Error("Unable to obtain access token.");
-  const result = await response.json();
-  if (!result.access_token) throw new Error("Access token missing.");
-  return result.access_token;
 }
 
 export async function onRequest({ request, env }) {
@@ -85,23 +46,15 @@ export async function onRequest({ request, env }) {
   }
 
   try {
-    const account = parseServiceAccount(env);
-    const accessToken = await googleAccessToken(account);
-    const documentUrl = "https://firestore.googleapis.com/v1/projects/" +
-      encodeURIComponent(account.project_id) +
-      "/databases/(default)/documents/" + USERNAMES_COLLECTION + "/" + encodeURIComponent(username);
-    const lookup = await fetch(documentUrl, {
-      headers: { Authorization: "Bearer " + accessToken },
-      cache: "no-store"
-    });
-    if (!lookup.ok) {
-      return jsonResponse({ message: "اسم المستخدم أو كلمة المرور غير صحيحة." }, 401);
-    }
-    const document = await lookup.json();
-    const fields = document.fields || {};
-    const email = fields.email?.stringValue || "";
-    const uid = fields.uid?.stringValue || "";
-    const active = fields.active?.booleanValue === true;
+    const database = getClinicDatabase(env);
+    const usernameRecord = await d1First(
+      database,
+      "SELECT email, uid, active FROM patient_usernames WHERE username_key = ? LIMIT 1",
+      [username]
+    );
+    const email = usernameRecord?.email || "";
+    const uid = usernameRecord?.uid || "";
+    const active = Number(usernameRecord?.active) === 1;
     if (!email || !uid || !active) {
       return jsonResponse({ message: "اسم المستخدم أو كلمة المرور غير صحيحة." }, 401);
     }
