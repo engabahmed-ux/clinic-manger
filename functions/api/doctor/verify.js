@@ -1,3 +1,4 @@
+import { getClinicDatabase, d1First } from "../../_shared/d1.js";
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const FIREBASE_PROJECT_ID = "clinics-manger";
 const STAFF_COLLECTION = "clinicStaff";
@@ -49,13 +50,13 @@ async function googleAccessToken(account) {
   if (!result.access_token) throw new Error("Service access token missing.");
   return result.access_token;
 }
-async function readStaffDocument(projectId, token, uid) {
-  const url = "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(projectId) +
-    "/databases/(default)/documents/" + STAFF_COLLECTION + "/" + encodeURIComponent(uid);
-  const response = await fetch(url, { headers: { Authorization: "Bearer " + token } });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error("Unable to verify staff permissions.");
-  return response.json();
+async function readStaffDocument(env, uid) {
+  const database = getClinicDatabase(env);
+  return d1First(
+    database,
+    "SELECT uid, role, active, display_name, permissions_json FROM staff WHERE uid = ? LIMIT 1",
+    [uid]
+  );
 }
 function readString(fields, key) { return fields?.[key]?.stringValue || ""; }
 
@@ -83,19 +84,17 @@ export async function onRequestPost({ request, env }) {
       });
     }
 
-    const account = parseServiceAccount(env);
-    const token = await googleAccessToken(account);
-    const staffDocument = await readStaffDocument(account.project_id, token, user.localId);
-    const fields = staffDocument?.fields || {};
-    const permissions = fields.permissions?.mapValue?.fields || {};
+    const staffDocument = await readStaffDocument(env, user.localId);
+    let permissions = {};
+    try { permissions = JSON.parse(staffDocument?.permissions_json || "{}"); } catch {}
     const staffPermissions = {
-      bookings: readString(permissions, "bookings"),
-      patients: readString(permissions, "patients"),
-      medicalRecords: readString(permissions, "medicalRecords"),
-      accounts: readString(permissions, "accounts")
+      bookings: permissions.bookings || "none",
+      patients: permissions.patients || "none",
+      medicalRecords: permissions.medicalRecords || "none",
+      accounts: permissions.accounts || "none"
     };
 
-    if (readString(fields, "role") !== "staff" || fields.active?.booleanValue !== true) {
+    if (staffDocument?.role !== "staff" || Number(staffDocument.active) !== 1) {
       return jsonResponse({ error: "forbidden", message: "حساب الموظف غير نشط أو غير معتمد." }, 403);
     }
     if (!Object.values(staffPermissions).some(value => value === "view" || value === "edit")) {
@@ -104,7 +103,7 @@ export async function onRequestPost({ request, env }) {
 
     return jsonResponse({
       authorized: true, uid: user.localId, email: user.email || null,
-      accountType: "staff", displayName: readString(fields, "displayName") || "الموظف",
+      accountType: "staff", displayName: staffDocument.display_name || "الموظف",
       permissions: staffPermissions
     });
   } catch (error) {
