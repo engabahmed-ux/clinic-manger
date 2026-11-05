@@ -1,9 +1,5 @@
+import { getClinicDatabase, d1First, d1Run } from "../../_shared/d1.js";
 import { publishClinicRealtime } from "../../_shared/realtime.js";
-const EXPECTED_PROJECT_ID = "clinics-manger";
-const BOOKINGS_COLLECTION = "clinicBookings";
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
-const GOOGLE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
-
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -16,182 +12,48 @@ function jsonResponse(body, status = 200) {
   });
 }
 
-function encodeBytes(bytes) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-function encodeText(value) {
-  return encodeBytes(new TextEncoder().encode(value));
-}
-
-function decodePrivateKey(pem) {
-  const base64 = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
-    .replace(/-----END PRIVATE KEY-----/g, "")
-    .replace(/\s/g, "");
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-function parseServiceAccount(env) {
-  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-    throw new Error("Missing service account configuration.");
-  }
-
-  let account;
-  try {
-    account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
-  } catch {
-    throw new Error("Invalid service account JSON.");
-  }
-
-  if (
-    account.project_id !== EXPECTED_PROJECT_ID ||
-    typeof account.client_email !== "string" ||
-    typeof account.private_key !== "string"
-  ) {
-    throw new Error("Invalid service account configuration.");
-  }
-
-  return account;
-}
-
-async function createGoogleAccessToken(account) {
-  const now = Math.floor(Date.now() / 1000);
-  const unsigned = [
-    encodeText(JSON.stringify({ alg: "RS256", typ: "JWT" })),
-    encodeText(JSON.stringify({
-      iss: account.client_email,
-      scope: GOOGLE_SCOPE,
-      aud: GOOGLE_TOKEN_URL,
-      iat: now,
-      exp: now + 3600
-    }))
-  ].join(".");
-
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    decodePrivateKey(account.private_key),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    new TextEncoder().encode(unsigned)
-  );
-
-  const assertion = `${unsigned}.${encodeBytes(new Uint8Array(signature))}`;
-  const response = await fetch(GOOGLE_TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error("Unable to obtain Google access token.");
-  }
-
-  const result = await response.json();
-  if (!result.access_token) {
-    throw new Error("Google access token missing.");
-  }
-
-  return result.access_token;
-}
-
-function firestoreUrl(projectId, path = "") {
-  return "https://firestore.googleapis.com/v1/projects/" +
-    `${encodeURIComponent(projectId)}/databases/(default)/documents${path}`;
-}
-
-async function createBooking(projectId, accessToken, data) {
+async function createBooking(env, data) {
+  const database = getClinicDatabase(env);
   const now = new Date().toISOString();
-  const fields = {
-    patientName: { stringValue: data.patientName.trim() },
-    patientPhone: { stringValue: data.patientPhone.trim() },
-    appointmentDate: { stringValue: data.appointmentDate },
-    service: { stringValue: data.service.trim() },
-    notes: { stringValue: data.notes.trim() },
-    status: { stringValue: "pending" },
-    createdAt: { stringValue: now },
-    updatedAt: { stringValue: now },
-    source: { stringValue: "public-website" }
+  const id = crypto.randomUUID();
+  const sourcePayload = {
+    patientName: data.patientName.trim(),
+    patientPhone: data.patientPhone.trim(),
+    appointmentDate: data.appointmentDate,
+    service: data.service.trim(),
+    notes: data.notes.trim(),
+    status: "pending",
+    createdAt: now,
+    updatedAt: now,
+    source: "public-website"
   };
-
-  const response = await fetch(firestoreUrl(
-    projectId,
-    `/${BOOKINGS_COLLECTION}`
-  ), {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ fields })
-  });
-
-  if (!response.ok) {
-    const details = await response.text();
-    console.error("Public booking write failed:", response.status, details.slice(0, 500));
-    throw new Error("تعذر حفظ طلب الحجز.");
-  }
-
-  const document = await response.json();
-  return (document.name || "").split("/").pop();
+  await d1Run(database,
+    "INSERT INTO bookings (id, patient_name, patient_phone, appointment_date, service, notes, status, created_at, updated_at, source_payload_json) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)",
+    [id, sourcePayload.patientName, sourcePayload.patientPhone, sourcePayload.appointmentDate, sourcePayload.service, sourcePayload.notes, now, now, JSON.stringify(sourcePayload)]);
+  return id;
 }
 
-async function writePublicAuditLog(projectId, accessToken, action, level, message, targetId = "") {
+async function writePublicAuditLog(env, action, level, message, targetId = "") {
+  const database = getClinicDatabase(env);
   const now = new Date();
   const expires = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-  const fields = {
-    actorUid: { stringValue: "public-visitor" },
-    actorName: { stringValue: "زائر الموقع" },
-    actorType: { stringValue: "public" },
-    action: { stringValue: action },
-    area: { stringValue: "public_booking" },
-    level: { stringValue: level },
-    message: { stringValue: message },
-    targetType: { stringValue: "booking" },
-    targetId: { stringValue: targetId },
-    createdAt: { timestampValue: now.toISOString() },
-    expiresAt: { timestampValue: expires.toISOString() }
+  const id = crypto.randomUUID();
+  const record = {
+    actorUid: "public-visitor", actorName: "زائر الموقع", actorType: "public",
+    action, area: "public_booking", level, message,
+    targetType: "booking", targetId, createdAt: now.toISOString(), expiresAt: expires.toISOString()
   };
-  const response = await fetch(firestoreUrl(projectId, "/clinicLogs"), {
-    method: "POST",
-    headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
-    body: JSON.stringify({ fields })
-  });
-  if (!response.ok) {
-    const details = await response.text();
-    console.error("Public audit log write failed:", response.status, details.slice(0, 300));
-  }
+  await d1Run(database,
+    "INSERT INTO clinic_logs (id, actor_uid, actor_name, actor_type, action, area, level, message, target_type, target_id, created_at, expires_at, source_payload_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [id, record.actorUid, record.actorName, record.actorType, record.action, record.area, record.level, record.message, record.targetType, record.targetId, record.createdAt, record.expiresAt, JSON.stringify(record)]);
 }
 
-async function validateConfiguredService(projectId, accessToken, serviceName) {
+async function validateConfiguredService(env, serviceName) {
   if (!serviceName) return null;
-  const response = await fetch(firestoreUrl(projectId, "/clinicSettings/current"), {
-    headers: { Authorization: "Bearer " + accessToken }
-  });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error("Unable to read clinic settings.");
-  const document = await response.json();
+  const database = getClinicDatabase(env);
+  const row = await d1First(database, "SELECT settings_json FROM clinic_settings WHERE id = ? LIMIT 1", ["singleton"]);
   let settings = null;
-  try { settings = JSON.parse(document.fields?.settingsJson?.stringValue || "null"); } catch { throw new Error("Clinic settings are invalid."); }
+  try { settings = JSON.parse(row?.settings_json || "null"); } catch { throw new Error("Clinic settings are invalid."); }
   const services = settings?.services?.items;
   if (!Array.isArray(services)) return null;
   const selected = services.find(item => item && item.enabled !== false && String(item.title || "").trim() === serviceName.trim());
@@ -284,27 +146,17 @@ export async function onRequest(context) {
   const validationError = validateBooking(data);
   if (validationError) return jsonResponse({ message: validationError }, 400);
 
-  let account;
-  let accessToken;
   try {
-    account = parseServiceAccount(env);
-    accessToken = await createGoogleAccessToken(account);
-  } catch (error) {
-    console.error("Public booking service configuration error:", error);
-    return jsonResponse({ message: "خدمة الحجز غير مهيأة حاليًا." }, 503);
-  }
-
-  try {
-    const serviceError = await validateConfiguredService(account.project_id, accessToken, data.service ?? "");
+    const serviceError = await validateConfiguredService(env, data.service ?? "");
     if (serviceError) return jsonResponse({ message: serviceError }, 400);
-    const id = await createBooking(account.project_id, accessToken, {
+    const id = await createBooking(env, {
       patientName: data.patientName,
       patientPhone: data.patientPhone,
       appointmentDate: data.appointmentDate,
       service: data.service ?? "",
       notes: data.notes ?? ""
     });
-    try { await writePublicAuditLog(account.project_id, accessToken, "booking_created", "info", "تم استلام طلب حجز من الموقع العام.", id); } catch (logError) { console.error("Public audit log failed:", logError); }
+    try { await writePublicAuditLog(env, "booking_created", "info", "تم استلام طلب حجز من الموقع العام.", id); } catch (logError) { console.error("Public audit log failed:", logError); }
     const notification = publishClinicRealtime(env, "booking_created");
     if (typeof context.waitUntil === "function") context.waitUntil(notification);
     else void notification;
@@ -317,7 +169,7 @@ export async function onRequest(context) {
     }, 201);
   } catch (error) {
     console.error("Public booking request failed:", error);
-    try { if (account?.project_id && accessToken) await writePublicAuditLog(account.project_id, accessToken, "request_failed", "error", "فشل حفظ طلب حجز من الموقع العام."); } catch (logError) { console.error("Public booking failure log failed:", logError); }
+    try { await writePublicAuditLog(env, "request_failed", "error", "فشل حفظ طلب حجز من الموقع العام."); } catch (logError) { console.error("Public booking failure log failed:", logError); }
     return jsonResponse({ message: "تعذر حفظ طلب الحجز الآن. حاولي مرة أخرى لاحقًا." }, 503);
   }
 }
