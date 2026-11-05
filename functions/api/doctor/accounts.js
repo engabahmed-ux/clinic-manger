@@ -100,7 +100,7 @@ export async function onRequestPost({ request, env }) {
     if (data.action === "listMonthlyExpenses") {
       const month = String(data.month || "");
       if (!/^\d{4}-\d{2}$/.test(month)) return jsonResponse({message:"الشهر المحدد غير صحيح."},400);
-      const expensesRecords = await listRecords(projectId, token, "dailyExpense");
+      const expensesRecords = await listRecords(env, "dailyExpense");
       const expenses = expensesRecords.filter(x=>String(x.date||"").startsWith(month))
         .filter(x=>verified.accountType==="doctor" || !x.enteredBy || x.enteredBy===verified.uid)
         .sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))
@@ -111,7 +111,7 @@ export async function onRequestPost({ request, env }) {
       const entry = data.entry || {}, description = String(entry.description || "").trim(), date = String(entry.date || ""), notes = String(entry.notes || "").trim(), amount = String(entry.amount ?? "");
       if (!cleanString(description,160) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00")) || !/^\d{1,8}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || notes.length > 500) return jsonResponse({ message:"راجع وصف المصروف والمبلغ والتاريخ." },400);
       const now = new Date().toISOString();
-      const records = verified.accountType === "staff" ? await listRecords(projectId, token, "settlement") : [];
+      const records = verified.accountType === "staff" ? await listRecords(env, "settlement") : [];
        if (verified.accountType === "staff" && records.some(x => x.type === "settlement" && x.employeeUid === verified.uid && ((x.periodType === "day" && x.periodKey === date) || (x.periodType === "month" && x.periodKey === date.slice(0,7))))) {
         return jsonResponse({ message:"هذه الفترة تمت تصفيتها بالفعل. لا يمكن إضافة مصروف إليها بعد الإقفال." },409);
       }
@@ -128,7 +128,7 @@ export async function onRequestPost({ request, env }) {
     if (data.action === "approveDailyExpense" || data.action === "rejectDailyExpense") {
       const id = String(data.id || "");
       if (!/^[A-Za-z0-9_-]{1,150}$/.test(id)) return jsonResponse({message:"معرّف المصروف غير صحيح."},400);
-      const records = await listRecords(projectId, token, "dailyExpense");
+      const records = await listRecords(env, "dailyExpense");
        const expense = records.find(x => x.id === id);
       if (!expense) return jsonResponse({message:"المصروف غير موجود."},404);
       if ((expense.status || "approved") !== "pending") return jsonResponse({message:"تمت معالجة هذا المصروف بالفعل."},409);
@@ -141,8 +141,8 @@ export async function onRequestPost({ request, env }) {
     }
     if (data.action === "listSettlements") {
       const [settlements, expenses] = await Promise.all([
-         listRecords(projectId, token, "settlement"),
-         listRecords(projectId, token, "dailyExpense")
+         listRecords(env, "settlement"),
+         listRecords(env, "dailyExpense")
        ]);
        settlements.sort((a,b)=>String(b.periodKey).localeCompare(String(a.periodKey)));
       return jsonResponse({settlements, expenses, pendingExpenses:expenses.filter(x=>(x.status || "approved")==="pending").length});
@@ -154,8 +154,8 @@ export async function onRequestPost({ request, env }) {
       if (!periodType || !(periodType === "day" ? /^\d{4}-\d{2}-\d{2}$/.test(periodKey) : /^\d{4}-\d{2}$/.test(periodKey)) ||
           !/^[A-Za-z0-9_-]{1,128}$/.test(employeeUid)) return jsonResponse({message:"حدد الموظف والفترة بصورة صحيحة."},400);
       const [settlements, allExpenses] = await Promise.all([
-         listRecords(projectId, token, "settlement"),
-         listRecords(projectId, token, "dailyExpense")
+         listRecords(env, "settlement"),
+         listRecords(env, "dailyExpense")
        ]);
        const prior = settlements.find(x=>x.employeeUid===employeeUid && x.periodType===periodType && x.periodKey===periodKey);
        const closedDays = new Set(settlements.filter(x=>x.employeeUid===employeeUid && x.periodType==="day" && String(x.periodKey||"").startsWith(periodKey.slice(0,7))).map(x=>x.periodKey));
@@ -180,8 +180,8 @@ export async function onRequestPost({ request, env }) {
       if(!employeeDoc||employeeDoc.role!=="staff"||Number(employeeDoc.active)!==1)return jsonResponse({message:"حساب الموظف غير نشط أو غير صالح للتصفية."},400);
       const employeeName=employeeDoc.display_name||"الموظف";
       const [settlements, allExpenses] = await Promise.all([
-         listRecords(projectId, token, "settlement"),
-         listRecords(projectId, token, "dailyExpense")
+         listRecords(env, "settlement"),
+         listRecords(env, "dailyExpense")
        ]);
        if (settlements.some(x=>x.employeeUid===employeeUid && x.periodType===periodType && x.periodKey===periodKey)) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف لهذه الفترة من قبل."},409);
        if (periodType === "day" && settlements.some(x=>x.employeeUid===employeeUid && x.periodType==="month" && x.periodKey===periodKey.slice(0,7))) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف للشهر بالفعل."},409);
@@ -191,7 +191,7 @@ export async function onRequestPost({ request, env }) {
       const pending = expenses.filter(x=>(x.status || "approved")==="pending");
       if (pending.length) return jsonResponse({message:"لا يمكن تصفية عهدة الموظف قبل اعتماد أو رفض كل مصروفاته المعلقة."},409);
       const approvedExpenses = expenses.filter(x=>(x.status || "approved")==="approved").reduce((sum,x)=>sum+(Number(x.amount)||0),0);
-      const bookings = (await listEmployeeBookings(projectId, token, employeeUid))
+      const bookings = (await listEmployeeBookings(env, employeeUid))
         .filter(x=>inPeriod(x.date) && x.paid>0);
       const receipts = bookings.reduce((sum,x)=>sum+x.paid,0);
       const now = new Date().toISOString();
@@ -224,7 +224,7 @@ export async function onRequestPost({ request, env }) {
         return jsonResponse({ message: "راجع البيان والقيمة والتاريخ والملاحظات." }, 400);
       }
       const builtIn = categoryId === "employee-salaries";
-      const categories = builtIn ? [] : (await listRecords(projectId, token, "category")).filter(x => x.id === categoryId);
+      const categories = builtIn ? [] : (await listRecords(env, "category")).filter(x => x.id === categoryId);
       if (!builtIn && !categories.length) return jsonResponse({ message: "قسم الحسابات المحدد غير موجود." }, 404);
       const kind = builtIn ? "expense" : categories[0].kind;
       const now = new Date().toISOString();
