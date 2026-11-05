@@ -647,7 +647,7 @@ async function updateBooking(env, data, actorUid = "", actorAccountType = "docto
     rescheduleHistory.push({ fromDate: oldDate, toDate: nextDate, fromQueueNumber: oldQueueNumber, toQueueNumber: newQueueNumber, at: now });
     queueNumber = String(newQueueNumber);
   } else if (!(Number(queueNumber) > 0) && nextDate) {
-    const allBookings = await listBookings(projectId, accessToken);
+    const allBookings = await listBookings(env);
     queueNumber = String(currentQueueNumberForDate(allBookings, existing, nextDate) || nextQueueNumberForDate(allBookings, nextDate));
   }
   let paidAmount = changes.paidAmount !== undefined ? String(changes.paidAmount).trim() : existing.paidAmount;
@@ -824,20 +824,21 @@ async function onRequestInternal(context) {
       case "updatePaidAmount": {
         const bookingId = String(data.id || ""), paidAmount = String(data.paidAmount ?? "");
         if (!/^[A-Za-z0-9_-]{1,150}$/.test(bookingId) || !/^\d{1,8}(\.\d{1,2})?$/.test(paidAmount) || Number(paidAmount) < 0) return jsonResponse({ message:"أدخل مبلغًا مدفوعًا صحيحًا." },400);
-        const currentDoc = await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(bookingId)}`);
-        const current = decodeBooking(currentDoc);
+        const database = getClinicDatabase(env);
+        const currentRow = await d1First(database, "SELECT * FROM bookings WHERE id = ? LIMIT 1", [bookingId]);
+        if (!currentRow) return jsonResponse({message:"الحجز غير موجود."},404);
+        const current = decodeBooking(currentRow);
         if (access.accountType === "staff" && current.paymentEnteredByUid && current.paymentEnteredByUid !== access.uid) return jsonResponse({message:"لا يمكنك تعديل مبلغ سجله موظف آخر."},403);
         if (await isFinancialPeriodClosed(env, current.appointmentDate, current.paymentEnteredByUid || access.uid)) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف؛ لا يمكن تعديل المبلغ بعد الإقفال."},409);
         const now = new Date().toISOString();
-        const patch = {fields:{
-          paidAmount:stringField(paidAmount),
-          paymentEnteredByUid:stringField(access.uid),
-          paymentEnteredByName:stringField(access.displayName || (access.accountType === "doctor" ? "الدكتور" : "الموظف")),
-          paymentUpdatedAt:stringField(now),
-          updatedAt:stringField(now)
-        }};
-        const updated = await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(bookingId)}?updateMask.fieldPaths=paidAmount&updateMask.fieldPaths=paymentEnteredByUid&updateMask.fieldPaths=paymentEnteredByName&updateMask.fieldPaths=paymentUpdatedAt&updateMask.fieldPaths=updatedAt`, {method:"PATCH",body:JSON.stringify(patch)});
-        const booking = decodeBooking(updated);
+        const booking = await writeBooking(env, {
+          ...current,
+          paidAmount,
+          paymentEnteredByUid:access.uid,
+          paymentEnteredByName:access.displayName || (access.accountType === "doctor" ? "الدكتور" : "الموظف"),
+          paymentUpdatedAt:now,
+          updatedAt:now
+        });
         return jsonResponse({ booking:{ id:booking.id, paidAmount:booking.paidAmount, paymentEnteredByUid:booking.paymentEnteredByUid, paymentEnteredByName:booking.paymentEnteredByName } });
       }
       case "archiveList": {
@@ -904,23 +905,16 @@ async function onRequestInternal(context) {
       case "restoreArchived": {
         const id = typeof data.id === "string" ? data.id : "";
         if (!/^[A-Za-z0-9_-]{1,150}$/.test(id)) return jsonResponse({ message: "رقم الحجز غير صحيح." }, 400);
-        const current = await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(id)}`);
+        const database = getClinicDatabase(env);
+        const current = await d1First(database, "SELECT * FROM bookings WHERE id = ? LIMIT 1", [id]);
+        if (!current) return jsonResponse({message:"الحجز غير موجود."},404);
         const booking = decodeBooking(current);
         if (!booking.isArchived) return jsonResponse({ booking, restored: false });
         const now = new Date().toISOString();
-        const fields = {
-          isArchived: stringField("false"),
-          archivedAt: stringField(""),
-          archivedByUid: stringField(""),
-          archivedByName: stringField(""),
-          updatedAt: stringField(now)
-        };
-        const mask = new URLSearchParams();
-        for (const key of Object.keys(fields)) mask.append("updateMask.fieldPaths", key);
-        const updated = await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(id)}?${mask}`, {
-          method: "PATCH", body: JSON.stringify({ fields })
+        const updated = await writeBooking(env, {
+          ...booking, isArchived:false, archivedAt:"", archivedByUid:"", archivedByName:"", updatedAt:now
         });
-        return jsonResponse({ booking: decodeBooking(updated), restored: true });
+        return jsonResponse({ booking:updated, restored:true });
       }
 
       case "archiveDay": {
@@ -928,7 +922,7 @@ async function onRequestInternal(context) {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00`))) {
           return jsonResponse({ message: "تاريخ الأرشفة غير صحيح." }, 400);
         }
-        const all = await listBookings(serviceAccount.project_id, accessToken);
+        const all = await listBookings(env);
         let archivedCount = 0;
         const archivedAt = new Date().toISOString();
         const archivedByUid = access.uid || "";
@@ -936,17 +930,8 @@ async function onRequestInternal(context) {
         for (const booking of all) {
           const currentDateMatches = String(booking.appointmentDate || "").slice(0, 10) === date;
           if (currentDateMatches && !booking.isArchived) {
-            const fields = {
-              isArchived: stringField("true"),
-              archivedAt: stringField(archivedAt),
-              archivedByUid: stringField(archivedByUid),
-              archivedByName: stringField(archivedByName),
-              updatedAt: stringField(archivedAt)
-            };
-            const mask = new URLSearchParams();
-            for (const key of Object.keys(fields)) mask.append("updateMask.fieldPaths", key);
-            await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(booking.id)}?${mask}`, {
-              method: "PATCH", body: JSON.stringify({ fields })
+            await writeBooking(env, {
+              ...booking, isArchived:true, archivedAt, archivedByUid, archivedByName, updatedAt:archivedAt
             });
             archivedCount += 1;
             continue;
@@ -983,14 +968,8 @@ async function onRequestInternal(context) {
             archivedCount += 1;
           }
           if (!changed) continue;
-          const fields = {
-            archivedRescheduleHistory: stringField(JSON.stringify(archivedHistory)),
-            updatedAt: stringField(archivedAt)
-          };
-          const mask = new URLSearchParams();
-          for (const key of Object.keys(fields)) mask.append("updateMask.fieldPaths", key);
-          await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(booking.id)}?${mask}`, {
-            method: "PATCH", body: JSON.stringify({ fields })
+          await writeBooking(env, {
+            ...booking, archivedRescheduleHistory:JSON.stringify(archivedHistory), updatedAt:archivedAt
           });
         }
         return jsonResponse({ archivedCount, date });
