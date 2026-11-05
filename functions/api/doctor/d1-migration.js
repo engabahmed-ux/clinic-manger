@@ -1,4 +1,4 @@
-import { getClinicDatabase, d1Batch, d1First } from "../../_shared/d1.js";
+import { getClinicDatabase, d1Batch, d1First, d1All } from "../../_shared/d1.js";
 
 const DOCTOR_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const PROJECT_ID = "clinics-manger";
@@ -190,6 +190,65 @@ export async function onRequestPost({ request, env }) {
     const action = body?.action;
     const database = getClinicDatabase(env);
     if (action === "status") return json({ ok: true, ...(await migrationStatus(database)) });
+    if (action === "verify-page") {
+      const collection = String(body.collection || "");
+      const pageSize = Math.min(25, Math.max(1, Number(body.pageSize) || 25));
+      const pageToken = typeof body.pageToken === "string" ? body.pageToken : "";
+      const account = parseServiceAccount(env);
+      const accessToken = await googleAccessToken(account);
+
+      if (collection === "clinicSettings/current") {
+        const response = await fetch(DOCUMENTS_URL + "/clinicSettings/current", { headers: { Authorization: "Bearer " + accessToken } });
+        if (response.status === 404) {
+          const target = await d1First(database, "SELECT id FROM clinic_settings WHERE id='singleton'");
+          return json({ ok: true, collection, checked: 0, missingIds: [], mismatchedIds: [], done: true, sourceCount: 0, targetExists: Boolean(target) });
+        }
+        if (!response.ok) throw new Error("Settings verification read failed.");
+        const document = await response.json();
+        const payload = decodeFields(document.fields || {});
+        const settingsValue = typeof payload.settingsJson === "string"
+          ? JSON.parse(payload.settingsJson)
+          : (payload.settings && typeof payload.settings === "object" ? payload.settings : payload);
+        const target = await d1First(database, "SELECT settings_json FROM clinic_settings WHERE id='singleton'");
+        const sourceJson = JSON.stringify(settingsValue);
+        const targetJson = target?.settings_json || "";
+        return json({
+          ok: true, collection, checked: 1, missingIds: target ? [] : ["singleton"],
+          mismatchedIds: target && targetJson !== sourceJson ? ["singleton"] : [],
+          done: true, sourceCount: 1, targetExists: Boolean(target)
+        });
+      }
+
+      const config = COLLECTIONS[collection];
+      if (!config) return json({ ok: false, message: "المجموعة غير مسموح بفحصها." }, 400);
+      const page = await fetchFirestorePage(accessToken, collection, pageSize, pageToken);
+      const documents = page.documents || [];
+      const ids = documents.map(document => String(document.name || "").split("/").pop()).filter(Boolean);
+      const storedColumn = config.table === "account_records" ? "payload_json" : "source_payload_json";
+      let stored = [];
+      if (ids.length) {
+        const placeholders = ids.map(() => "?").join(", ");
+        stored = await d1All(database,
+          "SELECT " + config.key + " AS document_id, " + storedColumn + " AS payload_json FROM " + config.table +
+          " WHERE " + config.key + " IN (" + placeholders + ")", ids);
+      }
+      const storedById = new Map(stored.map(row => [String(row.document_id), String(row.payload_json || "")]));
+      const missingIds = [];
+      const mismatchedIds = [];
+      for (const document of documents) {
+        const id = String(document.name || "").split("/").pop();
+        if (!storedById.has(id)) {
+          missingIds.push(id);
+          continue;
+        }
+        const sourcePayload = JSON.stringify(decodeFields(document.fields || {}));
+        if (storedById.get(id) !== sourcePayload) mismatchedIds.push(id);
+      }
+      return json({
+        ok: true, collection, checked: documents.length, missingIds, mismatchedIds,
+        done: !page.nextPageToken, nextPageToken: page.nextPageToken || null
+      });
+    }
     if (action !== "import-page") return json({ ok: false, message: "إجراء غير مدعوم." }, 400);
     if (body.confirm !== "IMPORT_TO_D1_PREVIEW") return json({ ok: false, message: "يلزم تأكيد النقل إلى قاعدة الاختبار." }, 400);
     const collection = String(body.collection || "");
