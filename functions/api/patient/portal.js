@@ -55,7 +55,7 @@ async function getPortalData(context) {
 async function requestBooking(context,body) {
   const appointmentDate=typeof body.appointmentDate==="string"?body.appointmentDate.trim():"";
   const service=typeof body.service==="string"?body.service.trim():"";
-  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(appointmentDate)||Number.isNaN(Date.parse(appointmentDate+"T12:00:00")))throw Object.assign(new Error("اختَر تاريخًا صحيحًا للموعد."),{status:400});
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)||Number.isNaN(Date.parse(appointmentDate+"T12:00:00")))throw Object.assign(new Error("اختَر تاريخًا صحيحًا للموعد."),{status:400});
   if(appointmentDate<new Date().toISOString().slice(0,10))throw Object.assign(new Error("لا يمكن طلب موعد بتاريخ مضى."),{status:400});
   if(service.length>160)throw Object.assign(new Error("اسم الخدمة أطول من المسموح."),{status:400});
   const {database,patient,patientId}=context,now=new Date().toISOString(),id=crypto.randomUUID();
