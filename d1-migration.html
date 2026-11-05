@@ -36,7 +36,7 @@
 <main>
   <section class="card">
     <h1>نقل بيانات العيادة إلى Cloudflare D1</h1>
-    <p>أداة نقل مستقلة لفرع الاختبار فقط. تنسخ البيانات من Firestore إلى قاعدة D1 التجريبية دون تعديل أو حذف أي بيانات في Firebase، ولا تغيّر الموقع الرئيسي.</p>
+    <p>أداة نقل مستقلة لفرع الاختبار فقط. تنسخ البيانات من Firestore إلى قاعدة Cloudflare D1 الجديدة دون تعديل أو حذف أي بيانات في Firebase، ولا تغيّر الموقع الرئيسي.</p>
     <div class="warning">تنبيه: قراءة بيانات Firebase أثناء النقل قد تستهلك قراءات حسب عدد المستندات. شغّل النقل مرة واحدة واترك الصفحة مفتوحة حتى تنتهي، ويمكن استكماله بعد انقطاع الاتصال.</div>
     <p class="muted">لأمان البيانات الطبية، تسجيل الدخول والتحقق من هوية الطبيب يتمان قبل السماح بالنسخ. كلمة المرور تُرسل مباشرة إلى Firebase من متصفحك ولا تُرسل إلى هذا الخادم أو تُحفظ في هذه الصفحة.</p>
   </section>
@@ -64,7 +64,7 @@
     <hr style="border:0;border-top:1px solid #e7ebef;margin:20px 0">
     <h2>نسخ البيانات</h2>
     <p>ينقل هذا الإجراء المستندات الموجودة في مجموعات العيادة المحددة إلى جداول D1 باستخدام معرّفاتها الأصلية، ويمكن إعادة تشغيله بأمان نسبيًا لأن النسخ يستخدم upsert بدل إنشاء نسخ مكررة. لا يبدّل التطبيق لاستخدام D1 تلقائيًا.</p>
-    <label class="check"><input id="confirm" type="checkbox"><span>أؤكد أنني أريد نسخ بيانات مشروع العيادة إلى قاعدة Cloudflare D1 التجريبية، وأفهم أن هذا الإجراء سيقرأ مستندات Firebase.</span></label>
+    <label class="check"><input id="confirm" type="checkbox"><span>أؤكد أنني أريد نسخ بيانات مشروع العيادة إلى قاعدة Cloudflare D1 الجديدة، وأفهم أن هذا الإجراء سيقرأ مستندات Firebase.</span></label>
     <div class="row">
       <button id="startBtn" disabled>ابدأ / استكمل النقل</button>
       <button id="statusBtn" class="secondary">تحديث أعداد D1</button>
@@ -87,7 +87,7 @@
   const progressBox = $("progress");
   const confirmBox = $("confirm");
   const startBtn = $("startBtn");
-  const checkpointKey = "clinic-d1-migration-preview-v1";
+  const checkpointKey = "clinic-cloudflare-native-migration-v2";
   const collections = [
     "clinicSettings/current",
     "clinicStaff",
