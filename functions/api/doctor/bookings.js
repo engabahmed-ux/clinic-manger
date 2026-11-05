@@ -2,14 +2,8 @@ import { getClinicDatabase, d1All, d1First, d1Run } from "../../_shared/d1.js";
 import { publishClinicRealtime } from "../../_shared/realtime.js";
 
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
-const EXPECTED_PROJECT_ID = "clinics-manger";
-const STAFF_COLLECTION = "clinicStaff";
-const BOOKINGS_COLLECTION = "clinicBookings";
-
 const FIREBASE_LOOKUP_URL =
   "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
-const GOOGLE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 
 const STATUSES = ["pending", "confirmed", "waiting", "completed", "postponed", "no_show", "apologized", "cancelled", "archived"];
 
@@ -23,111 +17,6 @@ function jsonResponse(body, status = 200) {
       "Referrer-Policy": "no-referrer"
     }
   });
-}
-
-function encodeBytes(bytes) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-function encodeText(value) {
-  return encodeBytes(new TextEncoder().encode(value));
-}
-
-function decodePrivateKey(pem) {
-  const base64 = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
-    .replace(/-----END PRIVATE KEY-----/g, "")
-    .replace(/\s/g, "");
-
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  return bytes;
-}
-
-function parseServiceAccount(env) {
-  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-    throw new Error("Missing service account configuration.");
-  }
-
-  const account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
-
-  if (
-    account.project_id !== EXPECTED_PROJECT_ID ||
-    typeof account.client_email !== "string" ||
-    typeof account.private_key !== "string"
-  ) {
-    throw new Error("Invalid service account configuration.");
-  }
-
-  return account;
-}
-
-async function createGoogleAccessToken(account) {
-  const now = Math.floor(Date.now() / 1000);
-
-  const header = { alg: "RS256", typ: "JWT" };
-  const claims = {
-    iss: account.client_email,
-    scope: GOOGLE_SCOPE,
-    aud: GOOGLE_TOKEN_URL,
-    iat: now,
-    exp: now + 3600
-  };
-
-  const unsigned = [
-    encodeText(JSON.stringify(header)),
-    encodeText(JSON.stringify(claims))
-  ].join(".");
-
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    decodePrivateKey(account.private_key),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    key,
-    new TextEncoder().encode(unsigned)
-  );
-
-  const assertion = `${unsigned}.${encodeBytes(new Uint8Array(signature))}`;
-
-  const response = await fetch(GOOGLE_TOKEN_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error("Unable to obtain Google access token.");
-  }
-
-  const result = await response.json();
-
-  if (!result.access_token) {
-    throw new Error("Google access token missing.");
-  }
-
-  return result.access_token;
 }
 
 async function verifyFirebaseUser(request, env) {
@@ -183,47 +72,6 @@ async function verifyFirebaseUser(request, env) {
     uid: user.localId,
     email: user.email || ""
   };
-}
-
-function firestoreUrl(projectId, path = "") {
-  return (
-    "https://firestore.googleapis.com/v1/projects/" +
-    `${encodeURIComponent(projectId)}/databases/(default)/documents${path}`
-  );
-}
-
-async function firestoreRequest(projectId, accessToken, path, options = {}) {
-  const response = await fetch(firestoreUrl(projectId, path), {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
-  });
-
-  if (!response.ok) {
-    const details = await response.text();
-
-    console.error(
-      "Bookings Firestore request failed:",
-      response.status,
-      details.slice(0, 1000)
-    );
-
-    const error = new Error("تعذر الوصول إلى بيانات الحجوزات.");
-    error.status = response.status;
-    throw error;
-  }
-
-  if (response.status === 204) return null;
-
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
-}
-
-function stringField(value) {
-  return { stringValue: String(value ?? "") };
 }
 
 function readString(fields, key) {
@@ -307,46 +155,6 @@ async function writeBooking(env, booking) {
     "patient_name=excluded.patient_name,patient_id=excluded.patient_id,patient_phone=excluded.patient_phone,blood_pressure=excluded.blood_pressure,weight=excluded.weight,blood_sugar=excluded.blood_sugar,pre_visit_notes=excluded.pre_visit_notes,appointment_date=excluded.appointment_date,service=excluded.service,service_price=excluded.service_price,paid_amount=excluded.paid_amount,completed_fee=excluded.completed_fee,completed_at=excluded.completed_at,completed_by_uid=excluded.completed_by_uid,completed_by_name=excluded.completed_by_name,payment_entered_by_uid=excluded.payment_entered_by_uid,payment_entered_by_name=excluded.payment_entered_by_name,payment_updated_at=excluded.payment_updated_at,reschedule_history_json=excluded.reschedule_history_json,archived_reschedule_history_json=excluded.archived_reschedule_history_json,queue_number=excluded.queue_number,is_archived=excluded.is_archived,archived_at=excluded.archived_at,archived_by_uid=excluded.archived_by_uid,archived_by_name=excluded.archived_by_name,notes=excluded.notes,status=excluded.status,created_at=excluded.created_at,updated_at=excluded.updated_at,source_payload_json=excluded.source_payload_json";
   await d1Run(database, sql, values);
   return { ...booking };
-}
-
-function encodeBooking(data) {
-  const fields = {};
-
-  for (const key of [
-    "patientName",
-    "patientId",
-    "patientPhone",
-    "bloodPressure",
-    "weight",
-    "bloodSugar",
-    "preVisitNotes",
-    "appointmentDate",
-    "service",
-    "servicePrice",
-    "paidAmount",
-    "completedFee",
-    "completedAt",
-    "completedByUid",
-    "completedByName",
-    "paymentEnteredByUid",
-    "paymentEnteredByName",
-    "paymentUpdatedAt",
-    "rescheduleHistory",
-    "archivedRescheduleHistory",
-    "queueNumber",
-    "isArchived",
-    "archivedAt",
-    "archivedByUid",
-    "archivedByName",
-    "notes",
-    "status",
-    "createdAt",
-    "updatedAt"
-  ]) {
-    fields[key] = stringField(data[key]);
-  }
-
-  return { fields };
 }
 
 async function getAccountAccess(user, env) {
