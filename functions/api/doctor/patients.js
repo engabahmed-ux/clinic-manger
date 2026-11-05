@@ -1,10 +1,7 @@
+import { getClinicDatabase, d1All, d1First, d1Run, d1Batch } from "../../_shared/d1.js";
 import { publishClinicRealtime } from "../../_shared/realtime.js";
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const EXPECTED_PROJECT_ID = "clinics-manger";
-const STAFF_COLLECTION = "clinicStaff";
-const PATIENTS_COLLECTION = "clinicPatients";
-const USERNAMES_COLLECTION = "clinicPatientUsernames";
-const MEDICAL_PATIENTS_COLLECTION = "clinicMedicalPatients";
 const FIREBASE_LOOKUP_URL = "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
 const FIREBASE_SIGNUP_URL = "https://identitytoolkit.googleapis.com/v1/accounts:signUp";
 const FIREBASE_ADMIN_UPDATE_URL = "https://identitytoolkit.googleapis.com/v1/projects/clinics-manger/accounts:update";
@@ -63,28 +60,6 @@ async function googleAccessToken(account) {
   if (!result.access_token) throw new Error("Google access token missing.");
   return result.access_token;
 }
-function docsUrl(projectId, path = "") {
-  return "https://firestore.googleapis.com/v1/projects/" + encodeURIComponent(projectId) + "/databases/(default)/documents" + path;
-}
-async function firestore(projectId, token, path, options = {}) {
-  const response = await fetch(docsUrl(projectId, path), {
-    ...options,
-    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", ...(options.headers || {}) }
-  });
-  if (response.status === 404) return null;
-  if (!response.ok) {
-    const details = await response.text();
-    console.error("Patient API Firestore error:", response.status, details.slice(0, 500));
-    const error = new Error("تعذر الوصول إلى بيانات المرضى.");
-    error.status = response.status;
-    throw error;
-  }
-  const raw = await response.text();
-  return raw ? JSON.parse(raw) : null;
-}
-function fsString(value) { return { stringValue: String(value ?? "") }; }
-function fsBool(value) { return { booleanValue: Boolean(value) }; }
-function readString(fields, key) { return fields?.[key]?.stringValue || ""; }
 function normalizeUsername(value) {
   return String(value || "").normalize("NFKC")
     .replace(/[\u064B-\u065F\u0670]/g, "")
@@ -116,21 +91,19 @@ async function verifyUser(request, env) {
   return user?.localId ? { ok: true, uid: user.localId, email: user.email || "" } : { ok: false, status: 401, message: "تعذر التحقق من الحساب." };
 }
 
-async function verifyPatientsEditor(user, account, token) {
+async function verifyPatientsEditor(user, env) {
   if (user.uid === DOCTOR_ADMIN_UID) return { ok: true };
-  const document = await firestore(account.project_id, token, "/" + STAFF_COLLECTION + "/" + encodeURIComponent(user.uid));
-  const fields = document?.fields || {};
-  if (readString(fields, "role") !== "staff" || fields.active?.booleanValue !== true) {
-    return { ok: false, status: 403, message: "حساب الموظف غير نشط أو غير معتمد." };
-  }
-  const permissions = fields.permissions?.mapValue?.fields || {};
-  const permission = readString(permissions, "patients");
-  if (permission !== "edit") return { ok: false, status: 403, message: "تحتاج إلى صلاحية تعديل بيانات المرضى لإدارة الحسابات." };
-  return { ok: true };
-}
-
-function encodeDocument(fields) {
-  return { fields };
+  const database = getClinicDatabase(env);
+  const staff = await d1First(database,
+    "SELECT role, active, permissions_json FROM staff WHERE uid = ? LIMIT 1", [user.uid]);
+  if (!staff || staff.role !== "staff" || Number(staff.active) !== 1) return {
+    ok:false,status:403,message:"حساب الموظف غير نشط أو غير معتمد."
+  };
+  let permissions={};try{permissions=JSON.parse(staff.permissions_json||"{}");}catch{}
+  if (permissions.patients !== "edit") return {
+    ok:false,status:403,message:"تحتاج إلى صلاحية تعديل بيانات المرضى لإدارة الحسابات."
+  };
+  return {ok:true};
 }
 
 async function deleteAuthUser(apiKey, idToken) {
@@ -169,59 +142,30 @@ async function onRequestInternal({ request, env }) {
     const user = await verifyUser(request, env);
     if (!user.ok) return jsonResponse({ message: user.message }, user.status);
     if (user.uid !== DOCTOR_ADMIN_UID) return jsonResponse({ message: "قائمة حسابات المريضات متاحة للدكتور فقط." }, 403);
-    let account, token;
     try {
-      account = parseServiceAccount(env);
-      token = await googleAccessToken(account);
-      const result = await firestore(account.project_id, token, ":runQuery", {
-        method: "POST",
-        body: JSON.stringify({ structuredQuery: { from: [{ collectionId: PATIENTS_COLLECTION }] } })
-      });
-      const patients = (Array.isArray(result) ? result : []).filter(item => item.document).map(item => {
-        const fields = item.document.fields || {};
-        return {
-          uid: readString(fields, "uid") || String(item.document.name || "").split("/").pop(),
-          role: readString(fields, "role"),
-          active: fields.active?.booleanValue === true,
-          displayName: readString(fields, "displayName"),
-          email: readString(fields, "email"),
-          phone: readString(fields, "phone"),
-          username: readString(fields, "username"),
-          patientId: readString(fields, "patientId"),
-          createdAt: readString(fields, "createdAt"),
-          updatedAt: readString(fields, "updatedAt")
-        };
-      });
-      return jsonResponse({ patients });
-    } catch (error) {
-      console.error("Patient list export failed:", error);
-      return jsonResponse({ message: "تعذر تحميل بيانات حسابات المريضات للتصدير." }, 503);
+      const database=getClinicDatabase(env);
+      const rows=await d1All(database,"SELECT uid, role, active, display_name, email, phone, username, patient_id, created_at, updated_at FROM patient_accounts ORDER BY created_at DESC");
+      const patients=rows.map(row=>({uid:row.uid,role:row.role,active:Number(row.active)===1,displayName:row.display_name||"",email:row.email||"",phone:row.phone||"",username:row.username||"",patientId:row.patient_id||"",createdAt:row.created_at||"",updatedAt:row.updated_at||""}));
+      return jsonResponse({patients});
+    } catch(error) {
+      console.error("Patient list export failed:",error);
+      return jsonResponse({message:"تعذر تحميل بيانات حسابات المريضات للتصدير."},503);
     }
   }
 
   if (body.action === "searchMedicalPatients") {
-    const user = await verifyUser(request, env);
-    if (!user.ok) return jsonResponse({ message: user.message }, user.status);
+    const user=await verifyUser(request,env);
+    if(!user.ok)return jsonResponse({message:user.message},user.status);
     try {
-      const account = parseServiceAccount(env);
-      const token = await googleAccessToken(account);
-      const permission = await verifyPatientsEditor(user, account, token);
-      if (!permission.ok) return jsonResponse({ message: permission.message }, permission.status);
-      const query = String(body.query || "").trim().normalize("NFKC").replace(/\s+/g, " ").toLocaleLowerCase("ar");
-      if (query.length < 1 || query.length > 120) return jsonResponse({ patients: [] });
-      const result = await firestore(account.project_id, token, ":runQuery", {
-        method: "POST",
-        body: JSON.stringify({ structuredQuery: { from: [{ collectionId: MEDICAL_PATIENTS_COLLECTION }] } })
-      });
-      const patients = (Array.isArray(result) ? result : []).filter(item => item.document).map(item => {
-        const fields = item.document.fields || {};
-        return { patientId: String(item.document.name || "").split("/").pop(), displayName: readString(fields, "displayName"), phone: readString(fields, "phone"), patientNumber: readString(fields, "patientNumber") };
-      }).filter(patient => patient.patientId && (patient.displayName.toLocaleLowerCase("ar").includes(query) || patient.phone.includes(query) || patient.patientNumber.toLocaleLowerCase("ar").includes(query))).slice(0, 20);
-      return jsonResponse({ patients });
-    } catch (error) {
-      console.error("Medical patient account search failed:", error);
-      return jsonResponse({ message: "تعذر البحث في ملفات المرضى." }, 503);
-    }
+      const permission=await verifyPatientsEditor(user,env);
+      if(!permission.ok)return jsonResponse({message:permission.message},permission.status);
+      const query=String(body.query||"").trim().normalize("NFKC").replace(/\\s+/g," ").toLocaleLowerCase("ar");
+      if(query.length<1||query.length>120)return jsonResponse({patients:[]});
+      const rows=await d1All(getClinicDatabase(env),"SELECT id, display_name, phone, patient_number FROM medical_patients ORDER BY display_name LIMIT 1000");
+      const patients=rows.map(row=>({patientId:row.id,displayName:row.display_name||"",phone:row.phone||"",patientNumber:row.patient_number||""}))
+        .filter(patient=>patient.patientId&&(patient.displayName.toLocaleLowerCase("ar").includes(query)||patient.phone.includes(query)||patient.patientNumber.toLocaleLowerCase("ar").includes(query))).slice(0,20);
+      return jsonResponse({patients});
+    }catch(error){console.error("Medical patient account search failed:",error);return jsonResponse({message:"تعذر البحث في ملفات المرضى."},503);}
   }
 
   const patientId = typeof body.patientId === "string" ? body.patientId.trim() : "";
@@ -230,109 +174,52 @@ async function onRequestInternal({ request, env }) {
   if (!/^[A-Za-z0-9_-]{1,150}$/.test(patientId)) return jsonResponse({ message: "اختَر ملف مريض مسجلًا من نتائج البحث." }, 400);
 
   if (["accountStatus", "resetPassword"].includes(body.action)) {
-    if (body.action === "resetPassword" && (password.length < 8 || password.length > 128)) {
-      return jsonResponse({ message: "كلمة المرور الجديدة يجب أن تكون من 8 إلى 128 حرفًا." }, 400);
-    }
-    const user = await verifyUser(request, env);
-    if (!user.ok) return jsonResponse({ message: user.message }, user.status);
+    if(body.action==="resetPassword"&&(password.length<8||password.length>128))return jsonResponse({message:"كلمة المرور الجديدة يجب أن تكون من 8 إلى 128 حرفًا."},400);
+    const user=await verifyUser(request,env);
+    if(!user.ok)return jsonResponse({message:user.message},user.status);
     try {
-      const account = parseServiceAccount(env);
-      const token = await googleAccessToken(account);
-      const permission = await verifyPatientsEditor(user, account, token);
-      if (!permission.ok) return jsonResponse({ message: permission.message }, permission.status);
-      const patientDoc = await firestore(account.project_id, token, "/" + MEDICAL_PATIENTS_COLLECTION + "/" + encodeURIComponent(patientId));
-      if (!patientDoc) return jsonResponse({ message: "ملف المريض المحدد غير موجود. ابحث عنه مرة أخرى." }, 404);
-      const accountQuery = await firestore(account.project_id, token, ":runQuery", {
-        method: "POST",
-        body: JSON.stringify({ structuredQuery: { from: [{ collectionId: PATIENTS_COLLECTION }] } })
+      const permission=await verifyPatientsEditor(user,env);
+      if(!permission.ok)return jsonResponse({message:permission.message},permission.status);
+      const database=getClinicDatabase(env);
+      const medicalPatient=await d1First(database,"SELECT id, display_name, phone FROM medical_patients WHERE id = ? LIMIT 1",[patientId]);
+      if(!medicalPatient)return jsonResponse({message:"ملف المريض المحدد غير موجود. ابحث عنه مرة أخرى."},404);
+      const linked=await d1First(database,"SELECT uid, username, email, source_payload_json FROM patient_accounts WHERE patient_id = ? AND role = 'patient' AND active = 1 LIMIT 1",[patientId]);
+      if(!linked)return jsonResponse({accountExists:false,message:"لا يوجد حساب نشط مرتبط بهذا الملف."});
+      if(body.action==="accountStatus")return jsonResponse({accountExists:true,username:linked.username||""});
+      const tokenAccount=parseServiceAccount(env),token=await googleAccessToken(tokenAccount);
+      const updateResponse=await fetch(FIREBASE_ADMIN_UPDATE_URL,{
+        method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+        body:JSON.stringify({localId:linked.uid,password})
       });
-      const linkedDoc = (Array.isArray(accountQuery) ? accountQuery : []).find(item => item.document &&
-        readString(item.document.fields || {}, "patientId") === patientId &&
-        item.document.fields?.active?.booleanValue === true)?.document;
-      if (!linkedDoc) return jsonResponse({ accountExists: false, message: "لا يوجد حساب نشط مرتبط بهذا الملف." });
-      const linkedFields = linkedDoc.fields || {};
-      const linkedUid = readString(linkedFields, "uid") || String(linkedDoc.name || "").split("/").pop();
-      const linkedUsername = readString(linkedFields, "username");
-      if (body.action === "accountStatus") {
-        return jsonResponse({ accountExists: true, username: linkedUsername, active: true });
-      }
-      const updateResponse = await fetch(FIREBASE_ADMIN_UPDATE_URL, {
-        method: "POST",
-        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-        body: JSON.stringify({ localId: linkedUid, password })
-      });
-      if (!updateResponse.ok) {
-        const detail = await updateResponse.text();
-        console.error("Patient password reset failed:", updateResponse.status, detail.slice(0, 400));
-        return jsonResponse({ message: "تعذر إعادة تعيين كلمة المرور من خدمة Firebase. لم يتم حفظ أي كلمة مرور." }, 503);
-      }
-      const now = new Date().toISOString();
-      const updatePath = "/" + PATIENTS_COLLECTION + "/" + encodeURIComponent(linkedUid) +
-        "?updateMask.fieldPaths=updatedAt&updateMask.fieldPaths=passwordResetAt&updateMask.fieldPaths=passwordResetBy";
-      let auditSaved = true;
-      try {
-        await firestore(account.project_id, token, updatePath, {
-          method: "PATCH",
-          body: JSON.stringify(encodeDocument({
-            updatedAt: fsString(now),
-            passwordResetAt: fsString(now),
-            passwordResetBy: fsString(user.uid)
-          }))
-        });
-      } catch (auditError) {
-        auditSaved = false;
-        console.error("Password reset succeeded but audit metadata could not be saved:", auditError);
-      }
-      return jsonResponse({
-        success: true,
-        patient: { patientId, username: linkedUsername },
-        credentials: { username: linkedUsername, password },
-        message: auditSaved
-          ? "تم تغيير كلمة المرور. سلّمها للمريض بشكل خاص؛ لن يتم حفظها كنص مكشوف."
-          : "تم تغيير كلمة المرور، لكن تعذر حفظ سجل العملية. سلّم كلمة المرور الجديدة للمريض بشكل خاص."
-      });
-    } catch (error) {
-      console.error("Patient account status/reset failed:", error);
-      return jsonResponse({ message: error.message || "تعذر التحقق من حساب المريض أو إعادة تعيين كلمة المرور." }, error.status === 403 ? 403 : 503);
-    }
+      if(!updateResponse.ok){const detail=await updateResponse.text();console.error("Patient password reset failed:",updateResponse.status,detail.slice(0,400));return jsonResponse({message:"تعذر إعادة تعيين كلمة المرور من خدمة Firebase. لم يتم حفظ أي كلمة مرور."},503);}
+      const now=new Date().toISOString();
+      let payload={};try{payload=JSON.parse(linked.source_payload_json||"{}");}catch{}
+      payload.updatedAt=now;payload.passwordResetAt=now;payload.passwordResetBy=user.uid;
+      await d1Run(database,"UPDATE patient_accounts SET updated_at = ?, source_payload_json = ? WHERE uid = ?",[now,JSON.stringify(payload),linked.uid]);
+      return jsonResponse({success:true,patient:{patientId,username:linked.username},credentials:{username:linked.username,password},message:"تم تغيير كلمة المرور. سلّمها للمريض بشكل خاص؛ لن يتم حفظها كنص مكشوف."});
+    }catch(error){console.error("Patient account status/reset failed:",error);return jsonResponse({message:error.message||"تعذر التحقق من حساب المريض أو إعادة تعيين كلمة المرور."},error.status===403?403:503);}
   }
 
   if (!validUsername(username)) return jsonResponse({ message: "اسم المستخدم يجب أن يكون من 3 إلى 40 حرفًا أو رقمًا، ويمكن أن يكون بالعربية أو رقم الهاتف." }, 400);
   if (password.length < 8 || password.length > 128) return jsonResponse({ message: "كلمة المرور يجب أن تكون من 8 إلى 128 حرفًا." }, 400);
 
-  let account, token;
-  try {
-    account = parseServiceAccount(env);
-    token = await googleAccessToken(account);
-  } catch (error) {
-    console.error("Patient API configuration error:", error);
-    return jsonResponse({ message: "خدمة إنشاء الحسابات غير مهيأة حاليًا." }, 503);
-  }
 
   const user = await verifyUser(request, env);
   if (!user.ok) return jsonResponse({ message: user.message }, user.status);
 
   try {
-    const permission = await verifyPatientsEditor(user, account, token);
+    const permission = await verifyPatientsEditor(user, env);
     if (!permission.ok) return jsonResponse({ message: permission.message }, permission.status);
 
-    const usernameKey = normalizeUsername(username);
-    const existingUsername = await firestore(account.project_id, token, "/" + USERNAMES_COLLECTION + "/" + encodeURIComponent(usernameKey));
-    if (existingUsername) return jsonResponse({ message: "اسم المستخدم مستخدم بالفعل. اختَر اسمًا آخر." }, 409);
-
-    const medicalPatient = await firestore(account.project_id, token, "/" + MEDICAL_PATIENTS_COLLECTION + "/" + encodeURIComponent(patientId));
-    if (!medicalPatient) return jsonResponse({ message: "ملف المريض المحدد غير موجود. ابحث عنه مرة أخرى." }, 404);
-    const medicalFields = medicalPatient.fields || {};
-    const displayName = readString(medicalFields, "displayName").trim();
-    const phone = readString(medicalFields, "phone").trim();
-    if (displayName.length < 2 || !phone) return jsonResponse({ message: "ملف المريض لا يحتوي على الاسم ورقم الهاتف اللازمين لإنشاء الحساب." }, 400);
-
-    const existingPatientAccounts = await firestore(account.project_id, token, ":runQuery", {
-      method: "POST",
-      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: PATIENTS_COLLECTION }] } })
-    });
-    const alreadyLinked = (Array.isArray(existingPatientAccounts) ? existingPatientAccounts : []).some(item => item.document && readString(item.document.fields || {}, "patientId") === patientId && item.document.fields?.active?.booleanValue === true);
-    if (alreadyLinked) return jsonResponse({ message: "يوجد حساب نشط مرتبط بملف هذا المريض بالفعل." }, 409);
+    const usernameKey=normalizeUsername(username),database=getClinicDatabase(env);
+    const existingUsername=await d1First(database,"SELECT username_key FROM patient_usernames WHERE username_key = ? LIMIT 1",[usernameKey]);
+    if(existingUsername)return jsonResponse({message:"اسم المستخدم مستخدم بالفعل. اختَر اسمًا آخر."},409);
+    const medicalPatient=await d1First(database,"SELECT id, display_name, phone FROM medical_patients WHERE id = ? LIMIT 1",[patientId]);
+    if(!medicalPatient)return jsonResponse({message:"ملف المريض المحدد غير موجود. ابحث عنه مرة أخرى."},404);
+    const displayName=String(medicalPatient.display_name||"").trim(),phone=String(medicalPatient.phone||"").trim();
+    if(displayName.length<2||!phone)return jsonResponse({message:"ملف المريض لا يحتوي على الاسم ورقم الهاتف اللازمين لإنشاء الحساب."},400);
+    const alreadyLinked=await d1First(database,"SELECT uid FROM patient_accounts WHERE patient_id = ? AND role = 'patient' AND active = 1 LIMIT 1",[patientId]);
+    if(alreadyLinked)return jsonResponse({message:"يوجد حساب نشط مرتبط بملف هذا المريض بالفعل."},409);
 
     const email = await internalEmailFor(usernameKey);
     const signup = await fetch(FIREBASE_SIGNUP_URL + "?key=" + encodeURIComponent(env.FIREBASE_API_KEY || ""), {
@@ -354,26 +241,16 @@ async function onRequestInternal({ request, env }) {
     const uid = signupResult.localId;
     const now = new Date().toISOString();
     try {
-      await firestore(account.project_id, token, "/" + PATIENTS_COLLECTION + "/" + encodeURIComponent(uid), {
-        method: "PATCH",
-        body: JSON.stringify(encodeDocument({ uid: fsString(uid), role: fsString("patient"), active: fsBool(true), patientId: fsString(patientId), displayName: fsString(displayName), email: fsString(email), phone: fsString(phone), username: fsString(username), usernameKey: fsString(usernameKey), createdAt: fsString(now), updatedAt: fsString(now) }))
-      });
-      await firestore(account.project_id, token, "/" + USERNAMES_COLLECTION + "/" + encodeURIComponent(usernameKey), {
-        method: "PATCH",
-        body: JSON.stringify(encodeDocument({ uid: fsString(uid), email: fsString(email), username: fsString(username), usernameKey: fsString(usernameKey), active: fsBool(true), createdAt: fsString(now) }))
-      });
-    } catch (error) {
-      try {
-        await firestore(account.project_id, token, "/" + PATIENTS_COLLECTION + "/" + encodeURIComponent(uid), {
-          method: "DELETE"
-        });
-        await firestore(account.project_id, token, "/" + USERNAMES_COLLECTION + "/" + encodeURIComponent(usernameKey), {
-          method: "DELETE"
-        });
-      } catch (cleanupError) {
-        console.error("Patient account rollback cleanup failed:", cleanupError);
-      }
-      await deleteAuthUser(env.FIREBASE_API_KEY, signupResult.idToken);
+      const patientAccount={uid,role:"patient",active:true,patientId,displayName,email,phone,username,usernameKey,createdAt:now,updatedAt:now};
+      const usernameRecord={usernameKey,uid,email,username,active:true,createdAt:now};
+      await d1Batch(database,[
+        {sql:"INSERT INTO patient_accounts (uid,role,active,patient_id,display_name,email,phone,username,username_key,created_at,updated_at,source_payload_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+          params:[uid,"patient",1,patientId,displayName,email,phone,username,usernameKey,now,now,JSON.stringify(patientAccount)]},
+        {sql:"INSERT INTO patient_usernames (username_key,uid,email,username,active,created_at,source_payload_json) VALUES (?,?,?,?,?,?,?)",
+          params:[usernameKey,uid,email,username,1,now,JSON.stringify(usernameRecord)]}
+      ]);
+    } catch(error) {
+      await deleteAuthUser(env.FIREBASE_API_KEY,signupResult.idToken);
       throw error;
     }
 
