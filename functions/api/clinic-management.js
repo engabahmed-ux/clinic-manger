@@ -1,4 +1,5 @@
 import { publishClinicRealtime } from "../_shared/realtime.js";
+import { getClinicDatabase, d1First } from "../_shared/d1.js";
 
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const EXPECTED_PROJECT_ID = "clinics-manger";
@@ -237,10 +238,22 @@ async function listLogs(projectId, token, input) {
 }
 async function onRequestGet({ env }) {
   try {
-    const account = parseServiceAccount(env), token = await createGoogleAccessToken(account);
-    return response(await getSettings(account.project_id, token));
+    const database = getClinicDatabase(env);
+    const row = await d1First(
+      database,
+      "SELECT settings_json, updated_at FROM clinic_settings WHERE id = ? LIMIT 1",
+      ["singleton"]
+    );
+    let settings = null;
+    if (row?.settings_json) {
+      settings = JSON.parse(row.settings_json);
+    }
+    return response({
+      settings,
+      updatedAt: row?.updated_at || null
+    });
   } catch (error) {
-    console.error("Clinic settings read failed:", error.status || "server", error.message);
+    console.error("Clinic settings D1 read failed:", error.message);
     return response({ message: "تعذر تحميل إعدادات العيادة حاليًا." }, 503);
   }
 }
