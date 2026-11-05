@@ -1,11 +1,8 @@
+import { getClinicDatabase, d1All, d1First, d1Run } from "../../_shared/d1.js";
 import { publishClinicRealtime } from "../../_shared/realtime.js";
 
 const DOCTOR_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
-const PROJECT = "clinics-manger";
 const LOOKUP = "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
-const SCOPE = "https://www.googleapis.com/auth/cloud-platform";
-const COLLECTION = "clinicAccountRecords";
 const LOCK_ID = "staff-custody-active-session";
 
 function reply(body, status = 200) {
@@ -14,48 +11,78 @@ function reply(body, status = 200) {
     "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"
   }});
 }
-function b64(bytes) { let s=""; for (const b of bytes) s+=String.fromCharCode(b); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,""); }
-function b64t(v) { return b64(new TextEncoder().encode(v)); }
-function keyBytes(pem) { const s=atob(pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g,"")); return Uint8Array.from(s,c=>c.charCodeAt(0)); }
-async function googleToken(a) {
-  const now=Math.floor(Date.now()/1000), unsigned=[b64t(JSON.stringify({alg:"RS256",typ:"JWT"})),b64t(JSON.stringify({iss:a.client_email,scope:SCOPE,aud:TOKEN_URL,iat:now,exp:now+3600}))].join(".");
-  const key=await crypto.subtle.importKey("pkcs8",keyBytes(a.private_key),{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["sign"]);
-  const sig=await crypto.subtle.sign("RSASSA-PKCS1-v1_5",key,new TextEncoder().encode(unsigned));
-  const r=await fetch(TOKEN_URL,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion:unsigned+"."+b64(new Uint8Array(sig))})});
-  if(!r.ok) throw new Error("تعذر تهيئة خدمة العهدة.");
-  const j=await r.json(); if(!j.access_token) throw new Error("تعذر تهيئة خدمة العهدة."); return j.access_token;
-}
-function url(project,path="") { return "https://firestore.googleapis.com/v1/projects/"+encodeURIComponent(project)+"/databases/(default)/documents"+path; }
-async function fs(project,token,path,options={}) {
-  const r=await fetch(url(project,path),{...options,headers:{Authorization:"Bearer "+token,"Content-Type":"application/json",...(options.headers||{})}});
-  if(!r.ok) { const t=await r.text(); if(r.status===404) return null; if(r.status===409||r.status===412) return {__conflict:true}; console.error("Custody Firestore error",r.status,t.slice(0,300)); throw new Error("تعذر حفظ بيانات العهدة."); }
-  if(r.status===204) return null; const t=await r.text(); return t?JSON.parse(t):null;
-}
-const sv=v=>({stringValue:String(v??"")});
-function enc(o){const fields={};for(const [k,v] of Object.entries(o)) if(v!==undefined&&v!==null) fields[k]=typeof v==="number"?{integerValue:String(v)}:typeof v==="boolean"?{booleanValue:v}:sv(v);return {fields};}
-function dec(d){const f=d?.fields||{},o={id:d?.name?.split("/").pop()};for(const[k,v]of Object.entries(f))o[k]=v.stringValue??v.integerValue??v.booleanValue??"";return o;}
 function cairoDate(value){if(!value)return"";const d=new Date(value);if(Number.isNaN(d.getTime()))return String(value).slice(0,10);const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(d),v=Object.fromEntries(p.map(x=>[x.type,x.value]));return `${v.year}-${v.month}-${v.day}`;}
 function validSameDayOwnHandover(history,uid,now){const amount=Number(history.nextOpeningAmount??history.totalHandedOverAmount??0),expected=Number(history.expectedAmount||0),dailyNet=Math.max(0,Number(history.baselineReceipts||0)-Number(history.baselineExpenses||0));return history.previousEmployeeUid===uid&&cairoDate(history.closedAt||"")===cairoDate(now)&&amount+0.009>=expected&&amount+0.009>=dailyNet;}
 async function authenticate(request,env) {
-  if(!env.FIREBASE_API_KEY||!env.FIREBASE_SERVICE_ACCOUNT_JSON) return {error:"إعدادات التحقق غير مكتملة.",status:503};
-  const m=(request.headers.get("Authorization")||"").match(/^Bearer\s+(\S+)$/i);if(!m||m[1].length>8192)return {error:"يلزم تسجيل الدخول.",status:401};
+  if(!env.FIREBASE_API_KEY)return {error:"إعدادات التحقق غير مكتملة.",status:503};
+  const m=(request.headers.get("Authorization")||"").match(/^Bearer\\s+(\\S+)$/i);
+  if(!m||m[1].length>8192)return {error:"يلزم تسجيل الدخول.",status:401};
   const r=await fetch(LOOKUP+"?key="+encodeURIComponent(env.FIREBASE_API_KEY),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:m[1]})});
-  if(!r.ok)return {error:"جلسة الدخول غير صالحة.",status:401};const user=(await r.json()).users?.[0];if(!user?.localId)return {error:"تعذر التحقق من الحساب.",status:401};
-  const a=JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);if(a.project_id!==PROJECT||!a.client_email||!a.private_key)return {error:"إعدادات الخدمة غير صحيحة.",status:503};
-  const token=await googleToken(a);if(user.localId===DOCTOR_UID)return {uid:user.localId,name:"الدكتور",role:"doctor",token,project:PROJECT};
-  const doc=await fs(PROJECT,token,"/clinicStaff/"+encodeURIComponent(user.localId));const f=doc?.fields||{};
-  const read=k=>f[k]?.stringValue||"";
-  if(f.active?.booleanValue!==true||read("role")!=="staff")return {error:"حساب الموظف غير نشط أو غير معتمد.",status:403};
-  const accountPermission=f.permissions?.mapValue?.fields?.accounts?.stringValue||"none";
-  return {uid:user.localId,name:read("displayName")||"الموظف",role:"staff",accountPermission,token,project:PROJECT};
+  if(!r.ok)return {error:"جلسة الدخول غير صالحة.",status:401};
+  const user=(await r.json()).users?.[0];if(!user?.localId)return {error:"تعذر التحقق من الحساب.",status:401};
+  if(user.localId===DOCTOR_UID)return {uid:user.localId,name:"الدكتور",role:"doctor",accountPermission:"edit"};
+  const db=getClinicDatabase(env);
+  const staff=await d1First(db,"SELECT role,active,display_name,permissions_json FROM staff WHERE uid = ? LIMIT 1",[user.localId]);
+  if(!staff||staff.role!=="staff"||Number(staff.active)!==1)return {error:"حساب الموظف غير نشط أو غير معتمد.",status:403};
+  let permissions={};try{permissions=JSON.parse(staff.permissions_json||"{}");}catch{}
+  return {uid:user.localId,name:staff.display_name||"الموظف",role:"staff",accountPermission:permissions.accounts||"none"};
 }
-async function readDoc(ctx,id){return dec(await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+encodeURIComponent(id)));}
-async function createRecord(ctx,id,record){return fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+encodeURIComponent(id)+"?currentDocument.exists=false",{method:"PATCH",body:JSON.stringify(enc(record))});}
-async function listCustodyRecords(ctx,types=["custodyHandover","custodyDoctorSettlement"]){const results=await Promise.all(types.map(type=>fs(ctx.project,ctx.token,":runQuery",{method:"POST",body:JSON.stringify({structuredQuery:{from:[{collectionId:COLLECTION}],where:{fieldFilter:{field:{fieldPath:"type"},op:"EQUAL",value:sv(type)}}}})})));return results.flatMap(result=>Array.isArray(result)?result:[]).filter(x=>x.document).map(x=>dec(x.document));}
+function decodeRecord(row) {
+  if(!row)return {};
+  let payload={};try{payload=JSON.parse(row.payload_json||"{}");}catch{}
+  return {...payload,id:row.id,type:row.record_type||payload.type||"",name:row.name||payload.name||"",kind:row.kind||payload.kind||"",
+    categoryId:row.category_id||payload.categoryId||"",personName:row.person_name||payload.personName||"",amount:row.amount||payload.amount||"",
+    date:row.date||payload.date||"",notes:row.notes||payload.notes||"",createdAt:row.created_at||payload.createdAt||"",
+    updatedAt:row.updated_at||payload.updatedAt||"",status:row.status||payload.status||"",enteredBy:row.entered_by||payload.enteredBy||"",
+    enteredByName:row.entered_by_name||payload.enteredByName||"",employeeUid:row.employee_uid||payload.employeeUid||"",
+    employeeName:row.employee_name||payload.employeeName||"",closedAt:row.closed_at||payload.closedAt||"",
+    totalReceipts:row.total_receipts||payload.totalReceipts||"",totalExpenses:row.total_expenses||payload.totalExpenses||"",
+    netTotal:row.net_total||payload.netTotal||"",bookingCount:row.booking_count||payload.bookingCount||""};
+}
+function recordValues(id,record) {
+  return [id,record.type||"",record.name||"",record.kind||"",record.categoryId||"",record.personName||"",record.amount||"",record.date||"",record.notes||"",
+    record.createdAt||"",record.updatedAt||"",record.status||"",record.enteredBy||"",record.enteredByName||"",record.approvedBy||"",record.approvedByName||"",
+    record.approvedAt||"",record.reviewedBy||"",record.reviewedByName||"",record.reviewedAt||"",record.rejectionReason||"",record.periodType||"",
+    record.periodKey||"",record.employeeUid||"",record.employeeName||"",record.closedBy||"",record.closedByName||"",record.closedAt||"",
+    record.totalReceipts||"",record.totalExpenses||"",record.netTotal||"",record.bookingCount||"",JSON.stringify(record)];
+}
+const RECORD_COLUMNS="id,record_type,name,kind,category_id,person_name,amount,date,notes,created_at,updated_at,status,entered_by,entered_by_name,approved_by,approved_by_name,approved_at,reviewed_by,reviewed_by_name,reviewed_at,rejection_reason,period_type,period_key,employee_uid,employee_name,closed_by,closed_by_name,closed_at,total_receipts,total_expenses,net_total,booking_count,payload_json";
+async function readDoc(ctx,id) {
+  const row=await d1First(getClinicDatabase(ctx.env),"SELECT * FROM account_records WHERE id = ? LIMIT 1",[id]);
+  return decodeRecord(row);
+}
+async function createRecord(ctx,id,record) {
+  try {
+    await d1Run(getClinicDatabase(ctx.env),"INSERT INTO account_records ("+RECORD_COLUMNS+") VALUES ("+recordValues(id,record).map(()=>"?").join(",")+")",recordValues(id,record));
+    return {id,...record};
+  } catch(error) {
+    const existing=await d1First(getClinicDatabase(ctx.env),"SELECT id FROM account_records WHERE id = ? LIMIT 1",[id]);
+    if(existing)return {__conflict:true};
+    throw error;
+  }
+}
+async function updateRecord(ctx,id,record) {
+  const values=recordValues(id,record);
+  const columns=RECORD_COLUMNS.split(",");
+  const updates=columns.filter(x=>x!=="id").map(x=>x+"=?").join(",");
+  await d1Run(getClinicDatabase(ctx.env),"UPDATE account_records SET "+updates+" WHERE id = ?",[...values.slice(1),id]);
+  return {id,...record};
+}
+async function deleteRecord(ctx,id) {
+  await d1Run(getClinicDatabase(ctx.env),"DELETE FROM account_records WHERE id = ?",[id]);
+  return null;
+}
+async function listCustodyRecords(ctx,types=["custodyHandover","custodyDoctorSettlement"]) {
+  const db=getClinicDatabase(ctx.env),placeholders=types.map(()=>"?").join(",");
+  const rows=await d1All(db,"SELECT * FROM account_records WHERE record_type IN ("+placeholders+") ORDER BY created_at DESC",types);
+  return rows.map(decodeRecord);
+}
+
 async function onRequestPostInternal({request,env}) {
   let data;try{const raw=await request.text();if(raw.length>12000)return reply({message:"حجم الطلب أكبر من المسموح."},413);data=JSON.parse(raw);}catch{return reply({message:"صيغة الطلب غير صحيحة."},400);}
   let ctx;try{ctx=await authenticate(request,env);}catch(e){console.error("Custody auth error",e);return reply({message:"تعذر التحقق من الجلسة."},503);}
   if(ctx.error)return reply({message:ctx.error},ctx.status);
+  ctx.env=env;
   const now=new Date().toISOString(),action=String(data.action||"");
   try {
     if(action==="status") {
@@ -118,7 +145,7 @@ async function onRequestPostInternal({request,env}) {
       if(made?.__conflict)return reply({message:"تعذر حفظ التصفية بسبب طلب متزامن. حدّث الصفحة وحاول مرة أخرى."},409);
       const updated={...history,settledAt:now,settledByUid:ctx.uid,settledByName:"الدكتور",settlementId:id};
       const masks=["settledAt","settledByUid","settledByName","settlementId"].map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");
-      const saved=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/custody-last-closed?"+masks,{method:"PATCH",body:JSON.stringify(enc(updated))});
+      const saved=await updateRecord(ctx,"custody-last-closed",updated);
       if(saved?.__conflict)return reply({message:"تم تسجيل التصفية لكن تعذر تحديث حالتها. راجع سجل التصفيات قبل إعادة المحاولة."},503);
       return reply({settlement});
     }
@@ -132,7 +159,7 @@ async function onRequestPostInternal({request,env}) {
         if(staleBaseline){
           const corrected={...lock,baselineReceipts:"0.00",baselineExpenses:"0.00",updatedAt:now};
           const patchFields=["baselineReceipts","baselineExpenses","updatedAt"].map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");
-          const saved=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+LOCK_ID+"?"+patchFields,{method:"PATCH",body:JSON.stringify(enc(corrected))});
+          const saved=await updateRecord(ctx,LOCK_ID,corrected);
           if(saved?.__conflict)return reply({message:"تغيرت بيانات العهدة بالتزامن. حدّث الصفحة وحاول مرة أخرى."},409);
           return reply({active:true,session:corrected,alreadyActive:true,baselineCorrected:true});
         }
@@ -167,13 +194,13 @@ async function onRequestPostInternal({request,env}) {
       const made=await createRecord(ctx,id,record);if(made?.__conflict)return reply({message:"تعذر تسجيل التسليم. حاول مرة أخرى."},409);
       const closed={...lock,status:"closed",actualAmount:actual.toFixed(2),difference:(actual-expected).toFixed(2),notes,closedAt:now,updatedAt:now};
       const patchFields=Object.entries(closed).filter(([k])=>k!=="id").map(([k])=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");
-      const updated=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+LOCK_ID+"?"+patchFields,{method:"PATCH",body:JSON.stringify(enc(closed))});
+      const updated=await updateRecord(ctx,LOCK_ID,closed);
       if(updated?.__conflict)return reply({message:"تغيرت حالة العهدة بالتزامن. راجع الدكتور قبل إعادة المحاولة."},409);
       const archived=await createRecord(ctx,id+"-session-close",{...closed,type:"custodySessionClosed",closedByUid:ctx.uid,closedByName:ctx.name});
       if(archived?.__conflict)return reply({message:"تم إغلاق العهدة لكن تعذر حفظ نسخة الأرشيف. راجع الدكتور قبل بدء عهدة جديدة."},503);
-      const removed=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+LOCK_ID,{method:"DELETE"});
+      const removed=await deleteRecord(ctx,LOCK_ID);
       if(removed?.__conflict)return reply({message:"تم تسجيل التسليم لكن تعذر تحرير قفل الجلسة. راجع الدكتور."},409);
-      const summary={type:"custodyHandoverSummary",nextOpeningAmount:actual.toFixed(2),totalHandedOverAmount:actual.toFixed(2),expectedAmount:expected.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,notes,closedAt:now,date:cairoDate(now),settledAt:"",settledByUid:"",settledByName:"",settlementId:""};const summaryMask=Object.keys(summary).map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");await fs(ctx.project,ctx.token,"/"+COLLECTION+"/custody-last-closed?"+summaryMask,{method:"PATCH",body:JSON.stringify(enc(summary))});
+      const summary={type:"custodyHandoverSummary",nextOpeningAmount:actual.toFixed(2),totalHandedOverAmount:actual.toFixed(2),expectedAmount:expected.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),previousEmployeeUid:ctx.uid,previousEmployeeName:ctx.name,notes,closedAt:now,date:cairoDate(now),settledAt:"",settledByUid:"",settledByName:"",settlementId:""};const summaryMask=Object.keys(summary).map(k=>"updateMask.fieldPaths="+encodeURIComponent(k)).join("&");await updateRecord(ctx,"custody-last-closed",summary);
       return reply({closed:true,expectedAmount:expected.toFixed(2),actualAmount:actual.toFixed(2),difference:(actual-expected).toFixed(2)});
     }
     if(action==="addCash") {
@@ -183,7 +210,7 @@ async function onRequestPostInternal({request,env}) {
       const expected=Number(lock.expectedAmount||0)+amount;
       const patch={...lock,expectedAmount:expected.toFixed(2),updatedAt:now};
       const masks=["expectedAmount","updatedAt"].map(k=>"updateMask.fieldPaths="+k).join("&");
-      const updated=await fs(ctx.project,ctx.token,"/"+COLLECTION+"/"+LOCK_ID+"?"+masks,{method:"PATCH",body:JSON.stringify(enc(patch))});
+      const updated=await updateRecord(ctx,LOCK_ID,patch);
       if(updated?.__conflict)return reply({message:"تغيرت العهدة بالتزامن. أعد تحميل الصفحة."},409);
       const id="custody-cash-"+Date.now()+"-"+crypto.randomUUID().replace(/-/g,"").slice(0,8);
       await createRecord(ctx,id,{type:"custodyAddition",employeeUid:ctx.uid,employeeName:ctx.name,amount:amount.toFixed(2),notes,createdAt:now});
