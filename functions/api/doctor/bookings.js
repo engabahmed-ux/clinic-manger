@@ -1,3 +1,4 @@
+import { getClinicDatabase, d1All, d1First, d1Run } from "../../_shared/d1.js";
 import { publishClinicRealtime } from "../../_shared/realtime.js";
 
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
@@ -244,41 +245,68 @@ function cairoDate(value) {
 }
 
 function decodeBooking(document) {
-  const fields = document.fields || {};
-  const id = (document.name || "").split("/").pop();
-
+  if (document?.fields) {
+    const fields = document.fields || {};
+    const id = (document.name || "").split("/").pop();
+    return {
+      id, patientName:readString(fields,"patientName"), patientId:readString(fields,"patientId"),
+      bloodPressure:readString(fields,"bloodPressure"), weight:readString(fields,"weight"),
+      bloodSugar:readString(fields,"bloodSugar"), preVisitNotes:readString(fields,"preVisitNotes"),
+      patientPhone:readString(fields,"patientPhone"), appointmentDate:readString(fields,"appointmentDate"),
+      service:readString(fields,"service"), servicePrice:readString(fields,"servicePrice"),
+      paidAmount:readString(fields,"paidAmount"), completedFee:readString(fields,"completedFee"),
+      completedAt:readString(fields,"completedAt"), completedByUid:readString(fields,"completedByUid"),
+      completedByName:readString(fields,"completedByName"), paymentEnteredByUid:readString(fields,"paymentEnteredByUid"),
+      paymentEnteredByName:readString(fields,"paymentEnteredByName"), paymentUpdatedAt:readString(fields,"paymentUpdatedAt"),
+      rescheduleHistory:readString(fields,"rescheduleHistory"), archivedRescheduleHistory:readString(fields,"archivedRescheduleHistory"),
+      queueNumber:readString(fields,"queueNumber"), isArchived:readString(fields,"isArchived")==="true",
+      archivedAt:readString(fields,"archivedAt"), archivedByUid:readString(fields,"archivedByUid"),
+      archivedByName:readString(fields,"archivedByName"), notes:readString(fields,"notes"),
+      status:readString(fields,"status")||"pending", createdAt:readString(fields,"createdAt"), updatedAt:readString(fields,"updatedAt")
+    };
+  }
+  let payload = {};
+  try { payload = JSON.parse(document?.source_payload_json || "{}"); } catch {}
+  const pick = (camel, snake, fallback = "") => payload[camel] ?? document?.[snake] ?? fallback;
   return {
-    id,
-    patientName: readString(fields, "patientName"),
-    patientId: readString(fields, "patientId"),
-    bloodPressure: readString(fields, "bloodPressure"),
-    weight: readString(fields, "weight"),
-    bloodSugar: readString(fields, "bloodSugar"),
-    preVisitNotes: readString(fields, "preVisitNotes"),
-    patientPhone: readString(fields, "patientPhone"),
-    appointmentDate: readString(fields, "appointmentDate"),
-    service: readString(fields, "service"),
-    servicePrice: readString(fields, "servicePrice"),
-    paidAmount: readString(fields, "paidAmount"),
-    completedFee: readString(fields, "completedFee"),
-    completedAt: readString(fields, "completedAt"),
-    completedByUid: readString(fields, "completedByUid"),
-    completedByName: readString(fields, "completedByName"),
-    paymentEnteredByUid: readString(fields, "paymentEnteredByUid"),
-    paymentEnteredByName: readString(fields, "paymentEnteredByName"),
-    paymentUpdatedAt: readString(fields, "paymentUpdatedAt"),
-    rescheduleHistory: readString(fields, "rescheduleHistory"),
-    archivedRescheduleHistory: readString(fields, "archivedRescheduleHistory"),
-    queueNumber: readString(fields, "queueNumber"),
-    isArchived: readString(fields, "isArchived") === "true",
-    archivedAt: readString(fields, "archivedAt"),
-    archivedByUid: readString(fields, "archivedByUid"),
-    archivedByName: readString(fields, "archivedByName"),
-    notes: readString(fields, "notes"),
-    status: readString(fields, "status") || "pending",
-    createdAt: readString(fields, "createdAt"),
-    updatedAt: readString(fields, "updatedAt")
+    ...payload,
+    id: document?.id || payload.id || "",
+    patientName:pick("patientName","patient_name"), patientId:pick("patientId","patient_id"),
+    bloodPressure:pick("bloodPressure","blood_pressure"), weight:pick("weight","weight"),
+    bloodSugar:pick("bloodSugar","blood_sugar"), preVisitNotes:pick("preVisitNotes","pre_visit_notes"),
+    patientPhone:pick("patientPhone","patient_phone"), appointmentDate:pick("appointmentDate","appointment_date"),
+    service:pick("service","service"), servicePrice:pick("servicePrice","service_price","0"),
+    paidAmount:pick("paidAmount","paid_amount","0"), completedFee:pick("completedFee","completed_fee"),
+    completedAt:pick("completedAt","completed_at"), completedByUid:pick("completedByUid","completed_by_uid"),
+    completedByName:pick("completedByName","completed_by_name"), paymentEnteredByUid:pick("paymentEnteredByUid","payment_entered_by_uid"),
+    paymentEnteredByName:pick("paymentEnteredByName","payment_entered_by_name"), paymentUpdatedAt:pick("paymentUpdatedAt","payment_updated_at"),
+    rescheduleHistory:pick("rescheduleHistory","reschedule_history_json","[]"),
+    archivedRescheduleHistory:pick("archivedRescheduleHistory","archived_reschedule_history_json","[]"),
+    queueNumber:pick("queueNumber","queue_number"), isArchived:Number(document?.is_archived)===1 || payload.isArchived===true,
+    archivedAt:pick("archivedAt","archived_at"), archivedByUid:pick("archivedByUid","archived_by_uid"),
+    archivedByName:pick("archivedByName","archived_by_name"), notes:pick("notes","notes"),
+    status:pick("status","status","pending"), createdAt:pick("createdAt","created_at"), updatedAt:pick("updatedAt","updated_at")
   };
+}
+
+async function writeBooking(env, booking) {
+  const database = getClinicDatabase(env);
+  const payload = { ...booking, id: booking.id };
+  const values = [
+    booking.id, booking.patientName||"", booking.patientId||"", booking.patientPhone||"",
+    booking.bloodPressure||"", booking.weight||"", booking.bloodSugar||"", booking.preVisitNotes||"",
+    booking.appointmentDate||"", booking.service||"", booking.servicePrice||"0", booking.paidAmount||"0",
+    booking.completedFee||"", booking.completedAt||"", booking.completedByUid||"", booking.completedByName||"",
+    booking.paymentEnteredByUid||"", booking.paymentEnteredByName||"", booking.paymentUpdatedAt||"",
+    booking.rescheduleHistory||"[]", booking.archivedRescheduleHistory||"[]", booking.queueNumber||"",
+    booking.isArchived ? 1 : 0, booking.archivedAt||"", booking.archivedByUid||"", booking.archivedByName||"",
+    booking.notes||"", booking.status||"pending", booking.createdAt||"", booking.updatedAt||"", JSON.stringify(payload)
+  ];
+  const sql = "INSERT INTO bookings (id,patient_name,patient_id,patient_phone,blood_pressure,weight,blood_sugar,pre_visit_notes,appointment_date,service,service_price,paid_amount,completed_fee,completed_at,completed_by_uid,completed_by_name,payment_entered_by_uid,payment_entered_by_name,payment_updated_at,reschedule_history_json,archived_reschedule_history_json,queue_number,is_archived,archived_at,archived_by_uid,archived_by_name,notes,status,created_at,updated_at,source_payload_json) VALUES ("+
+    values.map(()=>"?").join(",")+") ON CONFLICT(id) DO UPDATE SET "+
+    "patient_name=excluded.patient_name,patient_id=excluded.patient_id,patient_phone=excluded.patient_phone,blood_pressure=excluded.blood_pressure,weight=excluded.weight,blood_sugar=excluded.blood_sugar,pre_visit_notes=excluded.pre_visit_notes,appointment_date=excluded.appointment_date,service=excluded.service,service_price=excluded.service_price,paid_amount=excluded.paid_amount,completed_fee=excluded.completed_fee,completed_at=excluded.completed_at,completed_by_uid=excluded.completed_by_uid,completed_by_name=excluded.completed_by_name,payment_entered_by_uid=excluded.payment_entered_by_uid,payment_entered_by_name=excluded.payment_entered_by_name,payment_updated_at=excluded.payment_updated_at,reschedule_history_json=excluded.reschedule_history_json,archived_reschedule_history_json=excluded.archived_reschedule_history_json,queue_number=excluded.queue_number,is_archived=excluded.is_archived,archived_at=excluded.archived_at,archived_by_uid=excluded.archived_by_uid,archived_by_name=excluded.archived_by_name,notes=excluded.notes,status=excluded.status,created_at=excluded.created_at,updated_at=excluded.updated_at,source_payload_json=excluded.source_payload_json";
+  await d1Run(database, sql, values);
+  return { ...booking };
 }
 
 function encodeBooking(data) {
@@ -321,55 +349,24 @@ function encodeBooking(data) {
   return { fields };
 }
 
-async function getAccountAccess(
-  user,
-  serviceAccount,
-  accessToken
-) {
-  if (user.uid === DOCTOR_ADMIN_UID) {
-    return {
-      ok: true,
-      accountType: "doctor",
-      permission: "edit",
-      accountsPermission: "edit",
-      uid: user.uid,
-      displayName: "الدكتور"
-    };
-  }
-
-  let document;
-
-  try {
-    document = await firestoreRequest(
-      serviceAccount.project_id,
-      accessToken,
-      `/${STAFF_COLLECTION}/${encodeURIComponent(user.uid)}`
-    );
-  } catch {
-    return {
-      ok: false,
-      status: 403,
-      message: "هذا الحساب غير مصرح له بإدارة حجوزات العيادة."
-    };
-  }
-
-  const fields = document?.fields || {};
-  const active = fields.active?.booleanValue === true;
-  const role = readString(fields, "role");
-  const permission = readString(fields.permissions?.mapValue?.fields, "bookings");
-  const accountsPermission = readString(fields.permissions?.mapValue?.fields, "accounts");
-  const displayName = readString(fields, "displayName");
-
-  if (role !== "staff" || !active) {
-    return {
-      ok: false,
-      status: 403,
-      message: "حساب الموظف غير نشط أو غير معتمد."
-    };
-  }
-
-  if (!["view", "edit"].includes(permission) && !["view", "edit"].includes(accountsPermission)) return { ok:false, status:403, message:"لم يمنحك الدكتور صلاحية الوصول إلى هذا القسم." };
-  return { ok:true, accountType:"staff", permission, accountsPermission, uid:user.uid, displayName };
+async function getAccountAccess(user, env) {
+  if (user.uid === DOCTOR_ADMIN_UID) return {
+    ok:true, accountType:"doctor", permission:"edit", accountsPermission:"edit", uid:user.uid, displayName:"الدكتور"
+  };
+  const database = getClinicDatabase(env);
+  const row = await d1First(database,
+    "SELECT role, active, display_name, permissions_json FROM staff WHERE uid = ? LIMIT 1", [user.uid]);
+  if (!row || row.role !== "staff" || Number(row.active) !== 1) return {
+    ok:false,status:403,message:"حساب الموظف غير نشط أو غير معتمد."
+  };
+  let permissions = {};
+  try { permissions = JSON.parse(row.permissions_json || "{}"); } catch {}
+  const permission = permissions.bookings || "none";
+  const accountsPermission = permissions.accounts || "none";
+  if (!["view","edit"].includes(permission) && !["view","edit"].includes(accountsPermission)) return {
+    ok:false,status:403,message:"لم يمنحك الدكتور صلاحية الوصول إلى هذا القسم."
+  };
+  return {ok:true,accountType:"staff",permission,accountsPermission,uid:user.uid,displayName:row.display_name||""};
 }
 
 function validateBooking(data, partial = false) {
@@ -455,293 +452,93 @@ function validateBooking(data, partial = false) {
 }
 
 
-async function listArchivePage(projectId, accessToken, cursor = null, pageSize = 10) {
-  const limit = Math.max(5, Math.min(20, Number(pageSize) || 10));
-  const documentName = id => `projects/${projectId}/databases/(default)/documents/${BOOKINGS_COLLECTION}/${id}`;
-  const run = async (kind) => {
-    if (cursor && !cursor[kind]) return [];
-    const saved = cursor?.[kind] || null;
-    const query = {
-      from: [{ collectionId: BOOKINGS_COLLECTION }],
-      orderBy: kind === "primary"
-        ? [{ field: { fieldPath: "__name__" }, direction: "ASCENDING" }]
-        : [
-            { field: { fieldPath: "archivedRescheduleHistory" }, direction: "ASCENDING" },
-            { field: { fieldPath: "__name__" }, direction: "ASCENDING" }
-          ],
-      limit
-    };
-    if (kind === "primary") {
-      query.where = {
-        compositeFilter: {
-          op: "OR",
-          filters: [
-            { fieldFilter: { field: { fieldPath: "isArchived" }, op: "EQUAL", value: { stringValue: "true" } } },
-            { fieldFilter: { field: { fieldPath: "status" }, op: "IN", value: { arrayValue: { values: [{ stringValue: "archived" }, { stringValue: "cancelled" }] } } } }
-          ]
-        }
-      };
-      if (saved) query.startAt = { before: false, values: [
-        { referenceValue: documentName(saved.id) }
-      ] };
-    } else {
-      query.where = { fieldFilter: {
-        field: { fieldPath: "archivedRescheduleHistory" },
-        op: "NOT_EQUAL",
-        value: { stringValue: "[]" }
-      } };
-      if (saved) query.startAt = { before: false, values: [
-        { stringValue: saved.history || "[]" },
-        { referenceValue: documentName(saved.id) }
-      ] };
-    }
-    const result = await firestoreRequest(projectId, accessToken, ":runQuery", {
-      method: "POST",
-      body: JSON.stringify({ structuredQuery: query })
-    });
-    return (Array.isArray(result) ? result : []).filter(item => item.document).map(item => item.document);
-  };
-  const [primaryDocs, historyDocs] = await Promise.all([run("primary"), run("history")]);
-  const cursorFor = (kind, docs) => {
-    if (docs.length < limit) return null;
-    const doc = docs[docs.length - 1], booking = decodeBooking(doc);
-    return kind === "primary"
-      ? { id: booking.id }
-      : { id: booking.id, history: booking.archivedRescheduleHistory || "[]" };
-  };
+async function listBookings(env) {
+  const database = getClinicDatabase(env);
+  const rows = await d1All(database, "SELECT * FROM bookings ORDER BY created_at ASC, id ASC");
+  return rows.map(decodeBooking);
+}
+async function listArchivePage(env, cursor = null, pageSize = 10) {
+  const all = await listBookings(env);
   const rows = [];
   const compactBooking = booking => {
     const { rescheduleHistory, archivedRescheduleHistory, ...compact } = booking;
     return compact;
   };
-  for (const doc of primaryDocs) {
-    const booking = decodeBooking(doc);
-    if (booking.isArchived || ["archived", "cancelled"].includes(booking.status)) {
-      rows.push({ ...compactBooking(booking), isArchivedOccurrence: false });
+  for (const booking of all) {
+    if (booking.isArchived || ["archived","cancelled"].includes(booking.status)) {
+      rows.push({ ...compactBooking(booking), isArchivedOccurrence:false });
     }
-  }
-  for (const doc of historyDocs) {
-    const booking = decodeBooking(doc);
     let history = [];
     try { history = JSON.parse(booking.archivedRescheduleHistory || "[]"); } catch {}
     if (!Array.isArray(history)) continue;
     for (const entry of history) {
-      if (!entry || !/^\d{4}-\d{2}-\d{2}$/.test(entry.fromDate || "") || !/^\d{4}-\d{2}-\d{2}$/.test(entry.toDate || "")) continue;
-      rows.push({
-        ...compactBooking(booking),
-        appointmentDate: entry.fromDate,
-        queueNumber: entry.fromQueueNumber || booking.queueNumber,
-        status: "postponed",
-        isArchived: true,
-        isArchivedOccurrence: true,
-        archivedAt: entry.archivedAt || "",
-        archivedByUid: entry.archivedByUid || "",
-        archivedByName: entry.archivedByName || "",
-        rescheduleToDate: entry.toDate
-      });
+      if (!entry || !/^\\d{4}-\\d{2}-\\d{2}$/.test(entry.fromDate||"") || !/^\\d{4}-\\d{2}-\\d{2}$/.test(entry.toDate||"")) continue;
+      rows.push({ ...compactBooking(booking), appointmentDate:entry.fromDate,
+        queueNumber:entry.fromQueueNumber||booking.queueNumber,status:"postponed",isArchived:true,
+        isArchivedOccurrence:true,archivedAt:entry.archivedAt||"",archivedByUid:entry.archivedByUid||"",
+        archivedByName:entry.archivedByName||"",rescheduleToDate:entry.toDate });
     }
   }
-  rows.sort((a, b) =>
-    (Date.parse(b.archivedAt || b.updatedAt || b.createdAt || "") || 0) -
-    (Date.parse(a.archivedAt || a.updatedAt || a.createdAt || "") || 0)
-  );
-  const nextCursor = { primary: cursorFor("primary", primaryDocs), history: cursorFor("history", historyDocs) };
-  return { rows, nextCursor: nextCursor.primary || nextCursor.history ? nextCursor : null };
+  rows.sort((a,b)=>(Date.parse(b.archivedAt||b.updatedAt||b.createdAt||"")||0)-(Date.parse(a.archivedAt||a.updatedAt||a.createdAt||"")||0));
+  return { rows, nextCursor:null };
 }
-
-async function listBookings(projectId, accessToken) {
-  const result = await firestoreRequest(
-    projectId,
-    accessToken,
-    ":runQuery",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: BOOKINGS_COLLECTION }]
-        }
-      })
-    }
-  );
-
-  return (Array.isArray(result) ? result : [])
-    .filter((item) => item.document)
-    .map((item) => decodeBooking(item.document))
-    .sort((a, b) => (Date.parse(a.createdAt || "") || 0) - (Date.parse(b.createdAt || "") || 0));
+async function listBookingChanges(env, since) {
+  const database = getClinicDatabase(env);
+  const rows = await d1All(database, "SELECT * FROM bookings WHERE updated_at >= ? ORDER BY updated_at ASC, id ASC", [since]);
+  return rows.map(decodeBooking);
 }
-
-async function listBookingChanges(projectId, accessToken, since) {
-  const result = await firestoreRequest(
-    projectId,
-    accessToken,
-    ":runQuery",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: BOOKINGS_COLLECTION }],
-          where: {
-            fieldFilter: {
-              field: { fieldPath: "updatedAt" },
-              op: "GREATER_THAN_OR_EQUAL",
-              value: { stringValue: since }
-            }
-          },
-          orderBy: [
-            { field: { fieldPath: "updatedAt" }, direction: "ASCENDING" }
-          ]
-        }
-      })
-    }
-  );
-
-  return (Array.isArray(result) ? result : [])
-    .filter((item) => item.document)
-    .map((item) => decodeBooking(item.document))
-    .sort((a, b) =>
-      (Date.parse(a.updatedAt || "") || 0) - (Date.parse(b.updatedAt || "") || 0) ||
-      a.id.localeCompare(b.id)
-    );
+async function listCompletedBookingsForDate(env, date) {
+  const all = await listBookings(env);
+  return all.filter(booking => booking.status === "completed" && cairoDate(booking.completedAt) === date);
 }
-
-async function listCompletedBookingsForDate(projectId, accessToken, date) {
-  const target = new Date(`${date}T00:00:00.000Z`);
-  const lowerBound = new Date(target.getTime() - 24 * 60 * 60 * 1000).toISOString();
-  const upperBound = new Date(target.getTime() + 24 * 60 * 60 * 1000).toISOString();
-  const result = await firestoreRequest(
-    projectId,
-    accessToken,
-    ":runQuery",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: BOOKINGS_COLLECTION }],
-          where: {
-            compositeFilter: {
-              op: "AND",
-              filters: [
-                {
-                  fieldFilter: {
-                    field: { fieldPath: "completedAt" },
-                    op: "GREATER_THAN_OR_EQUAL",
-                    value: { stringValue: lowerBound }
-                  }
-                },
-                {
-                  fieldFilter: {
-                    field: { fieldPath: "completedAt" },
-                    op: "LESS_THAN",
-                    value: { stringValue: upperBound }
-                  }
-                }
-              ]
-            }
-          },
-          orderBy: [
-            { field: { fieldPath: "completedAt" }, direction: "ASCENDING" }
-          ]
-        }
-      })
-    }
-  );
-
-  return (Array.isArray(result) ? result : [])
-    .filter((item) => item.document)
-    .map((item) => decodeBooking(item.document));
-}
-
-
-async function isFinancialPeriodClosed(projectId, accessToken, dateValue, employeeUid = "") {
+async function isFinancialPeriodClosed(env, dateValue, employeeUid = "") {
   const date = String(dateValue || "").slice(0,10);
-  if (!employeeUid || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
-  const result = await firestoreRequest(projectId, accessToken, ":runQuery", {
-    method:"POST",
-    body:JSON.stringify({
-      structuredQuery: {
-        from: [{ collectionId: "clinicAccountRecords" }],
-        where: {
-          fieldFilter: {
-            field: { fieldPath: "employeeUid" },
-            op: "EQUAL",
-            value: { stringValue: employeeUid }
-          }
-        }
-      }
-    })
-  });
-  return (Array.isArray(result)?result:[]).some(item => {
-    const fields = item.document?.fields || {};
-    if (readString(fields,"type") !== "settlement" || readString(fields,"employeeUid") !== employeeUid) return false;
-    const type = readString(fields,"periodType"), key = readString(fields,"periodKey");
-    return (type === "day" && key === date) || (type === "month" && key === date.slice(0,7));
-  });
+  if (!employeeUid || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return false;
+  const database = getClinicDatabase(env);
+  const row = await d1First(database,
+    "SELECT id FROM account_records WHERE record_type = 'settlement' AND employee_uid = ? AND ((period_type = 'day' AND period_key = ?) OR (period_type = 'month' AND period_key = ?)) LIMIT 1",
+    [employeeUid, date, date.slice(0,7)]);
+  return !!row;
 }
-
-async function normalizeQueueNumbersForDate(projectId, accessToken, date, knownBookings = null) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) return knownBookings || await listBookings(projectId, accessToken);
-  const all = knownBookings || await listBookings(projectId, accessToken);
-  const rows = all
-    .filter(booking => String(booking.appointmentDate || "").slice(0, 10) === date)
-    .sort((a, b) => (Date.parse(a.createdAt || "") || 0) - (Date.parse(b.createdAt || "") || 0) || a.id.localeCompare(b.id));
-  let max = 0;
-  for (const booking of all) {
-    if (String(booking.appointmentDate || "").slice(0, 10) === date) max = Math.max(max, Number(booking.queueNumber) || 0);
-    for (const entry of historyForBooking(booking)) {
-      if (entry.fromDate === date) max = Math.max(max, Number(entry.fromQueueNumber) || 0);
-      if (entry.toDate === date) max = Math.max(max, Number(entry.toQueueNumber) || 0);
+async function normalizeQueueNumbersForDate(env, date, knownBookings = null) {
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(date || ""))) return knownBookings || await listBookings(env);
+  const database = getClinicDatabase(env);
+  const all = knownBookings || await listBookings(env);
+  const rows = all.filter(booking=>String(booking.appointmentDate||"").slice(0,10)===date)
+    .sort((a,b)=>(Date.parse(a.createdAt||"")||0)-(Date.parse(b.createdAt||"")||0)||a.id.localeCompare(b.id));
+  let max=0;
+  for(const booking of all){
+    if(String(booking.appointmentDate||"").slice(0,10)===date) max=Math.max(max,Number(booking.queueNumber)||0);
+    for(const entry of historyForBooking(booking)){
+      if(entry.fromDate===date) max=Math.max(max,Number(entry.fromQueueNumber)||0);
+      if(entry.toDate===date) max=Math.max(max,Number(entry.toQueueNumber)||0);
     }
   }
-  const used = new Set();
-  for (const booking of rows) {
-    const current = Number(booking.queueNumber);
-    if (Number.isInteger(current) && current > 0 && !used.has(current)) {
-      used.add(current);
-      continue;
-    }
-    do { max++; } while (used.has(max));
-    const queueNumber = String(max);
-    const fields = { queueNumber: stringField(queueNumber), updatedAt: stringField(booking.updatedAt || new Date().toISOString()) };
-    await firestoreRequest(projectId, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(booking.id)}?updateMask.fieldPaths=queueNumber`, {
-      method: "PATCH",
-      body: JSON.stringify({ fields: { queueNumber: fields.queueNumber } })
-    });
-    booking.queueNumber = queueNumber;
+  const used=new Set();
+  for(const booking of rows){
+    const current=Number(booking.queueNumber);
+    if(Number.isInteger(current)&&current>0&&!used.has(current)){used.add(current);continue;}
+    do{max++;}while(used.has(max));
+    booking.queueNumber=String(max);
+    booking.updatedAt=booking.updatedAt||new Date().toISOString();
+    await writeBooking(env,booking);
     used.add(max);
   }
   return all;
 }
-
-async function createBooking(projectId, accessToken, data) {
-  const now = new Date().toISOString();
-  const date = String(data.appointmentDate || "").slice(0, 10);
-  const existingBookings = await normalizeQueueNumbersForDate(projectId, accessToken, date);
-  const queueNumber = nextQueueNumberForDate(existingBookings, date);
-
-  const booking = {
-    ...data,
-    queueNumber: String(queueNumber),
-    patientName: data.patientName.trim(),
-    patientPhone: data.patientPhone.trim(),
-    appointmentDate: data.appointmentDate.trim(),
-    service: (data.service || "").trim(),
-    notes: (data.notes || "").trim(),
-    status: "waiting",
-    createdAt: now,
-    updatedAt: now
-  };
-
-  const result = await firestoreRequest(
-    projectId,
-    accessToken,
-    `/${BOOKINGS_COLLECTION}`,
-    {
-      method: "POST",
-      body: JSON.stringify(encodeBooking(booking))
-    }
-  );
-
-  return decodeBooking(result);
+async function createBooking(env, data) {
+  const now=new Date().toISOString(), date=String(data.appointmentDate||"").slice(0,10);
+  const existing=await normalizeQueueNumbersForDate(env,date);
+  const queueNumber=nextQueueNumberForDate(existing,date);
+  const booking={...data, id:crypto.randomUUID(), queueNumber:String(queueNumber),
+    patientName:data.patientName.trim(),patientPhone:data.patientPhone.trim(),
+    appointmentDate:data.appointmentDate.trim(),service:(data.service||"").trim(),
+    notes:(data.notes||"").trim(),status:"waiting",createdAt:now,updatedAt:now,
+    isArchived:false,archivedAt:"",archivedByUid:"",archivedByName:"",
+    paidAmount:data.paidAmount||"0",completedFee:"",completedAt:"",completedByUid:"",
+    completedByName:"",paymentEnteredByUid:"",paymentEnteredByName:"",paymentUpdatedAt:"",
+    rescheduleHistory:"[]",archivedRescheduleHistory:"[]"};
+  return writeBooking(env,booking);
 }
 
 function historyForBooking(booking) {
@@ -773,7 +570,7 @@ function nextQueueNumberForDate(bookings, date) {
   return max + 1;
 }
 
-async function updateBooking(projectId, accessToken, data, actorUid = "", actorAccountType = "doctor", actorDisplayName = "") {
+async function updateBooking(env, data, actorUid = "", actorAccountType = "doctor", actorDisplayName = "") {
   if (
     typeof data.id !== "string" ||
     !/^[A-Za-z0-9_-]{1,150}$/.test(data.id)
@@ -788,12 +585,9 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
   const error = validateBooking(changes, true);
   if (error) throw new Error(error);
 
-  const current = await firestoreRequest(
-    projectId,
-    accessToken,
-    `/${BOOKINGS_COLLECTION}/${encodeURIComponent(data.id)}`
-  );
-
+  const database = getClinicDatabase(env);
+  const current = await d1First(database, "SELECT * FROM bookings WHERE id = ? LIMIT 1", [data.id]);
+  if (!current) { const error = new Error("الحجز غير موجود."); error.status = 404; throw error; }
   const existing = decodeBooking(current);
   if (existing.status === "completed") {
     throw new Error("حالة «تم الكشف» نهائية؛ لا يمكن تعديل حالة الحجز أو بياناته بعد اعتماد الكشف.");
@@ -817,7 +611,7 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     const ownerUid = existing.paymentEnteredByUid || (actorAccountType === "staff" && changes.status === "completed" ? actorUid : "");
     if (ownerUid) {
       for (const date of dates) {
-        if (await isFinancialPeriodClosed(projectId, accessToken, date, ownerUid)) {
+        if (await isFinancialPeriodClosed(env, date, ownerUid)) {
           const isUnpaidStatusOnlyCompletion =
             actorAccountType === "staff" &&
             changes.status === "completed" &&
@@ -844,9 +638,9 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
   const nextDate = String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0, 10);
   let queueNumber = String(existing.queueNumber || "");
   if (changes.appointmentDate !== undefined && oldDate && nextDate && oldDate !== nextDate) {
-    let allBookings = await listBookings(projectId, accessToken);
-    allBookings = await normalizeQueueNumbersForDate(projectId, accessToken, oldDate, allBookings);
-    allBookings = await normalizeQueueNumbersForDate(projectId, accessToken, nextDate, allBookings);
+    let allBookings = await listBookings(env);
+    allBookings = await normalizeQueueNumbersForDate(env, oldDate, allBookings);
+    allBookings = await normalizeQueueNumbersForDate(env, nextDate, allBookings);
     const refreshedExisting = allBookings.find(item => item.id === existing.id) || existing;
     const oldQueueNumber = Number(refreshedExisting.queueNumber) > 0 ? Number(refreshedExisting.queueNumber) : currentQueueNumberForDate(allBookings, refreshedExisting, oldDate);
     const newQueueNumber = nextQueueNumberForDate(allBookings, nextDate);
@@ -907,52 +701,12 @@ async function updateBooking(projectId, accessToken, data, actorUid = "", actorA
     updatedAt: now
   };
 
-  const query = new URLSearchParams();
-
-  for (const key of [
-    "patientName",
-    "patientId",
-    "patientPhone",
-    "appointmentDate",
-    "service",
-    "servicePrice",
-    "bloodPressure",
-    "weight",
-    "bloodSugar",
-    "preVisitNotes",
-    "paidAmount",
-    "completedFee",
-    "completedAt",
-    "completedByUid",
-    "completedByName",
-    "paymentEnteredByUid",
-    "paymentEnteredByName",
-    "paymentUpdatedAt",
-    "rescheduleHistory",
-    "queueNumber",
-    "notes",
-    "status",
-    "updatedAt"
-  ]) {
-    query.append("updateMask.fieldPaths", key);
-  }
-
-  const result = await firestoreRequest(
-    projectId,
-    accessToken,
-    `/${BOOKINGS_COLLECTION}/${encodeURIComponent(data.id)}?${query}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify(encodeBooking(booking))
-    }
-  );
-
-  const updatedBooking = decodeBooking(result);
+  const updatedBooking = await writeBooking(env, booking);
   updatedBooking.financialPeriodClosed = closedPeriodForUnpaidCompletion;
   return updatedBooking;
 }
 
-async function cancelBooking(projectId, accessToken, data, actorUid = "", actorAccountType = "doctor") {
+async function cancelBooking(env, data, actorUid = "", actorAccountType = "doctor") {
   if (
     typeof data.id !== "string" ||
     !/^[A-Za-z0-9_-]{1,150}$/.test(data.id)
@@ -960,7 +714,7 @@ async function cancelBooking(projectId, accessToken, data, actorUid = "", actorA
     throw new Error("رقم الحجز غير صحيح.");
   }
 
-  return updateBooking(projectId, accessToken, {
+  return updateBooking(env, {
     id: data.id,
     status: "cancelled"
   }, actorUid, actorAccountType);
@@ -1005,29 +759,10 @@ async function onRequestInternal(context) {
     );
   }
 
-  let serviceAccount;
-  let accessToken;
-
-  try {
-    serviceAccount = parseServiceAccount(env);
-    accessToken = await createGoogleAccessToken(serviceAccount);
-  } catch (error) {
-    console.error("Bookings service configuration error:", error);
-
-    return jsonResponse(
-      { message: "خدمة الحجوزات غير مهيأة على الخادم." },
-      503
-    );
-  }
-
   let access;
 
   try {
-    access = await getAccountAccess(
-      user,
-      serviceAccount,
-      accessToken
-    );
+    access = await getAccountAccess(user, env);
   } catch (error) {
     console.error("Bookings authorization error:", error);
 
@@ -1056,7 +791,7 @@ async function onRequestInternal(context) {
       case "listDailyAccounts": {
         const date = typeof data.date === "string" ? data.date : "";
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
-        const bookings = await listCompletedBookingsForDate(serviceAccount.project_id, accessToken, date);
+        const bookings = await listCompletedBookingsForDate(env, date);
         // Daily accounts include only visits completed on the selected Cairo-local date.
         // Exclude archived/cancelled records even if legacy data still has completion fields.
         const daily = bookings.filter(b =>
@@ -1092,7 +827,7 @@ async function onRequestInternal(context) {
         const currentDoc = await firestoreRequest(serviceAccount.project_id, accessToken, `/${BOOKINGS_COLLECTION}/${encodeURIComponent(bookingId)}`);
         const current = decodeBooking(currentDoc);
         if (access.accountType === "staff" && current.paymentEnteredByUid && current.paymentEnteredByUid !== access.uid) return jsonResponse({message:"لا يمكنك تعديل مبلغ سجله موظف آخر."},403);
-        if (await isFinancialPeriodClosed(serviceAccount.project_id, accessToken, current.appointmentDate, current.paymentEnteredByUid || access.uid)) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف؛ لا يمكن تعديل المبلغ بعد الإقفال."},409);
+        if (await isFinancialPeriodClosed(env, current.appointmentDate, current.paymentEnteredByUid || access.uid)) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف؛ لا يمكن تعديل المبلغ بعد الإقفال."},409);
         const now = new Date().toISOString();
         const patch = {fields:{
           paidAmount:stringField(paidAmount),
@@ -1116,7 +851,7 @@ async function onRequestInternal(context) {
             }
           }
         }
-        const page = await listArchivePage(serviceAccount.project_id, accessToken, cursor, data.limit);
+        const page = await listArchivePage(env, cursor, data.limit);
         return jsonResponse({ rows: page.rows, nextCursor: page.nextCursor, hasMore: !!page.nextCursor });
       }
 
@@ -1126,11 +861,7 @@ async function onRequestInternal(context) {
           return jsonResponse({ message: "وقت مزامنة الحجوزات غير صحيح." }, 400);
         }
         const nextSince = new Date(Date.now() - 1000).toISOString();
-        let bookings = await listBookingChanges(
-          serviceAccount.project_id,
-          accessToken,
-          since
-        );
+        let bookings = await listBookingChanges(env, since);
         bookings = bookings.map(booking => {
           if (booking.status !== "completed" || Number(booking.paidAmount) > 0) return booking;
           const fee = Number(booking.completedFee) || Number(booking.servicePrice) || 0;
@@ -1147,13 +878,10 @@ async function onRequestInternal(context) {
 
       case "list": {
         const syncCursor = new Date(Date.now() - 1000).toISOString();
-        let bookings = await listBookings(
-          serviceAccount.project_id,
-          accessToken
-        );
+        let bookings = await listBookings(env);
         const bookingDates = new Set(bookings.map(booking => String(booking.appointmentDate || "").slice(0, 10)).filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date)));
         for (const date of bookingDates) {
-          bookings = await normalizeQueueNumbersForDate(serviceAccount.project_id, accessToken, date, bookings);
+          bookings = await normalizeQueueNumbersForDate(env, date, bookings);
         }
 
         // Backward compatibility for completed visits created before paidAmount
@@ -1273,11 +1001,7 @@ async function onRequestInternal(context) {
 
         if (error) return jsonResponse({ message: error }, 400);
 
-        const booking = await createBooking(
-          serviceAccount.project_id,
-          accessToken,
-          data.booking
-        );
+        const booking = await createBooking(env, data.booking);
 
         return jsonResponse({ booking }, 201);
       }
@@ -1287,8 +1011,7 @@ async function onRequestInternal(context) {
           return jsonResponse({ message: "تعديل المبلغ المقبوض يتم من قسم حسابات اليوم فقط حتى يُنسب الاستلام إلى الحساب الصحيح." }, 403);
         }
         const booking = await updateBooking(
-          serviceAccount.project_id,
-          accessToken,
+          env,
           data.booking || {},
           access.accountType === "staff" ? access.uid : "",
           access.accountType,
@@ -1300,8 +1023,7 @@ async function onRequestInternal(context) {
 
       case "cancel": {
         const booking = await cancelBooking(
-          serviceAccount.project_id,
-          accessToken,
+          env,
           { id: data.id },
           access.accountType === "staff" ? access.uid : "",
           access.accountType
