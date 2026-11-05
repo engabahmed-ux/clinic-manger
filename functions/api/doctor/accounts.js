@@ -44,12 +44,17 @@ function decode(row) {
     closedBy:pick("closedBy","closed_by"),closedByName:pick("closedByName","closed_by_name"),closedAt:pick("closedAt","closed_at"),
     totalReceipts:pick("totalReceipts","total_receipts"),totalExpenses:pick("totalExpenses","total_expenses"),netTotal:pick("netTotal","net_total"),bookingCount:pick("bookingCount","booking_count")};
 }
-async function saveRecord(env,record,id=crypto.randomUUID()) {
+async function saveRecord(env,record,id=crypto.randomUUID(),allowUpdate=true) {
   const db=getClinicDatabase(env),payload={...record};
   const columns=["id","record_type","name","kind","category_id","person_name","amount","date","notes","created_at","updated_at","status","entered_by","entered_by_name","approved_by","approved_by_name","approved_at","reviewed_by","reviewed_by_name","reviewed_at","rejection_reason","period_type","period_key","employee_uid","employee_name","closed_by","closed_by_name","closed_at","total_receipts","total_expenses","net_total","booking_count","payload_json"];
   const values=[id,record.type||"",record.name||"",record.kind||"",record.categoryId||"",record.personName||"",record.amount||"",record.date||"",record.notes||"",record.createdAt||"",record.updatedAt||"",record.status||"",record.enteredBy||"",record.enteredByName||"",record.approvedBy||"",record.approvedByName||"",record.approvedAt||"",record.reviewedBy||"",record.reviewedByName||"",record.reviewedAt||"",record.rejectionReason||"",record.periodType||"",record.periodKey||"",record.employeeUid||"",record.employeeName||"",record.closedBy||"",record.closedByName||"",record.closedAt||"",record.totalReceipts||"",record.totalExpenses||"",record.netTotal||"",record.bookingCount||"",JSON.stringify(payload)];
-  const updates=columns.filter(x=>x!=="id").map(x=>x+"=excluded."+x).join(",");
-  await d1Run(db,"INSERT INTO account_records ("+columns.join(",")+") VALUES ("+columns.map(()=>"?").join(",")+") ON CONFLICT(id) DO UPDATE SET "+updates,values);
+  const insertSql="INSERT INTO account_records ("+columns.join(",")+") VALUES ("+columns.map(()=>"?").join(",")+")";
+  if(allowUpdate){
+    const updates=columns.filter(x=>x!=="id").map(x=>x+"=excluded."+x).join(",");
+    await d1Run(db,insertSql+" ON CONFLICT(id) DO UPDATE SET "+updates,values);
+  } else {
+    await d1Run(db,insertSql,values);
+  }
   return decode({id,record_type:record.type,payload_json:JSON.stringify(payload)});
 }
 async function listRecords(env,type="") {
@@ -200,7 +205,13 @@ export async function onRequestPost({ request, env }) {
         totalReceipts:receipts.toFixed(2),totalExpenses:approvedExpenses.toFixed(2),netTotal:(receipts-approvedExpenses).toFixed(2),
         bookingCount:String(bookings.length),createdAt:now,updatedAt:now};
       const settlementId = "settlement-" + periodType + "-" + periodKey + "-" + employeeUid;
-      const saved=await saveRecord(env,settlement,settlementId);
+      let saved;
+      try { saved=await saveRecord(env,settlement,settlementId,false); }
+      catch(error) {
+        const existing=await d1First(getClinicDatabase(env),"SELECT id FROM account_records WHERE id = ? LIMIT 1",[settlementId]);
+        if(existing)return jsonResponse({message:"تمت تصفية عهدة هذا الموظف لهذه الفترة من قبل."},409);
+        throw error;
+      }
       return jsonResponse({settlement:saved},201);
     }
     if (data.action === "list") {
