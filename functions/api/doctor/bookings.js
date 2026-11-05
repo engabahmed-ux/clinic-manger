@@ -472,7 +472,7 @@ async function listArchivePage(env, cursor = null, pageSize = 10) {
     try { history = JSON.parse(booking.archivedRescheduleHistory || "[]"); } catch {}
     if (!Array.isArray(history)) continue;
     for (const entry of history) {
-      if (!entry || !/^\\d{4}-\\d{2}-\\d{2}$/.test(entry.fromDate||"") || !/^\\d{4}-\\d{2}-\\d{2}$/.test(entry.toDate||"")) continue;
+      if (!entry || !/^\d{4}-\d{2}-\d{2}$/.test(entry.fromDate||"") || !/^\d{4}-\d{2}-\d{2}$/.test(entry.toDate||"")) continue;
       rows.push({ ...compactBooking(booking), appointmentDate:entry.fromDate,
         queueNumber:entry.fromQueueNumber||booking.queueNumber,status:"postponed",isArchived:true,
         isArchivedOccurrence:true,archivedAt:entry.archivedAt||"",archivedByUid:entry.archivedByUid||"",
@@ -493,7 +493,7 @@ async function listCompletedBookingsForDate(env, date) {
 }
 async function isFinancialPeriodClosed(env, dateValue, employeeUid = "") {
   const date = String(dateValue || "").slice(0,10);
-  if (!employeeUid || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return false;
+  if (!employeeUid || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
   const database = getClinicDatabase(env);
   const row = await d1First(database,
     "SELECT id FROM account_records WHERE record_type = 'settlement' AND employee_uid = ? AND ((period_type = 'day' AND period_key = ?) OR (period_type = 'month' AND period_key = ?)) LIMIT 1",
@@ -501,7 +501,7 @@ async function isFinancialPeriodClosed(env, dateValue, employeeUid = "") {
   return !!row;
 }
 async function normalizeQueueNumbersForDate(env, date, knownBookings = null) {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(date || ""))) return knownBookings || await listBookings(env);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) return knownBookings || await listBookings(env);
   const database = getClinicDatabase(env);
   const all = knownBookings || await listBookings(env);
   const rows = all.filter(booking=>String(booking.appointmentDate||"").slice(0,10)===date)
