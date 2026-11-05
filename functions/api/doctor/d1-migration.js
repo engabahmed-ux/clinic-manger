@@ -204,9 +204,12 @@ export async function onRequestPost({ request, env }) {
       if (!response.ok) throw new Error("Settings document read failed.");
       const document = await response.json();
       const payload = decodeFields(document.fields || {});
+      const settingsValue = typeof payload.settingsJson === "string"
+        ? JSON.parse(payload.settingsJson)
+        : (payload.settings && typeof payload.settings === "object" ? payload.settings : payload);
       await d1Batch(database, [{
         sql: "INSERT INTO clinic_settings (id, settings_json, updated_at, updated_by_uid) VALUES ('singleton', ?, ?, ?) ON CONFLICT(id) DO UPDATE SET settings_json=excluded.settings_json, updated_at=excluded.updated_at, updated_by_uid=excluded.updated_by_uid",
-        params: [JSON.stringify(payload), String(payload.updatedAt || ""), String(payload.updatedByUid || "")]
+        params: [JSON.stringify(settingsValue), String(payload.updatedAt || ""), String(payload.updatedByUid || "")]
       }]);
       return json({ ok: true, collection, imported: 1, done: true });
     }
