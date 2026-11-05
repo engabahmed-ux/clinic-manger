@@ -68,6 +68,7 @@
     <div class="row">
       <button id="startBtn" disabled>ابدأ / استكمل النقل</button>
       <button id="statusBtn" class="secondary">تحديث أعداد D1</button>
+      <button id="verifyBtn" class="secondary">فحص تطابق البيانات</button>
     </div>
     <div id="progress" aria-live="polite">لم يبدأ النقل.</div>
   </section>
@@ -88,6 +89,8 @@
   const confirmBox = $("confirm");
   const startBtn = $("startBtn");
   const checkpointKey = "clinic-cloudflare-native-migration-v2";
+  const verifyCheckpointKey = "clinic-cloudflare-native-verification-v1";
+  const verifyBtn = $("verifyBtn");
   const collections = [
     "clinicSettings/current",
     "clinicStaff",
@@ -214,6 +217,83 @@
     } finally {
       busy = false;
       startBtn.disabled = !confirmBox.checked;
+    }
+  });
+
+  verifyBtn.addEventListener("click", async () => {
+    if (busy) return;
+    busy = true;
+    verifyBtn.disabled = true;
+    progressBox.textContent = "";
+    let checkpoint;
+    try {
+      checkpoint = JSON.parse(localStorage.getItem(verifyCheckpointKey) || "null");
+      if (!checkpoint || checkpoint.version !== 1 || !Number.isInteger(checkpoint.index)) {
+        checkpoint = { version: 1, index: 0, pageToken: null, totals: {}, missing: {}, mismatched: {} };
+      }
+      for (let i = checkpoint.index; i < collections.length; i++) {
+        const collection = collections[i];
+        let pageToken = i === checkpoint.index ? checkpoint.pageToken : null;
+        writeProgress("فحص تطابق: " + collection);
+        while (true) {
+          const result = await api({ action: "verify-page", collection, pageSize: 25, pageToken });
+          checkpoint.totals[collection] = (checkpoint.totals[collection] || 0) + result.checked;
+          checkpoint.missing[collection] = (checkpoint.missing[collection] || []).concat(result.missingIds || []);
+          checkpoint.mismatched[collection] = (checkpoint.mismatched[collection] || []).concat(result.mismatchedIds || []);
+          writeProgress(collection + ": تمت مراجعة " + result.checked + " مستند؛ ناقص " +
+            (result.missingIds || []).length + "؛ مختلف " + (result.mismatchedIds || []).length + ".");
+          if (result.done) {
+            checkpoint.index = i + 1;
+            checkpoint.pageToken = null;
+            localStorage.setItem(verifyCheckpointKey, JSON.stringify(checkpoint));
+            break;
+          }
+          pageToken = result.nextPageToken;
+          checkpoint.index = i;
+          checkpoint.pageToken = pageToken;
+          localStorage.setItem(verifyCheckpointKey, JSON.stringify(checkpoint));
+        }
+      }
+
+      const status = await api({ action: "status" });
+      const targetCounts = status.counts || {};
+      const tableByCollection = {
+        clinicStaff: "staff",
+        clinicBookings: "bookings",
+        clinicPatients: "patient_accounts",
+        clinicPatientUsernames: "patient_usernames",
+        clinicMedicalPatients: "medical_patients",
+        clinicMedicalVisits: "medical_visits",
+        clinicAccountRecords: "account_records",
+        clinicLogs: "clinic_logs",
+        "clinicSettings/current": "clinic_settings"
+      };
+      let allGood = true;
+      for (const collection of collections) {
+        const targetKey = tableByCollection[collection];
+        const sourceCount = checkpoint.totals[collection] || 0;
+        const targetCount = Number(targetCounts[targetKey] || 0);
+        const missing = checkpoint.missing[collection] || [];
+        const mismatched = checkpoint.mismatched[collection] || [];
+        const extra = Math.max(0, targetCount - sourceCount);
+        const good = missing.length === 0 && mismatched.length === 0 && sourceCount === targetCount;
+        if (!good) allGood = false;
+        writeProgress(collection + " — المصدر: " + sourceCount + "، D1: " + targetCount +
+          "، ناقص: " + missing.length + "، مختلف: " + mismatched.length + "، زائد: " + extra +
+          (good ? " — مطابق" : " — يحتاج مراجعة"));
+      }
+      writeProgress(allGood
+        ? "نجح فحص الأعداد والمعرّفات ومحتوى المستندات للمجموعات المحددة. لم يتم تغيير مصدر قراءة التطبيق."
+        : "لم يكتمل التطابق. لم يتم تغيير مصدر قراءة التطبيق؛ راجع النتائج وأعد الفحص بعد معالجة الاختلافات.");
+      await refreshStatus();
+      if (allGood) localStorage.removeItem(verifyCheckpointKey);
+      else localStorage.setItem(verifyCheckpointKey, JSON.stringify(checkpoint));
+    } catch (error) {
+      if (checkpoint) localStorage.setItem(verifyCheckpointKey, JSON.stringify(checkpoint));
+      writeProgress("توقف الفحص: " + error.message + " — يمكن استكماله بالضغط على فحص تطابق البيانات.");
+    } finally {
+      busy = false;
+      verifyBtn.disabled = false;
     }
   });
 </script>
