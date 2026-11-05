@@ -1,3 +1,4 @@
+import { getClinicDatabase, d1First } from "../../_shared/d1.js";
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const EXPECTED_PROJECT_ID = "clinics-manger";
 const STAFF_COLLECTION = "clinicStaff";
@@ -250,92 +251,33 @@ function decodePermissions(fields) {
 }
 
 async function getStaffRecord(uid, env) {
-  const serviceAccount = parseServiceAccount(env);
-  const accessToken = await createGoogleAccessToken(serviceAccount);
-
-  const url =
-    "https://firestore.googleapis.com/v1/projects/" +
-    `${encodeURIComponent(serviceAccount.project_id)}/databases/(default)/documents/` +
-    `${STAFF_COLLECTION}/${encodeURIComponent(uid)}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      "Authorization": `Bearer ${accessToken}`
-    }
-  });
-
-  if (response.status === 404) {
-    return { exists: false };
+  const database = getClinicDatabase(env);
+  const row = await d1First(
+    database,
+    "SELECT uid, role, active, display_name, permissions_json FROM staff WHERE uid = ? LIMIT 1",
+    [uid]
+  );
+  if (!row || row.role !== "staff") return { exists: false };
+  if (Number(row.active) !== 1) return { exists: true, active: false };
+  let permissions = {};
+  try { permissions = JSON.parse(row.permissions_json || "{}"); } catch {}
+  const normalized = {};
+  for (const key of PERMISSION_KEYS) {
+    const value = permissions[key];
+    normalized[key] = PERMISSION_VALUES.includes(value) ? value : "none";
   }
-
-  if (!response.ok) {
-    const details = await response.text();
-
-    console.error(
-      "Staff document lookup failed:",
-      response.status,
-      details.slice(0, 1000)
-    );
-
-    throw new Error("Unable to verify staff record.");
-  }
-
-  const document = await response.json();
-  const fields = document.fields || {};
-
-  const storedUid = fields.uid?.stringValue || "";
-  const role = fields.role?.stringValue || "";
-  const active = fields.active?.booleanValue === true;
-
-  if (storedUid !== uid || role !== "staff") {
-    return { exists: false };
-  }
-
-  if (!active) {
-    return { exists: true, active: false };
-  }
-
-  return {
-    exists: true,
-    active: true,
-    displayName: fields.displayName?.stringValue || "",
-    permissions: decodePermissions(fields)
-  };
+  return { exists: true, active: true, displayName: row.display_name || "", permissions: normalized };
 }
 
 async function getPatientRecord(uid, env) {
-  const serviceAccount = parseServiceAccount(env);
-  const accessToken = await createGoogleAccessToken(serviceAccount);
-  const url =
-    "https://firestore.googleapis.com/v1/projects/" +
-    `${encodeURIComponent(serviceAccount.project_id)}/databases/(default)/documents/` +
-    `${PATIENTS_COLLECTION}/${encodeURIComponent(uid)}`;
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers: { "Authorization": `Bearer ${accessToken}` }
-  });
-
-  if (response.status === 404) return { exists: false };
-  if (!response.ok) {
-    const details = await response.text();
-    console.error("Patient document lookup failed:", response.status, details.slice(0, 500));
-    throw new Error("Unable to verify patient record.");
-  }
-
-  const document = await response.json();
-  const fields = document.fields || {};
-  const storedUid = fields.uid?.stringValue || "";
-  const role = fields.role?.stringValue || "";
-  const active = fields.active?.booleanValue === true;
-
-  if (storedUid !== uid || role !== "patient") return { exists: false };
-  return {
-    exists: true,
-    active,
-    displayName: fields.displayName?.stringValue || ""
-  };
+  const database = getClinicDatabase(env);
+  const row = await d1First(
+    database,
+    "SELECT uid, role, active, display_name FROM patient_accounts WHERE uid = ? LIMIT 1",
+    [uid]
+  );
+  if (!row || row.role !== "patient") return { exists: false };
+  return { exists: true, active: Number(row.active) === 1, displayName: row.display_name || "" };
 }
 
 async function handlePost({ request, env }) {
