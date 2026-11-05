@@ -180,7 +180,7 @@ async function migrationStatus(database) {
 
 export async function onRequestPost({ request, env }) {
   if (request.method !== "POST") return json({ ok: false, message: "طريقة الطلب غير مدعومة." }, 405);
-  if (env.CF_PAGES_BRANCH !== "feature/cloudflare-d1-migration") {
+  if (env.CF_PAGES_BRANCH !== "feature/cloudflare-native-data") {
     return json({ ok: false, message: "أداة النقل مفعّلة فقط في بيئة الاختبار." }, 404);
   }
   try {
