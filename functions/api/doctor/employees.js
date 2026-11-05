@@ -1,8 +1,6 @@
 import { getClinicDatabase, d1All, d1Run } from "../../_shared/d1.js";
 
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
-const EXPECTED_PROJECT_ID = "clinics-manger";
-const FIRESTORE_COLLECTION = "clinicStaff";
 
 const ALLOWED_PERMISSION_KEYS = [
   "bookings",
@@ -18,8 +16,6 @@ const ALLOWED_PERMISSION_VALUES = [
   "edit"
 ];
 
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
-const GOOGLE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 const FIREBASE_SIGNUP_URL =
   "https://identitytoolkit.googleapis.com/v1/accounts:signUp";
 const FIREBASE_LOOKUP_URL =
@@ -37,143 +33,6 @@ function jsonResponse(body, status = 200) {
       "Referrer-Policy": "no-referrer"
     }
   });
-}
-
-function base64UrlEncodeBytes(bytes) {
-  let binary = "";
-
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-function base64UrlEncodeText(value) {
-  return base64UrlEncodeBytes(
-    new TextEncoder().encode(value)
-  );
-}
-
-function decodePrivateKey(pem) {
-  const base64 = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
-    .replace(/-----END PRIVATE KEY-----/g, "")
-    .replace(/\s/g, "");
-
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes;
-}
-
-function parseServiceAccount(env) {
-  const raw = env.FIREBASE_SERVICE_ACCOUNT_JSON;
-
-  if (!raw) {
-    throw new Error("Missing service account secret.");
-  }
-
-  let account;
-
-  try {
-    account = JSON.parse(raw);
-  } catch {
-    throw new Error("Invalid service account JSON.");
-  }
-
-  if (
-    account.project_id !== EXPECTED_PROJECT_ID ||
-    typeof account.client_email !== "string" ||
-    typeof account.private_key !== "string"
-  ) {
-    throw new Error("Invalid service account configuration.");
-  }
-
-  return account;
-}
-
-async function createGoogleAccessToken(serviceAccount) {
-  const now = Math.floor(Date.now() / 1000);
-
-  const header = {
-    alg: "RS256",
-    typ: "JWT"
-  };
-
-  const claims = {
-    iss: serviceAccount.client_email,
-    scope: GOOGLE_SCOPE,
-    aud: GOOGLE_TOKEN_URL,
-    iat: now,
-    exp: now + 3600
-  };
-
-  const unsignedToken = [
-    base64UrlEncodeText(JSON.stringify(header)),
-    base64UrlEncodeText(JSON.stringify(claims))
-  ].join(".");
-
-  const privateKey = await crypto.subtle.importKey(
-    "pkcs8",
-    decodePrivateKey(serviceAccount.private_key),
-    {
-      name: "RSASSA-PKCS1-v1_5",
-      hash: "SHA-256"
-    },
-    false,
-    ["sign"]
-  );
-
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    privateKey,
-    new TextEncoder().encode(unsignedToken)
-  );
-
-  const assertion = [
-    unsignedToken,
-    base64UrlEncodeBytes(new Uint8Array(signature))
-  ].join(".");
-
-  const response = await fetch(GOOGLE_TOKEN_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams({
-      grant_type:
-        "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion
-    })
-  });
-
-  if (!response.ok) {
-    console.error(
-      "Google OAuth token request failed:",
-      response.status
-    );
-
-    throw new Error("Unable to obtain Google access token.");
-  }
-
-  const result = await response.json();
-
-  if (
-    typeof result.access_token !== "string" ||
-    !result.access_token
-  ) {
-    throw new Error("Google access token missing.");
-  }
-
-  return result.access_token;
 }
 
 async function verifyDoctor(request, env) {
@@ -302,49 +161,6 @@ function encodePermissions(permissions) {
 
   return {
     mapValue: { fields }
-  };
-}
-
-function decodeString(field) {
-  if (!field) return "";
-
-  if (typeof field.stringValue === "string") {
-    return field.stringValue;
-  }
-
-  return "";
-}
-
-function decodePermissions(field) {
-  const fields = field?.mapValue?.fields || {};
-  const permissions = {};
-
-  for (const key of ALLOWED_PERMISSION_KEYS) {
-    const value = decodeString(fields[key]);
-
-    permissions[key] = ALLOWED_PERMISSION_VALUES.includes(value)
-      ? value
-      : "none";
-  }
-
-  return permissions;
-}
-
-function decodeEmployeeRow(row) {
-  let permissions = {};
-  try { permissions = JSON.parse(row.permissions_json || "{}"); } catch {}
-  const normalized = {};
-  for (const key of ALLOWED_PERMISSION_KEYS) {
-    const value = permissions[key];
-    normalized[key] = ALLOWED_PERMISSION_VALUES.includes(value) ? value : "none";
-  }
-  return {
-    uid: row.uid,
-    email: row.email || "",
-    displayName: row.display_name || "",
-    permissions: normalized,
-    expenseMode: row.expense_mode === "auto" ? "auto" : "approval",
-    createdAt: row.created_at || null
   };
 }
 
