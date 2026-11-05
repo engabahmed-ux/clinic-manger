@@ -1,14 +1,8 @@
 import { getClinicDatabase, d1First } from "../../_shared/d1.js";
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
-const EXPECTED_PROJECT_ID = "clinics-manger";
-const STAFF_COLLECTION = "clinicStaff";
-const PATIENTS_COLLECTION = "clinicPatients";
-
 const FIREBASE_LOOKUP_URL =
   "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
 
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
-const GOOGLE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 
 const PERMISSION_KEYS = [
   "bookings",
@@ -30,138 +24,6 @@ function jsonResponse(body, status = 200) {
       "Referrer-Policy": "no-referrer"
     }
   });
-}
-
-function base64UrlEncodeBytes(bytes) {
-  let binary = "";
-
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-function base64UrlEncodeText(value) {
-  return base64UrlEncodeBytes(
-    new TextEncoder().encode(value)
-  );
-}
-
-function decodePrivateKey(pem) {
-  const base64 = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
-    .replace(/-----END PRIVATE KEY-----/g, "")
-    .replace(/\s/g, "");
-
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return bytes;
-}
-
-function parseServiceAccount(env) {
-  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-    throw new Error("Missing service account secret.");
-  }
-
-  let account;
-
-  try {
-    account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
-  } catch {
-    throw new Error("Invalid service account JSON.");
-  }
-
-  if (
-    account.project_id !== EXPECTED_PROJECT_ID ||
-    typeof account.client_email !== "string" ||
-    typeof account.private_key !== "string"
-  ) {
-    throw new Error("Invalid service account configuration.");
-  }
-
-  return account;
-}
-
-async function createGoogleAccessToken(serviceAccount) {
-  const now = Math.floor(Date.now() / 1000);
-
-  const header = {
-    alg: "RS256",
-    typ: "JWT"
-  };
-
-  const claims = {
-    iss: serviceAccount.client_email,
-    scope: GOOGLE_SCOPE,
-    aud: GOOGLE_TOKEN_URL,
-    iat: now,
-    exp: now + 3600
-  };
-
-  const unsignedToken = [
-    base64UrlEncodeText(JSON.stringify(header)),
-    base64UrlEncodeText(JSON.stringify(claims))
-  ].join(".");
-
-  const privateKey = await crypto.subtle.importKey(
-    "pkcs8",
-    decodePrivateKey(serviceAccount.private_key),
-    {
-      name: "RSASSA-PKCS1-v1_5",
-      hash: "SHA-256"
-    },
-    false,
-    ["sign"]
-  );
-
-  const signature = await crypto.subtle.sign(
-    "RSASSA-PKCS1-v1_5",
-    privateKey,
-    new TextEncoder().encode(unsignedToken)
-  );
-
-  const assertion = [
-    unsignedToken,
-    base64UrlEncodeBytes(new Uint8Array(signature))
-  ].join(".");
-
-  const response = await fetch(GOOGLE_TOKEN_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams({
-      grant_type:
-        "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion
-    })
-  });
-
-  if (!response.ok) {
-    console.error(
-      "Account type Google OAuth error:",
-      response.status
-    );
-
-    throw new Error("Unable to obtain Google access token.");
-  }
-
-  const result = await response.json();
-
-  if (!result.access_token) {
-    throw new Error("Google access token missing.");
-  }
-
-  return result.access_token;
 }
 
 async function verifyFirebaseToken(request, env) {
@@ -232,22 +94,6 @@ async function verifyFirebaseToken(request, env) {
       body: { message: "تعذر التحقق من الحساب حاليًا." }
     };
   }
-}
-
-function decodePermissions(fields) {
-  const savedFields =
-    fields?.permissions?.mapValue?.fields || {};
-
-  const permissions = {};
-
-  for (const key of PERMISSION_KEYS) {
-    const value = savedFields[key]?.stringValue;
-
-    permissions[key] =
-      PERMISSION_VALUES.includes(value) ? value : "none";
-  }
-
-  return permissions;
 }
 
 async function getStaffRecord(uid, env) {
