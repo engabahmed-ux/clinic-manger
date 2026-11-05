@@ -6,7 +6,7 @@
  * module into browser code and never expose the D1 binding to clients.
  */
 
-const DEFAULT_BINDING_NAME = "CLINIC_DB";
+const DEFAULT_BINDING_NAME = "CLINIC_DB_NATIVE";
 
 export function getClinicDatabase(env, bindingName = DEFAULT_BINDING_NAME) {
   const database = env?.[bindingName];
