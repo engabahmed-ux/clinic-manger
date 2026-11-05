@@ -64,8 +64,8 @@ async function createRecord(ctx,id,record) {
 async function updateRecord(ctx,id,record) {
   const values=recordValues(id,record);
   const columns=RECORD_COLUMNS.split(",");
-  const updates=columns.filter(x=>x!=="id").map(x=>x+"=?").join(",");
-  await d1Run(getClinicDatabase(ctx.env),"UPDATE account_records SET "+updates+" WHERE id = ?",[...values.slice(1),id]);
+  const updates=columns.filter(x=>x!=="id").map(x=>x+"=excluded."+x).join(",");
+  await d1Run(getClinicDatabase(ctx.env),"INSERT INTO account_records ("+RECORD_COLUMNS+") VALUES ("+values.map(()=>"?").join(",")+") ON CONFLICT(id) DO UPDATE SET "+updates,values);
   return {id,...record};
 }
 async function deleteRecord(ctx,id) {
