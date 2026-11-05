@@ -15,7 +15,7 @@ function cairoDate(value){if(!value)return"";const d=new Date(value);if(Number.i
 function validSameDayOwnHandover(history,uid,now){const amount=Number(history.nextOpeningAmount??history.totalHandedOverAmount??0),expected=Number(history.expectedAmount||0),dailyNet=Math.max(0,Number(history.baselineReceipts||0)-Number(history.baselineExpenses||0));return history.previousEmployeeUid===uid&&cairoDate(history.closedAt||"")===cairoDate(now)&&amount+0.009>=expected&&amount+0.009>=dailyNet;}
 async function authenticate(request,env) {
   if(!env.FIREBASE_API_KEY)return {error:"إعدادات التحقق غير مكتملة.",status:503};
-  const m=(request.headers.get("Authorization")||"").match(/^Bearer\\s+(\\S+)$/i);
+  const m=(request.headers.get("Authorization")||"").match(/^Bearer\s+(\S+)$/i);
   if(!m||m[1].length>8192)return {error:"يلزم تسجيل الدخول.",status:401};
   const r=await fetch(LOOKUP+"?key="+encodeURIComponent(env.FIREBASE_API_KEY),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:m[1]})});
   if(!r.ok)return {error:"جلسة الدخول غير صالحة.",status:401};
