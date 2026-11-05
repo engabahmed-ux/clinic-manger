@@ -159,7 +159,7 @@ async function onRequestInternal({ request, env }) {
     try {
       const permission=await verifyPatientsEditor(user,env);
       if(!permission.ok)return jsonResponse({message:permission.message},permission.status);
-      const query=String(body.query||"").trim().normalize("NFKC").replace(/\\s+/g," ").toLocaleLowerCase("ar");
+      const query=String(body.query||"").trim().normalize("NFKC").replace(/\s+/g," ").toLocaleLowerCase("ar");
       if(query.length<1||query.length>120)return jsonResponse({patients:[]});
       const rows=await d1All(getClinicDatabase(env),"SELECT id, display_name, phone, patient_number FROM medical_patients ORDER BY display_name LIMIT 1000");
       const patients=rows.map(row=>({patientId:row.id,displayName:row.display_name||"",phone:row.phone||"",patientNumber:row.patient_number||""}))
