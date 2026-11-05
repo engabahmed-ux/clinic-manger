@@ -14,7 +14,7 @@ function jsonResponse(body, status = 200) {
 }
 async function verifyDoctor(request,env) {
   if(!env.FIREBASE_API_KEY)return {error:"إعدادات الحسابات غير مكتملة.",status:503};
-  const match=(request.headers.get("Authorization")||"").match(/^Bearer\\s+(\\S+)$/i);
+  const match=(request.headers.get("Authorization")||"").match(/^Bearer\s+(\S+)$/i);
   if(!match||match[1].length>8192)return {error:"يلزم تسجيل الدخول.",status:401};
   const response=await fetch(LOOKUP_URL+"?key="+encodeURIComponent(env.FIREBASE_API_KEY),{
     method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:match[1]})
