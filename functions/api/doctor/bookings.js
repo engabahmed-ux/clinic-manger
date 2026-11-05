@@ -288,7 +288,11 @@ async function listArchivePage(env, cursor = null, pageSize = 10) {
     }
   }
   rows.sort((a,b)=>(Date.parse(b.archivedAt||b.updatedAt||b.createdAt||"")||0)-(Date.parse(a.archivedAt||a.updatedAt||a.createdAt||"")||0));
-  return { rows, nextCursor:null };
+  const limit=Math.max(5,Math.min(100,Number(pageSize)||10));
+  const offset=Number.isSafeInteger(Number(cursor?.offset))&&Number(cursor.offset)>=0?Number(cursor.offset):0;
+  const pageRows=rows.slice(offset,offset+limit);
+  const nextOffset=offset+pageRows.length;
+  return {rows:pageRows,nextCursor:nextOffset<rows.length?{offset:nextOffset}:null};
 }
 async function listBookingChanges(env, since) {
   const database = getClinicDatabase(env);
@@ -652,6 +656,9 @@ async function onRequestInternal(context) {
       case "archiveList": {
         let cursor = data.cursor && typeof data.cursor === "object" && !Array.isArray(data.cursor) ? data.cursor : null;
         if (cursor) {
+          if (cursor.offset !== undefined && (!Number.isSafeInteger(Number(cursor.offset)) || Number(cursor.offset) < 0 || Number(cursor.offset) > 1000000)) {
+            return jsonResponse({ message: "مؤشر صفحة الأرشيف غير صحيح." }, 400);
+          }
           for (const key of ["primary", "history"]) {
             const item = cursor[key];
             if (item && (!/^[A-Za-z0-9_-]{1,150}$/.test(String(item.id || "")) ||
