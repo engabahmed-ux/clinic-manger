@@ -1,9 +1,9 @@
 /**
- * Server-only D1 adapter for the staged clinic migration.
+ * Server-only D1 adapter for clinic operational data.
  *
- * This module is intentionally not wired into existing routes yet. Route
- * cutover happens one feature at a time after parity tests. Never import this
- * module into browser code and never expose the D1 binding to clients.
+ * Runtime APIs use this module for clinic data reads and writes. Keep D1
+ * access behind Pages Functions; never import this module into browser code
+ * or expose the D1 binding to clients.
  */
 
 const DEFAULT_BINDING_NAME = "CLINIC_DB_NATIVE";
