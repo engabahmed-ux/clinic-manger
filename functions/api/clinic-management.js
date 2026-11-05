@@ -2,13 +2,7 @@ import { publishClinicRealtime } from "../_shared/realtime.js";
 import { getClinicDatabase, d1First, d1All, d1Run } from "../_shared/d1.js";
 
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
-const EXPECTED_PROJECT_ID = "clinics-manger";
-const SETTINGS_DOCUMENT = "clinicSettings/current";
-const LOGS_COLLECTION = "clinicLogs";
-const STAFF_COLLECTION = "clinicStaff";
 const FIREBASE_LOOKUP_URL = "https://identitytoolkit.googleapis.com/v1/accounts:lookup";
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
-const GOOGLE_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 const LOG_RETENTION_DAYS = 30;
 const MAX_BODY_LENGTH = 50000;
 
@@ -19,75 +13,6 @@ function response(body, status = 200) {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer"
   }});
-}
-function str(value) { return { stringValue: String(value ?? "") }; }
-function ts(value) { return { timestampValue: value }; }
-function decodeValue(value) {
-  if (!value || typeof value !== "object") return null;
-  if ("stringValue" in value) return value.stringValue;
-  if ("integerValue" in value) return Number(value.integerValue);
-  if ("doubleValue" in value) return Number(value.doubleValue);
-  if ("booleanValue" in value) return value.booleanValue;
-  if ("timestampValue" in value) return value.timestampValue;
-  if ("nullValue" in value) return null;
-  if ("arrayValue" in value) return (value.arrayValue.values || []).map(decodeValue);
-  if ("mapValue" in value) return decodeFields(value.mapValue.fields || {});
-  return null;
-}
-function decodeFields(fields) {
-  return Object.fromEntries(Object.entries(fields || {}).map(([key, value]) => [key, decodeValue(value)]));
-}
-function b64url(bytes) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-function b64text(value) { return b64url(new TextEncoder().encode(value)); }
-function privateKeyBytes(pem) {
-  const base64 = String(pem || "").replace(/-----BEGIN PRIVATE KEY-----/g, "").replace(/-----END PRIVATE KEY-----/g, "").replace(/\s/g, "");
-  const binary = atob(base64), bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-function parseServiceAccount(env) {
-  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) throw new Error("Missing service account.");
-  const account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT_JSON);
-  if (!account.client_email || !account.private_key || !account.project_id || account.project_id !== EXPECTED_PROJECT_ID) throw new Error("Invalid service account.");
-  return account;
-}
-async function createGoogleAccessToken(account) {
-  const now = Math.floor(Date.now() / 1000);
-  const unsigned = [b64text(JSON.stringify({ alg: "RS256", typ: "JWT" })), b64text(JSON.stringify({
-    iss: account.client_email, scope: GOOGLE_SCOPE, aud: GOOGLE_TOKEN_URL, iat: now, exp: now + 3600
-  }))].join(".");
-  const key = await crypto.subtle.importKey("pkcs8", privateKeyBytes(account.private_key), { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
-  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsigned));
-  const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
-    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: unsigned + "." + b64url(new Uint8Array(signature)) })
-  });
-  if (!tokenResponse.ok) throw new Error("Google access token unavailable.");
-  const token = (await tokenResponse.json()).access_token;
-  if (!token) throw new Error("Google access token missing.");
-  return token;
-}
-async function firestoreRequest(projectId, token, path, options = {}) {
-  const url = "https://firestore.googleapis.com/v1/projects/" + projectId + "/databases/(default)/documents" + path;
-  const result = await fetch(url, {
-    method: options.method || "GET",
-    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-    ...(options.body ? { body: options.body } : {})
-  });
-  const text = await result.text();
-  let parsed = {};
-  try { parsed = text ? JSON.parse(text) : {}; } catch {}
-  if (!result.ok) {
-    const error = new Error("Firestore request failed.");
-    error.status = result.status;
-    error.details = parsed;
-    throw error;
-  }
-  return parsed;
 }
 async function verifyUser(request, env) {
   if (!env.FIREBASE_API_KEY) return { ok: false, status: 503, message: "إعدادات التحقق غير مكتملة على الخادم." };
@@ -135,17 +60,6 @@ function validSettings(settings) {
         item.label.length > 60 || typeof item.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(item.color)) return false;
   }
   return true;
-}
-async function getSettings(projectId, token) {
-  try {
-    const doc = await firestoreRequest(projectId, token, "/" + SETTINGS_DOCUMENT);
-    const fields = doc.fields || {};
-    const raw = fields.settingsJson?.stringValue || "";
-    return { settings: raw ? JSON.parse(raw) : null, updatedAt: fields.updatedAt?.timestampValue || null };
-  } catch (error) {
-    if (error.status === 404) return { settings: null, updatedAt: null };
-    throw error;
-  }
 }
 async function saveSettings(env, uid, settings) {
   const database = getClinicDatabase(env);
