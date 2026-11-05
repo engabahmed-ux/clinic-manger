@@ -1,3 +1,4 @@
+import { getClinicDatabase, d1All, d1Run } from "../../_shared/d1.js";
 
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
 const EXPECTED_PROJECT_ID = "clinics-manger";
@@ -329,98 +330,32 @@ function decodePermissions(field) {
   return permissions;
 }
 
-function decodeEmployeeDocument(document) {
-  const fields = document.fields || {};
-  const nameParts = (document.name || "").split("/");
-  const uid = decodeString(fields.uid) || nameParts.at(-1) || "";
-
+function decodeEmployeeRow(row) {
+  let permissions = {};
+  try { permissions = JSON.parse(row.permissions_json || "{}"); } catch {}
+  const normalized = {};
+  for (const key of ALLOWED_PERMISSION_KEYS) {
+    const value = permissions[key];
+    normalized[key] = ALLOWED_PERMISSION_VALUES.includes(value) ? value : "none";
+  }
   return {
-    uid,
-    email: decodeString(fields.email),
-    displayName: decodeString(fields.displayName),
-    permissions: decodePermissions(fields.permissions),
-    expenseMode: decodeString(fields.expenseMode) === "auto" ? "auto" : "approval",
-    createdAt: fields.createdAt?.timestampValue || null
+    uid: row.uid,
+    email: row.email || "",
+    displayName: row.display_name || "",
+    permissions: normalized,
+    expenseMode: row.expense_mode === "auto" ? "auto" : "approval",
+    createdAt: row.created_at || null
   };
 }
 
-function firestoreBaseUrl(projectId) {
-  return (
-    "https://firestore.googleapis.com/v1/projects/" +
-    `${encodeURIComponent(projectId)}/databases/(default)/documents`
+async function listEmployees(env) {
+  const database = getClinicDatabase(env);
+  const rows = await d1All(
+    database,
+    "SELECT uid, email, display_name, permissions_json, expense_mode, created_at FROM staff WHERE role = ? ORDER BY display_name COLLATE NOCASE LIMIT 200",
+    ["staff"]
   );
-}
-
-async function firestoreRequest(
-  projectId,
-  accessToken,
-  path,
-  options = {}
-) {
-  const response = await fetch(
-    `${firestoreBaseUrl(projectId)}${path}`,
-    {
-      ...options,
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        ...(options.headers || {})
-      }
-    }
-  );
-
-  if (!response.ok) {
-    const details = await response.text();
-
-    console.error(
-      "Firestore REST request failed:",
-      response.status,
-      details.slice(0, 1500)
-    );
-
-    throw new Error("تعذر الوصول إلى بيانات الموظفين.");
-  }
-
-  if (response.status === 204) {
-    return null;
-  }
-
-  const responseText = await response.text();
-
-  if (!responseText) return null;
-
-  return JSON.parse(responseText);
-}
-
-async function listEmployees(projectId, accessToken) {
-  const result = await firestoreRequest(
-    projectId,
-    accessToken,
-    ":runQuery",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [
-            {
-              collectionId: FIRESTORE_COLLECTION
-            }
-          ],
-          limit: 200
-        }
-      })
-    }
-  );
-
-  const employees = (Array.isArray(result) ? result : [])
-    .filter((item) => item.document)
-    .map((item) => decodeEmployeeDocument(item.document))
-    .filter((employee) => employee.uid)
-    .sort((a, b) =>
-      a.displayName.localeCompare(b.displayName, "ar")
-    );
-
-  return employees;
+  return rows.map(decodeEmployeeRow);
 }
 
 async function createEmployeeAccount(env, data) {
@@ -557,36 +492,13 @@ async function createEmployeeAccount(env, data) {
   }
 
   try {
-    const serviceAccount = parseServiceAccount(env);
-    const accessToken = await createGoogleAccessToken(serviceAccount);
-
-    const document = {
-      fields: {
-        uid: encodeString(uid),
-        email: encodeString(email),
-        displayName: encodeString(displayName),
-        role: encodeString("staff"),
-        active: { booleanValue: true },
-        permissions: encodePermissions(permissions),
-        expenseMode: encodeString(expenseMode),
-        createdAt: {
-          timestampValue: new Date().toISOString()
-        }
-      }
-    };
-
-    const path =
-      `/${FIRESTORE_COLLECTION}/${encodeURIComponent(uid)}` +
-      "?currentDocument.exists=false";
-
-    await firestoreRequest(
-      serviceAccount.project_id,
-      accessToken,
-      path,
-      {
-        method: "PATCH",
-        body: JSON.stringify(document)
-      }
+    const database = getClinicDatabase(env);
+    const now = new Date().toISOString();
+    await d1Run(
+      database,
+      "INSERT INTO staff (uid, email, display_name, role, active, permissions_json, expense_mode, created_at, updated_at, source_payload_json) VALUES (?, ?, ?, 'staff', 1, ?, ?, ?, ?, ?) ",
+      [uid, email, displayName, JSON.stringify(permissions), expenseMode, now, now,
+        JSON.stringify({ uid, email, displayName, role: "staff", active: true, permissions, expenseMode, createdAt: now })]
     );
 
     return {
@@ -637,88 +549,56 @@ async function createEmployeeAccount(env, data) {
   }
 }
 
-async function updateEmployeeExpenseMode(projectId, accessToken, data) {
+async function updateEmployeeExpenseMode(env, data) {
   const uid = typeof data.uid === "string" ? data.uid.trim() : "";
   const expenseMode = data.expenseMode;
   if (!uid || uid.length > 128 || uid.includes("/") || !["auto","approval"].includes(expenseMode)) {
     return { status:400, body:{ message:"بيانات طريقة اعتماد المصروفات غير صحيحة." } };
   }
-  try {
-    await firestoreRequest(projectId, accessToken,
-      `/${FIRESTORE_COLLECTION}/${encodeURIComponent(uid)}?updateMask.fieldPaths=expenseMode`,
-      { method:"PATCH", body:JSON.stringify({fields:{expenseMode:encodeString(expenseMode)}}) });
-    return { status:200, body:{uid, expenseMode} };
-  } catch {
-    return { status:404, body:{message:"تعذر تحديث إعدادات مصروفات الموظف."} };
-  }
+  const database = getClinicDatabase(env);
+  const result = await d1Run(
+    database,
+    "UPDATE staff SET expense_mode = ?, updated_at = ? WHERE uid = ? AND role = 'staff'",
+    [expenseMode, new Date().toISOString(), uid]
+  );
+  if (!result.meta?.changes) return { status:404, body:{message:"تعذر تحديث إعدادات مصروفات الموظف."} };
+  return { status:200, body:{uid, expenseMode} };
 }
 
-async function updateEmployeePermissions(
-  projectId,
-  accessToken,
-  data
-) {
+async function updateEmployeePermissions(env, data) {
   const uid = typeof data.uid === "string" ? data.uid.trim() : "";
-
   if (!uid || uid.length > 128 || uid.includes("/")) {
-    return {
-      status: 400,
-      body: { message: "معرّف الموظف غير صحيح." }
-    };
+    return { status:400, body:{ message:"معرّف الموظف غير صحيح." } };
   }
-
   let permissions;
-
-  try {
-    permissions = normalizePermissions(data.permissions);
-  } catch (error) {
-    return {
-      status: 400,
-      body: { message: error.message }
-    };
-  }
-
-  const fields = { permissions: encodePermissions(permissions) };
-  let path = `/${FIRESTORE_COLLECTION}/${encodeURIComponent(uid)}?updateMask.fieldPaths=permissions`;
-  let expenseMode;
+  try { permissions = normalizePermissions(data.permissions); }
+  catch (error) { return { status:400, body:{ message:error.message } }; }
+  const database = getClinicDatabase(env);
+  const current = await d1All(database,
+    "SELECT source_payload_json, expense_mode FROM staff WHERE uid = ? AND role = 'staff' LIMIT 1", [uid]);
+  if (!current.length) return {status:404,body:{message:"تعذر تحديث الصلاحيات. تأكد من وجود حساب الموظف."}};
+  let payload = {};
+  try { payload = JSON.parse(current[0].source_payload_json || "{}"); } catch {}
+  payload.permissions = permissions;
+  const params = [JSON.stringify(permissions), new Date().toISOString(), JSON.stringify(payload), uid];
+  let sql = "UPDATE staff SET permissions_json = ?, updated_at = ?, source_payload_json = ?";
   if (data.expenseMode !== undefined) {
     if (!["auto","approval"].includes(data.expenseMode)) return {status:400,body:{message:"طريقة اعتماد المصروفات غير صحيحة."}};
-    expenseMode = data.expenseMode;
-    fields.expenseMode = encodeString(expenseMode);
-    path += "&updateMask.fieldPaths=expenseMode";
+    payload.expenseMode = data.expenseMode;
+    params[2] = JSON.stringify(payload);
+    sql += ", expense_mode = ?";
+    params.splice(3, 0, data.expenseMode);
   }
-
-  try {
-    await firestoreRequest(projectId, accessToken, path, {
-      method: "PATCH",
-      body: JSON.stringify({ fields })
-    });
-
-    return {
-      status: 200,
-      body: { uid, permissions, ...(expenseMode ? {expenseMode} : {}) }
-    };
-  } catch (error) {
-    return {
-      status: 404,
-      body: {
-        message: "تعذر تحديث الصلاحيات. تأكد من وجود حساب الموظف."
-      }
-    };
-  }
+  sql += " WHERE uid = ? AND role = 'staff'";
+  const result = await d1Run(database, sql, params);
+  if (!result.meta?.changes) return {status:404,body:{message:"تعذر تحديث الصلاحيات. تأكد من وجود حساب الموظف."}};
+  return {status:200,body:{uid,permissions,...(data.expenseMode ? {expenseMode:data.expenseMode} : {})}};
 }
 
 export async function onRequestPost({ request, env }) {
   if (!env.FIREBASE_API_KEY) {
     return jsonResponse(
       { message: "إعدادات Firebase غير مكتملة على الخادم." },
-      503
-    );
-  }
-
-  if (!env.FIREBASE_SERVICE_ACCOUNT_JSON) {
-    return jsonResponse(
-      { message: "بيانات حساب الخدمة غير مهيأة على الخادم." },
       503
     );
   }
@@ -783,39 +663,11 @@ export async function onRequestPost({ request, env }) {
     );
   }
 
-  let serviceAccount;
-
-  try {
-    serviceAccount = parseServiceAccount(env);
-  } catch (error) {
-    console.error("Service account configuration error:", error);
-
-    return jsonResponse(
-      { message: "إعدادات حساب الخدمة غير صحيحة." },
-      503
-    );
-  }
-
-  let accessToken;
-
-  try {
-    accessToken = await createGoogleAccessToken(serviceAccount);
-  } catch (error) {
-    console.error("Failed to obtain Google access token:", error);
-
-    return jsonResponse(
-      { message: "تعذر الاتصال بخدمة البيانات الآمنة." },
-      503
-    );
-  }
 
   try {
     switch (data.action) {
       case "list": {
-        const employees = await listEmployees(
-          serviceAccount.project_id,
-          accessToken
-        );
+        const employees = await listEmployees(env);
 
         return jsonResponse({ employees });
       }
@@ -827,16 +679,12 @@ export async function onRequestPost({ request, env }) {
       }
 
       case "updateExpenseMode": {
-        const result = await updateEmployeeExpenseMode(serviceAccount.project_id, accessToken, data);
+        const result = await updateEmployeeExpenseMode(env, data);
         return jsonResponse(result.body, result.status);
       }
 
       case "updatePermissions": {
-        const result = await updateEmployeePermissions(
-          serviceAccount.project_id,
-          accessToken,
-          data
-        );
+        const result = await updateEmployeePermissions(env, data);
 
         return jsonResponse(result.body, result.status);
       }
