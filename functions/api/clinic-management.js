@@ -91,7 +91,7 @@ async function firestoreRequest(projectId, token, path, options = {}) {
 }
 async function verifyUser(request, env) {
   if (!env.FIREBASE_API_KEY) return { ok: false, status: 503, message: "إعدادات التحقق غير مكتملة على الخادم." };
-  const match = (request.headers.get("Authorization") || "").match(/^Bearer\\s+(\\S+)$/i);
+  const match = (request.headers.get("Authorization") || "").match(/^Bearer\s+(\S+)$/i);
   if (!match || match[1].length > 8192) return { ok: false, status: 401, message: "يلزم تسجيل الدخول." };
   const check = await fetch(FIREBASE_LOOKUP_URL + "?key=" + encodeURIComponent(env.FIREBASE_API_KEY), {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken: match[1] })
