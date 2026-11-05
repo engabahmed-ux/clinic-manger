@@ -28,8 +28,8 @@ function decodeBookingRow(row) {
   const pick=(camel,snake,fallback="")=>p[camel]??row?.[snake]??fallback;
   return {...p,id:row?.id||p.id||"",patientName:pick("patientName","patient_name"),patientId:pick("patientId","patient_id"),patientPhone:pick("patientPhone","patient_phone"),appointmentDate:pick("appointmentDate","appointment_date"),service:pick("service","service"),servicePrice:pick("servicePrice","service_price","0"),paidAmount:pick("paidAmount","paid_amount","0"),completedFee:pick("completedFee","completed_fee"),completedAt:pick("completedAt","completed_at"),status:pick("status","status","pending"),queueNumber:pick("queueNumber","queue_number"),notes:pick("notes","notes"),bloodPressure:pick("bloodPressure","blood_pressure"),weight:pick("weight","weight"),bloodSugar:pick("bloodSugar","blood_sugar"),preVisitNotes:pick("preVisitNotes","pre_visit_notes"),createdAt:pick("createdAt","created_at"),updatedAt:pick("updatedAt","updated_at"),archivedAt:pick("archivedAt","archived_at"),archivedByName:pick("archivedByName","archived_by_name"),archivedRescheduleHistory:pick("archivedRescheduleHistory","archived_reschedule_history_json","[]"),isArchived:Number(row?.is_archived)===1||p.isArchived===true};
 }
-function norm(value){return String(value||"").normalize("NFKC").replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/\\s+/g," ").trim().toLocaleLowerCase("ar");}
-function normPhone(value){return String(value||"").replace(/\\D/g,"");}
+function norm(value){return String(value||"").normalize("NFKC").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[أإآ]/g,"ا").replace(/ى/g,"ي").replace(/\s+/g," ").trim().toLocaleLowerCase("ar");}
+function normPhone(value){return String(value||"").replace(/\D/g,"");}
 function validId(value){return typeof value==="string"&&/^[A-Za-z0-9_-]{1,150}$/.test(value);}
 function canSearch(access){return access.accountType==="doctor"||["view","edit"].some(v=>access.permissions.bookings===v||access.permissions.patients===v||access.permissions.medicalRecords===v);}
 function canResolve(access){return access.accountType==="doctor"||access.permissions.bookings==="edit"||access.permissions.patients==="edit"||access.permissions.medicalRecords==="edit";}
@@ -37,7 +37,7 @@ function canViewRecords(access){return access.accountType==="doctor"||["view","e
 function canEditRecords(access){return access.accountType==="doctor"||access.permissions.medicalRecords==="edit";}
 async function verifyUser(request,env){
   if(!env.FIREBASE_API_KEY)return {ok:false,status:503,message:"خدمة التحقق غير مهيأة."};
-  const match=(request.headers.get("Authorization")||"").match(/^Bearer\\s+(\\S+)$/i);
+  const match=(request.headers.get("Authorization")||"").match(/^Bearer\s+(\S+)$/i);
   if(!match||match[1].length>8192)return {ok:false,status:401,message:"يلزم تسجيل الدخول."};
   const response=await fetch(LOOKUP_URL+"?key="+encodeURIComponent(env.FIREBASE_API_KEY),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:match[1]})});
   if(!response.ok)return {ok:false,status:401,message:"جلسة الدخول غير صالحة. سجّل الدخول مجددًا."};
@@ -147,7 +147,7 @@ async function onRequestInternal({request,env}){
       let archivedOccurrence=false,rescheduleToDate="";
       if(!isArchived&&!["archived","cancelled"].includes(status)&&occurrenceDate){
         let archivedHistory=[];try{archivedHistory=JSON.parse(bf.archivedRescheduleHistory||"[]");}catch{}
-        const entry=Array.isArray(archivedHistory)?archivedHistory.find(item=>item&&item.fromDate===occurrenceDate&&/^\\d{4}-\\d{2}-\\d{2}$/.test(item.toDate||"")):null;
+        const entry=Array.isArray(archivedHistory)?archivedHistory.find(item=>item&&item.fromDate===occurrenceDate&&/^\d{4}-\\d{2}-\\d{2}$/.test(item.toDate||"")):null;
         if(!entry)return jsonResponse({message:"هذا الموعد غير موجود في الأرشيف."},404);
         archivedOccurrence=true;rescheduleToDate=entry.toDate;
       }else if(!isArchived&&!["archived","cancelled"].includes(status))return jsonResponse({message:"هذا الحجز غير مؤرشف."},404);
@@ -169,13 +169,13 @@ async function onRequestInternal({request,env}){
     if(booking.patientId&&booking.patientId!==patientId)return jsonResponse({message:"هذا الحجز مرتبط بملف مريض آخر."},409);
     if(booking.status==="completed")return jsonResponse({message:"تم اعتماد هذا الكشف نهائيًا؛ لا يمكن تعديل بياناته."},409);
     const visitDate=String(data.visitDate||booking.appointmentDate||"").slice(0,10);
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(visitDate)||Number.isNaN(Date.parse(visitDate+"T12:00:00")))return jsonResponse({message:"تاريخ الكشف غير صحيح."},400);
+    if(!/^\d{4}-\\d{2}-\\d{2}$/.test(visitDate)||Number.isNaN(Date.parse(visitDate+"T12:00:00")))return jsonResponse({message:"تاريخ الكشف غير صحيح."},400);
     const keys=["bloodPressure","weight","bloodSugar","preVisitNotes","diagnosis","clinicalNotes","treatment","followUp","followUpNotes","followUpDays","followUpDate"];
     const visit={patientId,bookingId,visitDate,queueNumber:String(data.queueNumber||""),createdByName:access.displayName||"الدكتور"};
     for(const key of keys){visit[key]=String(data[key]||"").trim();if(visit[key].length>(key==="clinicalNotes"||key==="treatment"?4000:1000))return jsonResponse({message:"أحد حقول الكشف أطول من المسموح."},400);}
-    if(visit.followUpDays&&(!/^\\d{1,4}$/.test(visit.followUpDays)||Number(visit.followUpDays)>3650))return jsonResponse({message:"عدد أيام المتابعة غير صحيح."},400);
-    if(visit.followUpDate&&(!/^\\d{4}-\\d{2}-\\d{2}$/.test(visit.followUpDate)||Number.isNaN(Date.parse(visit.followUpDate+"T12:00:00"))))return jsonResponse({message:"تاريخ المتابعة غير صحيح."},400);
-    if(visit.weight&&(!/^\\d{1,3}(\\.\\d{1,2})?$/.test(visit.weight)||Number(visit.weight)<0||Number(visit.weight)>500))return jsonResponse({message:"قيمة الوزن غير صحيحة."},400);
+    if(visit.followUpDays&&(!/^\d{1,4}$/.test(visit.followUpDays)||Number(visit.followUpDays)>3650))return jsonResponse({message:"عدد أيام المتابعة غير صحيح."},400);
+    if(visit.followUpDate&&(!/^\d{4}-\\d{2}-\\d{2}$/.test(visit.followUpDate)||Number.isNaN(Date.parse(visit.followUpDate+"T12:00:00"))))return jsonResponse({message:"تاريخ المتابعة غير صحيح."},400);
+    if(visit.weight&&(!/^\d{1,3}(\\.\\d{1,2})?$/.test(visit.weight)||Number(visit.weight)<0||Number(visit.weight)>500))return jsonResponse({message:"قيمة الوزن غير صحيحة."},400);
     const now=new Date().toISOString(),existingRow=await d1First(db,"SELECT * FROM medical_visits WHERE booking_id = ? LIMIT 1",[bookingId]),existing=existingRow?decodeVisit(existingRow):null;
     if(existing&&existing.patientId!==patientId)return jsonResponse({message:"هذا الكشف مرتبط بملف مريض آخر ولا يمكن نقله."},409);
     visit.updatedAt=now;visit.createdAt=existing?.createdAt||now;
