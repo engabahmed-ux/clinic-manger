@@ -35,67 +35,90 @@ function canSearch(access){return access.accountType==="doctor"||["view","edit"]
 function canResolve(access){return access.accountType==="doctor"||access.permissions.bookings==="edit"||access.permissions.patients==="edit"||access.permissions.medicalRecords==="edit";}
 function canViewRecords(access){return access.accountType==="doctor"||["view","edit"].includes(access.permissions.medicalRecords);}
 function canEditRecords(access){return access.accountType==="doctor"||access.permissions.medicalRecords==="edit";}
-function validId(value){return typeof value==="string"&&/^[A-Za-z0-9_-]{1,150}$/.test(value);}
-async function findPatient(projectId,token,id){if(!validId(id))return null;const doc=await firestore(projectId,token,"/"+PATIENTS_COLLECTION+"/"+encodeURIComponent(id));return doc?decode(doc):null;}
-async function savePatient(projectId,token,patient){
-  const now=new Date().toISOString(),patientNumber=patient.patientNumber||"P-"+Math.random().toString(36).slice(2,8).toUpperCase();
-  const data={...patient,patientNumber,createdAt:patient.createdAt||now,updatedAt:now};
-  const result=await firestore(projectId,token,"/"+PATIENTS_COLLECTION,{method:"POST",body:JSON.stringify(fieldsFrom(data,["patientNumber","displayName","phone","gender","birthDate","notes","createdAt","updatedAt"]))});
-  return decode(result);
+async function verifyUser(request,env){
+  if(!env.FIREBASE_API_KEY)return {ok:false,status:503,message:"خدمة التحقق غير مهيأة."};
+  const match=(request.headers.get("Authorization")||"").match(/^Bearer\\s+(\\S+)$/i);
+  if(!match||match[1].length>8192)return {ok:false,status:401,message:"يلزم تسجيل الدخول."};
+  const response=await fetch(LOOKUP_URL+"?key="+encodeURIComponent(env.FIREBASE_API_KEY),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken:match[1]})});
+  if(!response.ok)return {ok:false,status:401,message:"جلسة الدخول غير صالحة. سجّل الدخول مجددًا."};
+  const result=await response.json(),user=result.users?.[0];
+  return user?.localId?{ok:true,uid:user.localId,email:user.email||""}:{ok:false,status:401,message:"تعذر التحقق من الحساب."};
 }
-async function updateBookingPatient(projectId,token,doc,patientId){
-  const id=(doc.name||"").split("/").pop();if(!validId(id))return;
-  await firestore(projectId,token,"/"+BOOKINGS_COLLECTION+"/"+encodeURIComponent(id)+"?updateMask.fieldPaths=patientId",{method:"PATCH",body:JSON.stringify({fields:{patientId:str(patientId)}})});
+async function accessFor(user,env){
+  if(user.uid===DOCTOR_ADMIN_UID)return {ok:true,accountType:"doctor",uid:user.uid,displayName:"الدكتور",permissions:{bookings:"edit",patients:"edit",medicalRecords:"edit"}};
+  const database=getClinicDatabase(env);
+  const row=await d1First(database,"SELECT role, active, display_name, permissions_json FROM staff WHERE uid = ? LIMIT 1",[user.uid]);
+  if(!row||row.role!=="staff"||Number(row.active)!==1)return {ok:false,status:403,message:"حساب الموظف غير نشط أو غير معتمد."};
+  let permissions={};try{permissions=JSON.parse(row.permissions_json||"{}");}catch{}
+  const p={bookings:permissions.bookings||"none",patients:permissions.patients||"none",medicalRecords:permissions.medicalRecords||"none"};
+  if(!["view","edit"].some(v=>p.bookings===v||p.patients===v||p.medicalRecords===v))return {ok:false,status:403,message:"لا تملك صلاحية الوصول إلى ملفات المرضى."};
+  return {ok:true,accountType:"staff",uid:user.uid,displayName:row.display_name||"الموظف",permissions:p};
 }
-async function resolvePatient(projectId,token,data,access){
-  let patient=data.patientId?await findPatient(projectId,token,String(data.patientId)):null;
+async function allPatients(env){return (await d1All(getClinicDatabase(env),"SELECT * FROM medical_patients ORDER BY created_at ASC")).map(decode);}
+async function allBookings(env){
+  return (await d1All(getClinicDatabase(env),"SELECT * FROM bookings ORDER BY created_at ASC")).map(row=>{
+    const b=decodeBookingRow(row);
+    return b;
+  });
+}
+async function findPatient(env,id){if(!validId(id))return null;const row=await d1First(getClinicDatabase(env),"SELECT * FROM medical_patients WHERE id = ? LIMIT 1",[id]);return row?decode(row):null;}
+async function savePatient(env,patient){
+  const db=getClinicDatabase(env),now=new Date().toISOString(),id=crypto.randomUUID();
+  const data={...patient,id,patientNumber:patient.patientNumber||"P-"+Math.random().toString(36).slice(2,8).toUpperCase(),createdAt:patient.createdAt||now,updatedAt:now};
+  await d1Run(db,"INSERT INTO medical_patients (id,patient_number,display_name,phone,gender,birth_date,notes,created_at,updated_at,source_payload_json) VALUES (?,?,?,?,?,?,?,?,?,?)",
+    [id,data.patientNumber,data.displayName,data.phone,data.gender,data.birthDate,data.notes,data.createdAt,data.updatedAt,JSON.stringify(data)]);
+  return data;
+}
+async function updateBookingPatient(env,booking,patientId){
+  const db=getClinicDatabase(env),payload={...booking,patientId};
+  await d1Run(db,"UPDATE bookings SET patient_id = ?, source_payload_json = ? WHERE id = ?",[patientId,JSON.stringify(payload),booking.id]);
+}
+async function resolvePatient(env,data){
+  let patient=data.patientId?await findPatient(env,String(data.patientId)):null;
   if(data.patientId&&!patient)throw new Error("ملف المريض المحدد لم يعد موجودًا. ابحث عنه مرة أخرى.");
   let name=String(data.patientName||"").trim(),phone=String(data.patientPhone||"").trim();
   if(!patient){
-    // نتائج "ملف سابق" لا تملك patientId؛ استعد الاسم والهاتف من الحجز الأصلي إذا كانا ناقصين في النموذج.
     const legacyBookingId=String(data.legacyBookingId||"");
     if(validId(legacyBookingId)&&(name.length<2||phone.length<5)){
-      const legacyBooking=await firestore(projectId,token,"/"+BOOKINGS_COLLECTION+"/"+encodeURIComponent(legacyBookingId));
-      const legacyFields=legacyBooking?.fields||{};
-      if(name.length<2)name=read(legacyFields,"patientName").trim();
-      if(phone.length<5)phone=read(legacyFields,"patientPhone").trim();
+      const legacy=(await allBookings(env)).find(item=>item.id===legacyBookingId);
+      if(name.length<2)name=String(legacy?.patientName||"").trim();
+      if(phone.length<5)phone=String(legacy?.patientPhone||"").trim();
     }
     if(name.length<2||name.length>120||phone.length<5||phone.length>40)throw new Error("أدخل اسم المريض ورقم هاتف صحيحًا.");
-    const docs=await collection(projectId,token,PATIENTS_COLLECTION);
-    const found=docs.map(decode).find(p=>norm(p.displayName)===norm(name)&&normPhone(p.phone)===normPhone(phone));
-    patient=found||await savePatient(projectId,token,{displayName:name,phone,gender:String(data.gender||""),birthDate:String(data.birthDate||""),notes:""});
+    const docs=await allPatients(env),found=docs.find(item=>norm(item.displayName)===norm(name)&&normPhone(item.phone)===normPhone(phone));
+    patient=found||await savePatient(env,{displayName:name,phone,gender:String(data.gender||""),birthDate:String(data.birthDate||""),notes:""});
   }
-  // ربط الحجوزات القديمة فقط عند تطابق الاسم والهاتف معًا، وليس اعتمادًا على الاسم وحده.
-  const bookings=await collection(projectId,token,BOOKINGS_COLLECTION);
-  for(const doc of bookings){
-    const f=doc.fields||{};
-    if(read(f,"status")==="completed"||read(f,"patientId")||norm(read(f,"patientName"))!==norm(patient.displayName)||normPhone(read(f,"patientPhone"))!==normPhone(patient.phone))continue;
-    await updateBookingPatient(projectId,token,doc,patient.id);
+  const bookings=await allBookings(env);
+  for(const booking of bookings){
+    if(booking.status==="completed"||booking.patientId||norm(booking.patientName)!==norm(patient.displayName)||normPhone(booking.patientPhone)!==normPhone(patient.phone))continue;
+    await updateBookingPatient(env,booking,patient.id);
   }
   return patient;
 }
-async function searchPatients(projectId,token,query){
+async function searchPatients(env,query){
   const q=norm(query);if(q.length<1)return [];
-  const [patientDocs,bookingDocs]=await Promise.all([collection(projectId,token,PATIENTS_COLLECTION),collection(projectId,token,BOOKINGS_COLLECTION)]);
+  const [patients,bookings]=await Promise.all([allPatients(env),allBookings(env)]);
   const result=new Map();
-  for(const doc of patientDocs){const p=decode(doc);if(norm(p.displayName).includes(q)||norm(p.phone).includes(q)||norm(p.patientNumber).includes(q))result.set(p.id,{...p,legacy:false});}
-  for(const doc of bookingDocs){
-    const f=doc.fields||{},name=read(f,"patientName"),phone=read(f,"patientPhone"),id=read(f,"patientId");
+  for(const p of patients)if(norm(p.displayName).includes(q)||norm(p.phone).includes(q)||norm(p.patientNumber).includes(q))result.set(p.id,{...p,legacy:false});
+  for(const booking of bookings){
+    const name=booking.patientName||"",phone=booking.patientPhone||"",id=booking.patientId||"";
     if(!name||(!norm(name).includes(q)&&!norm(phone).includes(q)))continue;
-    if(id){if(!result.has(id)){const p=await findPatient(projectId,token,id);if(p)result.set(id,{...p,legacy:false});}continue;}
-    const alreadyHasProfile=[...result.values()].some(p=>norm(p.displayName)===norm(name)&&normPhone(p.phone)===normPhone(phone));
-    if(alreadyHasProfile)continue;
+    if(id){if(!result.has(id)){const p=await findPatient(env,id);if(p)result.set(id,{...p,legacy:false});}continue;}
+    const exists=[...result.values()].some(p=>norm(p.displayName)===norm(name)&&normPhone(p.phone)===normPhone(phone));
+    if(exists)continue;
     const key=norm(name)+"|"+normPhone(phone);
-    if(!result.has(key))result.set(key,{id:"",legacyBookingId:(doc.name||"").split("/").pop(),displayName:name,phone,patientNumber:"",legacy:true});
+    if(!result.has(key))result.set(key,{id:"",legacyBookingId:booking.id,displayName:name,phone,patientNumber:"",legacy:true});
   }
   return [...result.values()].filter(p=>norm(p.displayName).includes(q)||norm(p.phone).includes(q)||norm(p.patientNumber).includes(q)).slice(0,20);
 }
-async function getPatientHistory(projectId,token,patientId){
-  const patient=await findPatient(projectId,token,patientId);if(!patient)throw new Error("ملف المريض غير موجود.");
-  const [visitDocs,bookingDocs]=await Promise.all([collection(projectId,token,VISITS_COLLECTION),collection(projectId,token,BOOKINGS_COLLECTION)]);
-  const visits=visitDocs.map(decodeVisit).filter(v=>v.patientId===patientId).sort((a,b)=>String(b.visitDate).localeCompare(String(a.visitDate))||String(b.createdAt).localeCompare(String(a.createdAt)));
-  const bookings=bookingDocs.map(doc=>({doc,fields:doc.fields||{}})).filter(x=>read(x.fields,"patientId")===patientId||(!read(x.fields,"patientId")&&norm(read(x.fields,"patientName"))===norm(patient.displayName)&&normPhone(read(x.fields,"patientPhone"))===normPhone(patient.phone))).map(x=>({id:(x.doc.name||"").split("/").pop(),appointmentDate:read(x.fields,"appointmentDate"),patientName:read(x.fields,"patientName"),patientPhone:read(x.fields,"patientPhone"),service:read(x.fields,"service"),status:read(x.fields,"status"),bloodPressure:read(x.fields,"bloodPressure"),weight:read(x.fields,"weight"),bloodSugar:read(x.fields,"bloodSugar"),preVisitNotes:read(x.fields,"preVisitNotes"),createdAt:read(x.fields,"createdAt")}));
-  return {patient,visits,bookings};
+async function getPatientHistory(env,patientId){
+  const patient=await findPatient(env,patientId);if(!patient)throw new Error("ملف المريض غير موجود.");
+  const db=getClinicDatabase(env);
+  const [visitRows,bookings]=await Promise.all([d1All(db,"SELECT * FROM medical_visits WHERE patient_id = ? ORDER BY visit_date DESC, created_at DESC",[patientId]),allBookings(env)]);
+  const visits=visitRows.map(decodeVisit);
+  const linked=bookings.filter(b=>b.patientId===patientId||(!b.patientId&&norm(b.patientName)===norm(patient.displayName)&&normPhone(b.patientPhone)===normPhone(patient.phone)));
+  const historyBookings=linked.map(b=>({id:b.id,appointmentDate:b.appointmentDate,patientName:b.patientName,patientPhone:b.patientPhone,service:b.service,status:b.status,bloodPressure:b.bloodPressure,weight:b.weight,bloodSugar:b.bloodSugar,preVisitNotes:b.preVisitNotes,createdAt:b.createdAt}));
+  return {patient,visits,bookings:historyBookings};
 }
 async function onRequestInternal({request,env}){
   if(request.method!=="POST")return jsonResponse({message:"طريقة الطلب غير مسموحة."},405);
