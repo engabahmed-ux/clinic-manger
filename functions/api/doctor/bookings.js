@@ -769,7 +769,10 @@ async function onRequestInternal(context) {
         const now = new Date().toISOString();
         const updated = await writeBooking(env, {
           ...booking, isArchived:false, archivedAt:"", archivedByUid:"", archivedByName:"", updatedAt:now
-        });
+        }, [{
+          sql: "DELETE FROM booking_archive_occurrences WHERE id = ? AND is_reschedule = 0",
+          params: ["primary:" + id]
+        }]);
         return jsonResponse({ booking:updated, restored:true });
       }
 
