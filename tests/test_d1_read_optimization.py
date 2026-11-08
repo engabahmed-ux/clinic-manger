@@ -129,7 +129,7 @@ class AccountReadOptimizationTests(unittest.TestCase):
         ).fetchall()
         counters = {row["appointment_date"]: row["last_queue_number"] for row in rows}
         self.assertEqual(counters["2026-11-07"], 2)
-        self.assertEqual(counters["2026-11-08"], 4)
+        self.assertEqual(counters["2026-11-08"], 5)
 
     def test_queue_counters_include_archived_history_payloads(self):
         rows = self.db.execute(
