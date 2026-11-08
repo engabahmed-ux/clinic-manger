@@ -287,33 +287,35 @@ async function allocateQueueNumber(env, date) {
   return number;
 }
 async function listArchivePage(env, cursor = null, pageSize = 10) {
-  const all = await listBookings(env);
-  const rows = [];
-  const compactBooking = booking => {
+  const database = getClinicDatabase(env);
+  const limit = Math.max(5, Math.min(100, Number(pageSize) || 10));
+  const offset = Number.isSafeInteger(Number(cursor?.offset)) && Number(cursor.offset) >= 0
+    ? Number(cursor.offset)
+    : 0;
+  const rows = await d1All(database,
+    "SELECT b.*, a.appointment_date AS archive_appointment_date, a.queue_number AS archive_queue_number, a.status AS archive_status, a.archived_at AS archive_archived_at, a.archived_by_uid AS archive_archived_by_uid, a.archived_by_name AS archive_archived_by_name, a.is_reschedule AS archive_is_reschedule, a.reschedule_to_date AS archive_reschedule_to_date FROM booking_archive_occurrences a INNER JOIN bookings b ON b.id = a.booking_id ORDER BY a.archived_at DESC, a.id DESC LIMIT ? OFFSET ?",
+    [limit + 1, offset]
+  );
+  const hasMore = rows.length > limit;
+  const pageRows = rows.slice(0, limit).map(row => {
+    const booking = decodeBooking(row);
     const { rescheduleHistory, archivedRescheduleHistory, ...compact } = booking;
-    return compact;
-  };
-  for (const booking of all) {
-    if (booking.isArchived || ["archived","cancelled"].includes(booking.status)) {
-      rows.push({ ...compactBooking(booking), isArchivedOccurrence:false });
-    }
-    let history = [];
-    try { history = JSON.parse(booking.archivedRescheduleHistory || "[]"); } catch {}
-    if (!Array.isArray(history)) continue;
-    for (const entry of history) {
-      if (!entry || !/^\d{4}-\d{2}-\d{2}$/.test(entry.fromDate||"") || !/^\d{4}-\d{2}-\d{2}$/.test(entry.toDate||"")) continue;
-      rows.push({ ...compactBooking(booking), appointmentDate:entry.fromDate,
-        queueNumber:entry.fromQueueNumber||booking.queueNumber,status:"postponed",isArchived:true,
-        isArchivedOccurrence:true,archivedAt:entry.archivedAt||"",archivedByUid:entry.archivedByUid||"",
-        archivedByName:entry.archivedByName||"",rescheduleToDate:entry.toDate });
-    }
-  }
-  rows.sort((a,b)=>(Date.parse(b.archivedAt||b.updatedAt||b.createdAt||"")||0)-(Date.parse(a.archivedAt||a.updatedAt||a.createdAt||"")||0));
-  const limit=Math.max(5,Math.min(100,Number(pageSize)||10));
-  const offset=Number.isSafeInteger(Number(cursor?.offset))&&Number(cursor.offset)>=0?Number(cursor.offset):0;
-  const pageRows=rows.slice(offset,offset+limit);
-  const nextOffset=offset+pageRows.length;
-  return {rows:pageRows,nextCursor:nextOffset<rows.length?{offset:nextOffset}:null};
+    const isReschedule = Number(row.archive_is_reschedule) === 1;
+    return {
+      ...compact,
+      appointmentDate: row.archive_appointment_date || booking.appointmentDate,
+      queueNumber: row.archive_queue_number || booking.queueNumber,
+      status: row.archive_status || booking.status,
+      isArchived: isReschedule ? true : booking.isArchived,
+      isArchivedOccurrence: isReschedule,
+      archivedAt: row.archive_archived_at || "",
+      archivedByUid: row.archive_archived_by_uid || "",
+      archivedByName: row.archive_archived_by_name || "",
+      rescheduleToDate: row.archive_reschedule_to_date || ""
+    };
+  });
+  const nextOffset = offset + pageRows.length;
+  return { rows: pageRows, nextCursor: hasMore ? { offset: nextOffset } : null };
 }
 async function listBookingChanges(env, since) {
   const database = getClinicDatabase(env);
