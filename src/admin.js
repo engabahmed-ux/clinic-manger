@@ -1559,7 +1559,7 @@ async function loadBookings() {
     updatePendingBookingBadge();
     renderPendingBookings(); renderDailyAppointments(); renderDoctorArchive();
     // Avoid rebuilding the visible accounts table during background booking refreshes.
-    if (!doctorAccountsSection?.hidden) renderDoctorAccounts();
+    if (doctorAccountsSection && !doctorAccountsSection.hidden) renderDoctorAccounts();
   } catch (error) {
     console.error("تعذر تحميل الحجوزات:", error);
     showMessage(bookingListMessage,error.message||"تعذر تحميل الحجوزات.");
@@ -1613,7 +1613,7 @@ async function syncBookingChanges({ fallback = false } = {}) {
       openDoctorScheduleCalendar?.refresh?.();
       updatePendingBookingBadge();
       renderPendingBookings(); renderDailyAppointments(); renderDoctorArchive();
-      if (doctorAccountsSection?.hidden) renderDoctorAccounts();
+      if (doctorAccountsSection && !doctorAccountsSection.hidden) renderDoctorAccounts();
     }
   } catch (error) {
     console.error("تعذر مزامنة تغييرات الحجوزات:", error);
