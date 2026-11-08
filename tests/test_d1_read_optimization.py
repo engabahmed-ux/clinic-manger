@@ -80,7 +80,20 @@ class AccountReadOptimizationTests(unittest.TestCase):
             "INSERT INTO account_records (id, record_type, employee_uid, date, period_type, period_key, created_at, payload_json) VALUES (?, ?, '', '', ?, ?, ?, ?)",
             ("legacy-settlement", "settlement", "day", "2026-11-08", "2026-11-08T18:00:00Z", '{"employeeUid":"staff-a","periodType":"day","periodKey":"2026-11-08"}'),
         )
+        cls.db.execute(
+            "INSERT INTO bookings (id, appointment_date, queue_number, status, created_at, updated_at, archived_reschedule_history_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                "booking-history-no-archived-at",
+                "2026-11-09T13:00:00",
+                "11",
+                "waiting",
+                "2026-11-08T07:00:00Z",
+                "2026-11-08T17:00:00Z",
+                '[{"fromDate":"2026-11-05","toDate":"2026-11-09","fromQueueNumber":8,"toQueueNumber":11,"at":"2026-11-08T12:00:00Z"}]',
+            ),
+        )
         cls.db.executescript((ROOT / "migrations/0004_custody_employee_lookup_index.sql").read_text())
+        cls.db.executescript((ROOT / "migrations/0005_archive_sort_timestamp.sql").read_text())
 
     def test_daily_expenses_are_scoped_to_selected_day(self):
         rows = self.db.execute(
@@ -172,6 +185,13 @@ class AccountReadOptimizationTests(unittest.TestCase):
         self.assertEqual(row["status"], "cancelled")
         self.assertEqual(row["is_reschedule"], 0)
 
+    def test_archive_display_timestamp_stays_empty_while_sort_uses_legacy_fallback(self):
+        row = self.db.execute(
+            "SELECT archived_at, sort_at FROM booking_archive_occurrences WHERE id = 'history:booking-history-no-archived-at:0'"
+        ).fetchone()
+        self.assertEqual(row["archived_at"], "")
+        self.assertEqual(row["sort_at"], "2026-11-08T17:00:00Z")
+
     def test_restoring_primary_occurrence_keeps_archived_reschedule_history(self):
         self.db.execute("SAVEPOINT restore_primary_test")
         self.db.execute("UPDATE bookings SET is_archived = 0 WHERE id = 'booking-archived'")
@@ -185,7 +205,7 @@ class AccountReadOptimizationTests(unittest.TestCase):
 
     def test_archive_page_uses_archive_order_index_and_booking_point_lookup(self):
         plan = self.db.execute(
-            "EXPLAIN QUERY PLAN SELECT b.*, a.appointment_date AS archive_appointment_date FROM booking_archive_occurrences a INNER JOIN bookings b ON b.id = a.booking_id ORDER BY a.archived_at DESC, a.id DESC LIMIT 6 OFFSET 0"
+            "EXPLAIN QUERY PLAN SELECT b.*, a.appointment_date AS archive_appointment_date FROM booking_archive_occurrences a INNER JOIN bookings b ON b.id = a.booking_id ORDER BY a.sort_at DESC, a.id DESC LIMIT 6 OFFSET 0"
         ).fetchall()
         detail = " ".join(row["detail"] for row in plan)
         self.assertIn("idx_booking_archive_order", detail)
