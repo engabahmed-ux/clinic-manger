@@ -76,6 +76,10 @@ class AccountReadOptimizationTests(unittest.TestCase):
             ("other-handover", "custodyHandover", "staff-b", "2026-11-08T16:00:00Z", '{"previousEmployeeUid":"staff-b"}'),
         )
         cls.db.executescript((ROOT / "migrations/0003_booking_queue_and_archive_occurrences.sql").read_text())
+        cls.db.execute(
+            "INSERT INTO account_records (id, record_type, employee_uid, date, period_type, period_key, created_at, payload_json) VALUES (?, ?, '', '', ?, ?, ?, ?)",
+            ("legacy-settlement", "settlement", "day", "2026-11-08", "2026-11-08T18:00:00Z", '{"employeeUid":"staff-a","periodType":"day","periodKey":"2026-11-08"}'),
+        )
         cls.db.executescript((ROOT / "migrations/0004_custody_employee_lookup_index.sql").read_text())
 
     def test_daily_expenses_are_scoped_to_selected_day(self):
@@ -208,6 +212,28 @@ class AccountReadOptimizationTests(unittest.TestCase):
             "SELECT employee_uid FROM account_records WHERE id = 'legacy-handover'"
         ).fetchone()
         self.assertEqual(row["employee_uid"], "staff-a")
+
+    def test_legacy_settlement_backfills_employee_and_period_date(self):
+        row = self.db.execute(
+            "SELECT employee_uid, date FROM account_records WHERE id = 'legacy-settlement'"
+        ).fetchone()
+        self.assertEqual(row["employee_uid"], "staff-a")
+        self.assertEqual(row["date"], "2026-11-08")
+
+    def test_settlement_history_is_scoped_to_employee_and_period(self):
+        rows = self.db.execute(
+            "SELECT id FROM account_records WHERE record_type = 'settlement' AND employee_uid = ? AND date >= ? AND date < ?",
+            ("staff-a", "2026-11-01", "2026-12-01"),
+        ).fetchall()
+        self.assertEqual({row["id"] for row in rows}, {"legacy-settlement"})
+
+    def test_settlement_query_uses_employee_date_index(self):
+        plan = self.db.execute(
+            "EXPLAIN QUERY PLAN SELECT * FROM account_records WHERE record_type = 'settlement' AND employee_uid = ? AND date >= ? AND date < ?",
+            ("staff-a", "2026-11-01", "2026-12-01"),
+        ).fetchall()
+        detail = " ".join(row["detail"] for row in plan)
+        self.assertIn("idx_account_records_employee_date", detail)
 
     def test_custody_history_query_is_employee_scoped(self):
         rows = self.db.execute(
