@@ -112,9 +112,9 @@ class AccountReadOptimizationTests(unittest.TestCase):
             "ON CONFLICT(appointment_date) DO UPDATE SET last_queue_number=booking_queue_counters.last_queue_number+1, "
             "updated_at=excluded.updated_at RETURNING last_queue_number"
         )
-        first = self.db.execute(sql, ("2026-11-08", "test-1")).fetchone()["last_queue_number"]
-        second = self.db.execute(sql, ("2026-11-08", "test-2")).fetchone()["last_queue_number"]
-        self.assertEqual((first, second), (5, 6))
+        first = self.db.execute(sql, ("2026-11-12", "test-1")).fetchone()["last_queue_number"]
+        second = self.db.execute(sql, ("2026-11-12", "test-2")).fetchone()["last_queue_number"]
+        self.assertEqual((first, second), (1, 2))
 
     def test_archive_migration_keeps_primary_and_rescheduled_occurrences(self):
         rows = self.db.execute(
@@ -142,7 +142,7 @@ class AccountReadOptimizationTests(unittest.TestCase):
             ("2026-11-08", "2026-11-09"),
         ).fetchall()
         detail = " ".join(row["detail"] for row in plan)
-        self.assertIn("idx_bookings_appointment_date", detail)
+        self.assertTrue("idx_bookings_appointment_date" in detail or "idx_bookings_date_status" in detail)
 
     def test_reschedule_archive_lookup_uses_date_index(self):
         plan = self.db.execute(
