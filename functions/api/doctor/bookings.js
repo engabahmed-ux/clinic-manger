@@ -323,8 +323,15 @@ async function listBookingChanges(env, since) {
   return rows.map(decodeBooking);
 }
 async function listCompletedBookingsForDate(env, date) {
-  const all = await listBookings(env);
-  return all.filter(booking => booking.status === "completed" && cairoDate(booking.completedAt) === date);
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(date || ""))) return [];
+  const [year, month, day] = date.split("-").map(Number);
+  const startDate = new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10);
+  const endDate = new Date(Date.UTC(year, month - 1, day + 2)).toISOString().slice(0, 10);
+  const rows = await d1All(getClinicDatabase(env),
+    "SELECT * FROM bookings WHERE status = 'completed' AND completed_at >= ? AND completed_at < ? ORDER BY completed_at ASC, id ASC",
+    [startDate, endDate]
+  );
+  return rows.map(decodeBooking).filter(booking => cairoDate(booking.completedAt) === date);
 }
 async function isFinancialPeriodClosed(env, dateValue, employeeUid = "") {
   const date = String(dateValue || "").slice(0,10);
