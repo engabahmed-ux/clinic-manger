@@ -1,4 +1,4 @@
-import { getClinicDatabase, d1All, d1First, d1Run } from "../../_shared/d1.js";
+import { getClinicDatabase, d1All, d1First, d1Run, d1Batch } from "../../_shared/d1.js";
 import { publishClinicRealtime } from "../../_shared/realtime.js";
 
 const DOCTOR_ADMIN_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
@@ -137,7 +137,7 @@ function decodeBooking(document) {
   };
 }
 
-async function writeBooking(env, booking) {
+async function writeBooking(env, booking, additionalStatements = []) {
   const database = getClinicDatabase(env);
   const payload = { ...booking, id: booking.id };
   const values = [
@@ -153,7 +153,11 @@ async function writeBooking(env, booking) {
   const sql = "INSERT INTO bookings (id,patient_name,patient_id,patient_phone,blood_pressure,weight,blood_sugar,pre_visit_notes,appointment_date,service,service_price,paid_amount,completed_fee,completed_at,completed_by_uid,completed_by_name,payment_entered_by_uid,payment_entered_by_name,payment_updated_at,reschedule_history_json,archived_reschedule_history_json,queue_number,is_archived,archived_at,archived_by_uid,archived_by_name,notes,status,created_at,updated_at,source_payload_json) VALUES ("+
     values.map(()=>"?").join(",")+") ON CONFLICT(id) DO UPDATE SET "+
     "patient_name=excluded.patient_name,patient_id=excluded.patient_id,patient_phone=excluded.patient_phone,blood_pressure=excluded.blood_pressure,weight=excluded.weight,blood_sugar=excluded.blood_sugar,pre_visit_notes=excluded.pre_visit_notes,appointment_date=excluded.appointment_date,service=excluded.service,service_price=excluded.service_price,paid_amount=excluded.paid_amount,completed_fee=excluded.completed_fee,completed_at=excluded.completed_at,completed_by_uid=excluded.completed_by_uid,completed_by_name=excluded.completed_by_name,payment_entered_by_uid=excluded.payment_entered_by_uid,payment_entered_by_name=excluded.payment_entered_by_name,payment_updated_at=excluded.payment_updated_at,reschedule_history_json=excluded.reschedule_history_json,archived_reschedule_history_json=excluded.archived_reschedule_history_json,queue_number=excluded.queue_number,is_archived=excluded.is_archived,archived_at=excluded.archived_at,archived_by_uid=excluded.archived_by_uid,archived_by_name=excluded.archived_by_name,notes=excluded.notes,status=excluded.status,created_at=excluded.created_at,updated_at=excluded.updated_at,source_payload_json=excluded.source_payload_json";
-  await d1Run(database, sql, values);
+  if (additionalStatements.length) {
+    await d1Batch(database, [{ sql, params: values }, ...additionalStatements]);
+  } else {
+    await d1Run(database, sql, values);
+  }
   return { ...booking };
 }
 
@@ -265,6 +269,23 @@ async function listBookings(env) {
   const rows = await d1All(database, "SELECT * FROM bookings ORDER BY created_at ASC, id ASC");
   return rows.map(decodeBooking);
 }
+async function allocateQueueNumber(env, date) {
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(date || ""))) {
+    throw new Error("تاريخ الحجز غير صالح لتخصيص رقم الدور.");
+  }
+  const database = getClinicDatabase(env);
+  const now = new Date().toISOString();
+  const row = await d1First(
+    database,
+    "INSERT INTO booking_queue_counters (appointment_date, last_queue_number, updated_at) VALUES (?, 1, ?) ON CONFLICT(appointment_date) DO UPDATE SET last_queue_number = booking_queue_counters.last_queue_number + 1, updated_at = excluded.updated_at RETURNING last_queue_number",
+    [date, now]
+  );
+  const number = Number(row?.last_queue_number);
+  if (!Number.isSafeInteger(number) || number < 1) {
+    throw new Error("تعذر تخصيص رقم الدور للحجز.");
+  }
+  return number;
+}
 async function listArchivePage(env, cursor = null, pageSize = 10) {
   const all = await listBookings(env);
   const rows = [];
@@ -327,6 +348,7 @@ async function normalizeQueueNumbersForDate(env, date, knownBookings = null) {
     }
   }
   const used=new Set();
+  let repaired=false;
   for(const booking of rows){
     const current=Number(booking.queueNumber);
     if(Number.isInteger(current)&&current>0&&!used.has(current)){used.add(current);continue;}
@@ -335,13 +357,18 @@ async function normalizeQueueNumbersForDate(env, date, knownBookings = null) {
     booking.updatedAt=booking.updatedAt||new Date().toISOString();
     await writeBooking(env,booking);
     used.add(max);
+    repaired=true;
+  }
+  if(repaired){
+    await d1Run(database,
+      "INSERT INTO booking_queue_counters (appointment_date,last_queue_number,updated_at) VALUES (?,?,?) ON CONFLICT(appointment_date) DO UPDATE SET last_queue_number=MAX(booking_queue_counters.last_queue_number,excluded.last_queue_number),updated_at=excluded.updated_at",
+      [date,max,new Date().toISOString()]);
   }
   return all;
 }
 async function createBooking(env, data) {
   const now=new Date().toISOString(), date=String(data.appointmentDate||"").slice(0,10);
-  const existing=await normalizeQueueNumbersForDate(env,date);
-  const queueNumber=nextQueueNumberForDate(existing,date);
+  const queueNumber=await allocateQueueNumber(env,date);
   const booking={...data, id:crypto.randomUUID(), queueNumber:String(queueNumber),
     patientName:data.patientName.trim(),patientPhone:data.patientPhone.trim(),
     appointmentDate:data.appointmentDate.trim(),service:(data.service||"").trim(),
@@ -449,18 +476,26 @@ async function updateBooking(env, data, actorUid = "", actorAccountType = "docto
   const oldDate = String(existing.appointmentDate || "").slice(0, 10);
   const nextDate = String(changes.appointmentDate ?? existing.appointmentDate ?? "").slice(0, 10);
   let queueNumber = String(existing.queueNumber || "");
+  let rescheduleOccurrence = null;
   if (changes.appointmentDate !== undefined && oldDate && nextDate && oldDate !== nextDate) {
-    let allBookings = await listBookings(env);
-    allBookings = await normalizeQueueNumbersForDate(env, oldDate, allBookings);
-    allBookings = await normalizeQueueNumbersForDate(env, nextDate, allBookings);
-    const refreshedExisting = allBookings.find(item => item.id === existing.id) || existing;
-    const oldQueueNumber = Number(refreshedExisting.queueNumber) > 0 ? Number(refreshedExisting.queueNumber) : currentQueueNumberForDate(allBookings, refreshedExisting, oldDate);
-    const newQueueNumber = nextQueueNumberForDate(allBookings, nextDate);
+    const oldQueueNumber = Number(existing.queueNumber) > 0
+      ? Number(existing.queueNumber)
+      : await allocateQueueNumber(env, oldDate);
+    const newQueueNumber = await allocateQueueNumber(env, nextDate);
+    rescheduleOccurrence = {
+      id: crypto.randomUUID(),
+      bookingId: existing.id,
+      fromDate: oldDate,
+      toDate: nextDate,
+      fromQueueNumber: String(oldQueueNumber),
+      toQueueNumber: String(newQueueNumber),
+      occurredAt: now,
+      createdAt: now
+    };
     rescheduleHistory.push({ fromDate: oldDate, toDate: nextDate, fromQueueNumber: oldQueueNumber, toQueueNumber: newQueueNumber, at: now });
     queueNumber = String(newQueueNumber);
   } else if (!(Number(queueNumber) > 0) && nextDate) {
-    const allBookings = await listBookings(env);
-    queueNumber = String(currentQueueNumberForDate(allBookings, existing, nextDate) || nextQueueNumberForDate(allBookings, nextDate));
+    queueNumber = String(await allocateQueueNumber(env, nextDate));
   }
   let paidAmount = changes.paidAmount !== undefined ? String(changes.paidAmount).trim() : existing.paidAmount;
   let completedFee = existing.completedFee || "";
@@ -513,7 +548,11 @@ async function updateBooking(env, data, actorUid = "", actorAccountType = "docto
     updatedAt: now
   };
 
-  const updatedBooking = await writeBooking(env, booking);
+  const additionalStatements = rescheduleOccurrence ? [{
+    sql: "INSERT INTO booking_reschedule_occurrences (id,booking_id,from_date,to_date,from_queue_number,to_queue_number,occurred_at,created_at) VALUES (?,?,?,?,?,?,?,?)",
+    params: [rescheduleOccurrence.id,rescheduleOccurrence.bookingId,rescheduleOccurrence.fromDate,rescheduleOccurrence.toDate,rescheduleOccurrence.fromQueueNumber,rescheduleOccurrence.toQueueNumber,rescheduleOccurrence.occurredAt,rescheduleOccurrence.createdAt]
+  }] : [];
+  const updatedBooking = await writeBooking(env, booking, additionalStatements);
   updatedBooking.financialPeriodClosed = closedPeriodForUnpaidCompletion;
   return updatedBooking;
 }
