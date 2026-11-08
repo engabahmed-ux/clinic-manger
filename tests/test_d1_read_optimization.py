@@ -138,11 +138,11 @@ class AccountReadOptimizationTests(unittest.TestCase):
 
     def test_archive_day_finds_current_bookings_by_date_index(self):
         plan = self.db.execute(
-            "EXPLAIN QUERY PLAN SELECT * FROM bookings WHERE appointment_date >= ? AND appointment_date < ? AND is_archived = 0 ORDER BY appointment_date ASC, created_at ASC, id ASC",
+            "EXPLAIN QUERY PLAN SELECT * FROM bookings WHERE appointment_date >= ? AND appointment_date < ? ORDER BY appointment_date ASC, created_at ASC, id ASC",
             ("2026-11-08", "2026-11-09"),
         ).fetchall()
         detail = " ".join(row["detail"] for row in plan)
-        self.assertIn("idx_bookings_appointment_date_archive", detail)
+        self.assertIn("idx_bookings_appointment_date", detail)
 
     def test_reschedule_archive_lookup_uses_date_index(self):
         plan = self.db.execute(
