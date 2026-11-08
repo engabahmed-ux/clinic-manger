@@ -142,7 +142,7 @@ class AccountReadOptimizationTests(unittest.TestCase):
             ("2026-11-08", "2026-11-09"),
         ).fetchall()
         detail = " ".join(row["detail"] for row in plan)
-        self.assertIn("idx_bookings_appointment_date", detail)
+        self.assertIn("idx_bookings_appointment_date_archive", detail)
 
     def test_reschedule_archive_lookup_uses_date_index(self):
         plan = self.db.execute(
