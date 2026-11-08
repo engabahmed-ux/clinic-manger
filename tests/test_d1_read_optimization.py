@@ -51,7 +51,16 @@ class AccountReadOptimizationTests(unittest.TestCase):
         cls.db.execute(
             "INSERT INTO bookings (id, appointment_date, queue_number, status, is_archived, archived_at, created_at, updated_at) VALUES ('booking-archived','2026-11-08T08:00:00','4','completed',1,'2026-11-08T14:00:00Z','2026-11-08T07:00:00Z','2026-11-08T14:00:00Z')"
         )
+        cls.db.execute(
+            "INSERT INTO account_records (id, record_type, employee_uid, created_at, payload_json) VALUES (?, ?, '', ?, ?)",
+            ("legacy-handover", "custodyHandover", "2026-11-08T15:00:00Z", '{"previousEmployeeUid":"staff-a","previousEmployeeName":"Staff A"}'),
+        )
+        cls.db.execute(
+            "INSERT INTO account_records (id, record_type, employee_uid, created_at, payload_json) VALUES (?, ?, ?, ?, ?)",
+            ("other-handover", "custodyHandover", "staff-b", "2026-11-08T16:00:00Z", '{"previousEmployeeUid":"staff-b"}'),
+        )
         cls.db.executescript((ROOT / "migrations/0003_booking_queue_and_archive_occurrences.sql").read_text())
+        cls.db.executescript((ROOT / "migrations/0004_custody_employee_lookup_index.sql").read_text())
 
     def test_daily_expenses_are_scoped_to_selected_day(self):
         rows = self.db.execute(
@@ -151,6 +160,27 @@ class AccountReadOptimizationTests(unittest.TestCase):
         ).fetchall()
         detail = " ".join(row["detail"] for row in plan)
         self.assertIn("idx_booking_reschedule_from_date", detail)
+
+    def test_custody_migration_backfills_previous_employee_uid(self):
+        row = self.db.execute(
+            "SELECT employee_uid FROM account_records WHERE id = 'legacy-handover'"
+        ).fetchone()
+        self.assertEqual(row["employee_uid"], "staff-a")
+
+    def test_custody_history_query_is_employee_scoped(self):
+        rows = self.db.execute(
+            "SELECT id FROM account_records WHERE record_type IN (?, ?) AND employee_uid = ? ORDER BY created_at DESC",
+            ("custodyHandover", "custodyDoctorSettlement", "staff-a"),
+        ).fetchall()
+        self.assertEqual({row["id"] for row in rows}, {"legacy-handover"})
+
+    def test_custody_employee_query_uses_employee_type_index(self):
+        plan = self.db.execute(
+            "EXPLAIN QUERY PLAN SELECT * FROM account_records WHERE record_type IN (?, ?) AND employee_uid = ? ORDER BY created_at DESC",
+            ("custodyHandover", "custodyDoctorSettlement", "staff-a"),
+        ).fetchall()
+        detail = " ".join(row["detail"] for row in plan)
+        self.assertIn("idx_account_records_employee_type_created", detail)
 
 
 if __name__ == "__main__":
