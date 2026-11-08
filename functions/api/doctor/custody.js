@@ -1,4 +1,4 @@
-import { getClinicDatabase, d1All, d1First, d1Run } from "../../_shared/d1.js";
+import { getClinicDatabase, d1All, d1First, d1Run, d1Batch } from "../../_shared/d1.js";
 import { publishClinicRealtime } from "../../_shared/realtime.js";
 
 const DOCTOR_UID = "8fUdGutQHRau3RXQIrRtZUqQ9Nm1";
@@ -67,6 +67,31 @@ async function updateRecord(ctx,id,record) {
   const updates=columns.filter(x=>x!=="id").map(x=>x+"=excluded."+x).join(",");
   await d1Run(getClinicDatabase(ctx.env),"INSERT INTO account_records ("+RECORD_COLUMNS+") VALUES ("+values.map(()=>"?").join(",")+") ON CONFLICT(id) DO UPDATE SET "+updates,values);
   return {id,...record};
+}
+
+/**
+ * Start a staff session without deleting or overwriting its previous history.
+ * The archive copy and conditional lock upsert run in one D1 transaction.
+ * A competing request can only replace a non-active lock; an active lock
+ * always wins, so two employees cannot start simultaneously.
+ */
+async function startSessionRecord(ctx,record) {
+  const db=getClinicDatabase(ctx.env);
+  const columns=RECORD_COLUMNS.split(",");
+  const values=recordValues(LOCK_ID,record);
+  const updates=columns.filter(column=>column!=="id").map(column=>column+"=excluded."+column).join(",");
+  const archiveId=LOCK_ID+"-closed-"+Date.now()+"-"+crypto.randomUUID().replace(/-/g,"").slice(0,8);
+  const archiveSelect=columns.map((column,index)=>index===0?"?":column).join(",");
+  const archiveSql="INSERT INTO account_records ("+RECORD_COLUMNS+") SELECT "+archiveSelect+" FROM account_records WHERE id = ? AND status IS NOT 'active'";
+  const upsertSql="INSERT INTO account_records ("+RECORD_COLUMNS+") VALUES ("+values.map(()=>"?").join(",")+") ON CONFLICT(id) DO UPDATE SET "+updates+" WHERE account_records.status IS NOT 'active'";
+  const results=await d1Batch(db,[
+    {sql:archiveSql,params:[archiveId,LOCK_ID]},
+    {sql:upsertSql,params:values}
+  ]);
+  if(Number(results?.[1]?.meta?.changes)>0)return {id:LOCK_ID,...record};
+  const current=await readDoc(ctx,LOCK_ID);
+  if(current.status==="active"&&current.employeeUid===record.employeeUid)return {__alreadyActive:true,session:current};
+  return {__conflict:true,current};
 }
 async function deleteRecord(ctx,id) {
   await d1Run(getClinicDatabase(ctx.env),"DELETE FROM account_records WHERE id = ?",[id]);
@@ -177,8 +202,13 @@ async function onRequestPostInternal({request,env}) {
       const baselineReceipts=sameDayHandover?Number(history.baselineReceipts||0):0;
       const baselineExpenses=sameDayHandover?Number(history.baselineExpenses||0):0;
       const record={type:"custodySession",status:"active",employeeUid:ctx.uid,employeeName:ctx.name,openingAmount:opening.toFixed(2),expectedAmount:opening.toFixed(2),baselineReceipts:baselineReceipts.toFixed(2),baselineExpenses:baselineExpenses.toFixed(2),handoverAccepted:Boolean(data.acceptHandover),notes:"",startedAt:now,updatedAt:now};
-      const made=await createRecord(ctx,LOCK_ID,record);
-      if(made?.__conflict)return reply({message:"بدأ موظف آخر جلسة في نفس اللحظة. حدّث الصفحة وحاول مرة أخرى."},409);
+      const made=await startSessionRecord(ctx,record);
+      if(made?.__conflict){
+        const active=made.current||{};
+        if(active.status==="active"&&active.employeeUid!==ctx.uid)return reply({message:"يوجد موظف آخر مسجل الدخول. يجب أن ينهي جلسته ويسلّم العهدة أولًا.",activeSession:{employeeName:active.employeeName||"الموظف",expectedAmount:active.expectedAmount||"0",notes:active.notes||""}},409);
+        return reply({message:"بدأت جلسة أخرى بالتزامن. حدّث الصفحة وحاول مرة أخرى."},409);
+      }
+      if(made?.__alreadyActive)return reply({active:true,session:made.session,alreadyActive:true});
       return reply({active:true,session:{id:LOCK_ID,...record}},201);
     }
     if(action==="handover") {
