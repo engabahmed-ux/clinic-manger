@@ -154,7 +154,7 @@ const clinicRealtime = createClinicRealtime(auth, event => {
         if (typeof loadDoctorAccountRecords === "function") loadDoctorAccountRecords();
       }
       if (typeof loadDoctorCustody === "function") loadDoctorCustody();
-      if (typeof loadDoctorSettlements === "function") loadDoctorSettlements();
+      if (event === "custody_changed" && typeof loadDoctorSettlements === "function") loadDoctorSettlements();
       if (typeof previewDoctorSettlement === "function") previewDoctorSettlement(settlementPreviewPeriodType || "day");
     }
   } else if (event === "patient_changed") {
@@ -1559,7 +1559,7 @@ async function loadBookings() {
     updatePendingBookingBadge();
     renderPendingBookings(); renderDailyAppointments(); renderDoctorArchive();
     // Avoid rebuilding the visible accounts table during background booking refreshes.
-    if (doctorAccountsSection?.hidden) renderDoctorAccounts();
+    if (!doctorAccountsSection?.hidden) renderDoctorAccounts();
   } catch (error) {
     console.error("تعذر تحميل الحجوزات:", error);
     showMessage(bookingListMessage,error.message||"تعذر تحميل الحجوزات.");
