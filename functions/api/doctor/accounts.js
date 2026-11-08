@@ -64,10 +64,34 @@ async function listRecords(env,type="") {
     : await d1All(db,"SELECT * FROM account_records ORDER BY created_at DESC");
   return rows.map(decode);
 }
-async function listEmployeeBookings(env,employeeUid) {
+async function listRecordsByDateRange(env,type,startDate,endDate,enteredBy="") {
+  const db=getClinicDatabase(env);
+  const conditions=["record_type = ?","date >= ?","date < ?"];
+  const params=[type,startDate,endDate];
+  if(enteredBy){conditions.push("entered_by = ?");params.push(enteredBy);}
+  const rows=await d1All(db,"SELECT * FROM account_records WHERE "+conditions.join(" AND ")+" ORDER BY created_at DESC",params);
+  return rows.map(decode);
+}
+async function listEmployeeSettlements(env,employeeUid,startDate,endDate) {
   const rows=await d1All(getClinicDatabase(env),
-    "SELECT appointment_date, payment_entered_by_uid, paid_amount FROM bookings WHERE payment_entered_by_uid = ?",
-    [employeeUid]);
+    "SELECT * FROM account_records WHERE record_type = 'settlement' AND employee_uid = ? AND date >= ? AND date < ? ORDER BY created_at DESC",
+    [employeeUid,startDate,endDate]);
+  return rows.map(decode);
+}
+function periodDateRange(periodType,periodKey) {
+  if(periodType==="day") {
+    const [year,month,day]=periodKey.split("-").map(Number);
+    const next=new Date(Date.UTC(year,month-1,day+1));
+    return {start:periodKey,end:next.toISOString().slice(0,10)};
+  }
+  const [year,month]=periodKey.split("-").map(Number);
+  const next=new Date(Date.UTC(year,month,1));
+  return {start:periodKey+"-01",end:next.toISOString().slice(0,10)};
+}
+async function listEmployeeBookings(env,employeeUid,startDate,endDate) {
+  const rows=await d1All(getClinicDatabase(env),
+    "SELECT appointment_date, payment_entered_by_uid, paid_amount FROM bookings WHERE payment_entered_by_uid = ? AND appointment_date >= ? AND appointment_date < ?",
+    [employeeUid,startDate,endDate]);
   return rows.map(row=>({date:String(row.appointment_date||"").slice(0,10),paymentEnteredByUid:row.payment_entered_by_uid,paid:Number(row.paid_amount)||0}));
 }
 
@@ -90,8 +114,8 @@ export async function onRequestPost({ request, env }) {
     if (data.action === "listDailyExpenses") {
       const date = String(data.date || "");
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date + "T12:00:00"))) return jsonResponse({ message:"التاريخ غير صحيح." },400);
-      const expensesRecords = await listRecords(env, "dailyExpense");
-      const dailyExpenseRecords = expensesRecords.filter(x => x.date === date);
+      const dailyRange=periodDateRange("day",date);
+      const dailyExpenseRecords = await listRecordsByDateRange(env,"dailyExpense",dailyRange.start,dailyRange.end);
       const custodyTotalExpenses = dailyExpenseRecords
         .filter(x => (x.status || "approved") === "approved")
         .reduce((sum, x) => sum + (Number(x.amount) || 0), 0);
@@ -105,8 +129,9 @@ export async function onRequestPost({ request, env }) {
     if (data.action === "listMonthlyExpenses") {
       const month = String(data.month || "");
       if (!/^\d{4}-\d{2}$/.test(month)) return jsonResponse({message:"الشهر المحدد غير صحيح."},400);
-      const expensesRecords = await listRecords(env, "dailyExpense");
-      const expenses = expensesRecords.filter(x=>String(x.date||"").startsWith(month))
+      const monthlyRange=periodDateRange("month",month);
+      const expensesRecords = await listRecordsByDateRange(env,"dailyExpense",monthlyRange.start,monthlyRange.end);
+      const expenses = expensesRecords
         .filter(x=>verified.accountType==="doctor" || !x.enteredBy || x.enteredBy===verified.uid)
         .sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))
         .map(x=>({id:x.id,description:x.personName,amount:x.amount,date:x.date,notes:x.notes,status:x.status||"approved",enteredByName:x.enteredByName,approvedByName:x.approvedByName,reviewedByName:x.reviewedByName,reviewedAt:x.reviewedAt,rejectionReason:x.rejectionReason}));
@@ -145,9 +170,14 @@ export async function onRequestPost({ request, env }) {
       return jsonResponse({id,status,approvedAt:status === "approved" ? now : "",rejectionReason:status === "rejected" ? (rejectionReason || "لم يُذكر سبب") : ""});
     }
     if (data.action === "listSettlements") {
+      const month=String(data.month||"");
+      const monthlyRange=/^\d{4}-\d{2}$/.test(month)?periodDateRange("month",month):null;
+      const expensesPromise=monthlyRange
+        ? listRecordsByDateRange(env,"dailyExpense",monthlyRange.start,monthlyRange.end)
+        : listRecords(env,"dailyExpense");
       const [settlements, expenses] = await Promise.all([
          listRecords(env, "settlement"),
-         listRecords(env, "dailyExpense")
+         expensesPromise
        ]);
        settlements.sort((a,b)=>String(b.periodKey).localeCompare(String(a.periodKey)));
       return jsonResponse({settlements, expenses, pendingExpenses:expenses.filter(x=>(x.status || "approved")==="pending").length});
@@ -158,17 +188,20 @@ export async function onRequestPost({ request, env }) {
       const employeeUid = String(data.employeeUid || "");
       if (!periodType || !(periodType === "day" ? /^\d{4}-\d{2}-\d{2}$/.test(periodKey) : /^\d{4}-\d{2}$/.test(periodKey)) ||
           !/^[A-Za-z0-9_-]{1,128}$/.test(employeeUid)) return jsonResponse({message:"حدد الموظف والفترة بصورة صحيحة."},400);
-      const [settlements, allExpenses] = await Promise.all([
-         listRecords(env, "settlement"),
-         listRecords(env, "dailyExpense")
+      const monthKey=periodKey.slice(0,7);
+      const monthRange=periodDateRange("month",monthKey);
+      const range=periodDateRange(periodType,periodKey);
+      const [settlements, periodExpenses] = await Promise.all([
+         listEmployeeSettlements(env,employeeUid,monthRange.start,monthRange.end),
+         listRecordsByDateRange(env,"dailyExpense",range.start,range.end,employeeUid)
        ]);
-       const prior = settlements.find(x=>x.employeeUid===employeeUid && x.periodType===periodType && x.periodKey===periodKey);
-       const closedDays = new Set(settlements.filter(x=>x.employeeUid===employeeUid && x.periodType==="day" && String(x.periodKey||"").startsWith(periodKey.slice(0,7))).map(x=>x.periodKey));
-       const inPeriod = date => periodType === "day" ? date === periodKey : String(date || "").startsWith(periodKey) && !closedDays.has(String(date || "").slice(0,10));
-       const expenses = allExpenses.filter(x=>x.enteredBy===employeeUid && inPeriod(x.date));
+       const prior = settlements.find(x=>x.periodType===periodType && x.periodKey===periodKey);
+       const closedDays = new Set(settlements.filter(x=>x.periodType==="day").map(x=>x.periodKey));
+       const inPeriod = date => periodType === "day" ? date === periodKey : String(date || "") >= range.start && String(date || "") < range.end && !closedDays.has(String(date || "").slice(0,10));
+       const expenses = periodExpenses.filter(x=>inPeriod(x.date));
       const pendingExpenses = expenses.filter(x=>(x.status || "approved")==="pending").length;
       const approvedExpenses = expenses.filter(x=>(x.status || "approved")==="approved").reduce((sum,x)=>sum+(Number(x.amount)||0),0);
-      const bookings = (await listEmployeeBookings(env, employeeUid))
+      const bookings = (await listEmployeeBookings(env, employeeUid, range.start, range.end))
         .filter(x=>inPeriod(x.date) && x.paid>0);
       const receipts = bookings.reduce((sum,x)=>sum+x.paid,0);
       return jsonResponse({periodType,periodKey,employeeUid,totalReceipts:receipts.toFixed(2),totalExpenses:approvedExpenses.toFixed(2),
@@ -184,15 +217,18 @@ export async function onRequestPost({ request, env }) {
       const employeeDoc=await d1First(getClinicDatabase(env),"SELECT role,active,display_name FROM staff WHERE uid = ? LIMIT 1",[employeeUid]);
       if(!employeeDoc||employeeDoc.role!=="staff"||Number(employeeDoc.active)!==1)return jsonResponse({message:"حساب الموظف غير نشط أو غير صالح للتصفية."},400);
       const employeeName=employeeDoc.display_name||"الموظف";
-      const [settlements, allExpenses] = await Promise.all([
-         listRecords(env, "settlement"),
-         listRecords(env, "dailyExpense")
+      const monthKey=periodKey.slice(0,7);
+      const monthRange=periodDateRange("month",monthKey);
+      const range=periodDateRange(periodType,periodKey);
+      const [settlements, periodExpenses] = await Promise.all([
+         listEmployeeSettlements(env,employeeUid,monthRange.start,monthRange.end),
+         listRecordsByDateRange(env,"dailyExpense",range.start,range.end,employeeUid)
        ]);
-       if (settlements.some(x=>x.employeeUid===employeeUid && x.periodType===periodType && x.periodKey===periodKey)) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف لهذه الفترة من قبل."},409);
-       if (periodType === "day" && settlements.some(x=>x.employeeUid===employeeUid && x.periodType==="month" && x.periodKey===periodKey.slice(0,7))) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف للشهر بالفعل."},409);
-       const closedDays = new Set(settlements.filter(x=>x.employeeUid===employeeUid && x.periodType==="day" && String(x.periodKey||"").startsWith(periodKey.slice(0,7))).map(x=>x.periodKey));
-       const inPeriod = date => periodType === "day" ? date === periodKey : String(date || "").startsWith(periodKey) && !closedDays.has(String(date || "").slice(0,10));
-       const expenses = allExpenses.filter(x=>x.enteredBy===employeeUid && inPeriod(x.date));
+       if (settlements.some(x=>x.periodType===periodType && x.periodKey===periodKey)) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف لهذه الفترة من قبل."},409);
+       if (periodType === "day" && settlements.some(x=>x.periodType==="month" && x.periodKey===monthKey)) return jsonResponse({message:"تمت تصفية عهدة هذا الموظف للشهر بالفعل."},409);
+       const closedDays = new Set(settlements.filter(x=>x.periodType==="day").map(x=>x.periodKey));
+       const inPeriod = date => periodType === "day" ? date === periodKey : String(date || "") >= range.start && String(date || "") < range.end && !closedDays.has(String(date || "").slice(0,10));
+       const expenses = periodExpenses.filter(x=>inPeriod(x.date));
       const pending = expenses.filter(x=>(x.status || "approved")==="pending");
       if (pending.length) return jsonResponse({message:"لا يمكن تصفية عهدة الموظف قبل اعتماد أو رفض كل مصروفاته المعلقة."},409);
       const approvedExpenses = expenses.filter(x=>(x.status || "approved")==="approved").reduce((sum,x)=>sum+(Number(x.amount)||0),0);
