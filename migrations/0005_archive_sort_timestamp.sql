@@ -12,7 +12,7 @@ SET sort_at = COALESCE(
 
 DROP INDEX IF EXISTS idx_booking_archive_order;
 CREATE INDEX IF NOT EXISTS idx_booking_archive_order
-ON booking_archive_occurrences(sort_at DESC, id DESC);
+ON booking_archive_occurrences(sort_at DESC, created_at ASC, booking_id ASC, is_reschedule ASC, id ASC);
 
 INSERT OR IGNORE INTO schema_migrations(version, applied_at)
 VALUES ('0005_archive_sort_timestamp', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
