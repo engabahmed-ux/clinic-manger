@@ -875,7 +875,7 @@ async function onRequestInternal(context) {
             },
             {
               sql: "INSERT OR REPLACE INTO booking_archive_occurrences (id,booking_id,appointment_date,queue_number,status,archived_at,archived_by_uid,archived_by_name,is_reschedule,reschedule_to_date,created_at,sort_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-              params: ["history:" + occurrence.id,booking.id,occurrence.from_date,occurrence.from_queue_number || "","postponed",archivedAt,archivedByUid,archivedByName,1,occurrence.to_date,booking.createdAt || archivedAt,archivedAt]
+              params: ["history:" + occurrence.id,booking.id,occurrence.from_date,occurrence.from_queue_number || booking.queueNumber || "","postponed",archivedAt,archivedByUid,archivedByName,1,occurrence.to_date,booking.createdAt || archivedAt,archivedAt]
             }
           ]);
           if (!alreadyArchived) archivedCount += 1;
