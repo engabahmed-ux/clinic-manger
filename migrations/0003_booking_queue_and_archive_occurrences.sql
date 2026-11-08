@@ -134,7 +134,7 @@ SELECT
   substr(appointment_date, 1, 10),
   queue_number,
   status,
-  COALESCE(archived_at, ''),
+  COALESCE(archived_at, json_extract(source_payload_json, '$.archivedAt'), ''),
   archived_by_uid,
   archived_by_name,
   0,
