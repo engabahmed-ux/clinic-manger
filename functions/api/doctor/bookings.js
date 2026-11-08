@@ -270,7 +270,7 @@ async function listBookings(env) {
   return rows.map(decodeBooking);
 }
 async function allocateQueueNumber(env, date) {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(date || ""))) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) {
     throw new Error("تاريخ الحجز غير صالح لتخصيص رقم الدور.");
   }
   const database = getClinicDatabase(env);
