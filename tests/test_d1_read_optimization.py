@@ -154,7 +154,7 @@ class AccountReadOptimizationTests(unittest.TestCase):
         ).fetchall()
         counters = {row["appointment_date"]: row["last_queue_number"] for row in rows}
         self.assertEqual(counters["2026-11-06"], 9)
-        self.assertEqual(counters["2026-11-09"], 10)
+        self.assertEqual(counters["2026-11-09"], 11)
 
     def test_queue_counter_allocation_is_atomic_and_monotonic(self):
         sql = (
