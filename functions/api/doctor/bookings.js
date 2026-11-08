@@ -797,7 +797,7 @@ async function onRequestInternal(context) {
         const archivedByName = access.displayName || (access.accountType === "doctor" ? "الدكتور" : "الموظف");
 
         const currentRows = await d1All(database,
-          "SELECT * FROM bookings WHERE appointment_date >= ? AND appointment_date < ? AND is_archived = 0 ORDER BY appointment_date ASC, created_at ASC, id ASC",
+          "SELECT * FROM bookings WHERE appointment_date >= ? AND appointment_date < ? ORDER BY appointment_date ASC, created_at ASC, id ASC",
           [date, nextDate]
         );
         for (const row of currentRows) {
