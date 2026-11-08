@@ -75,11 +75,6 @@ class AccountReadOptimizationTests(unittest.TestCase):
             "INSERT INTO account_records (id, record_type, employee_uid, created_at, payload_json) VALUES (?, ?, ?, ?, ?)",
             ("other-handover", "custodyHandover", "staff-b", "2026-11-08T16:00:00Z", '{"previousEmployeeUid":"staff-b"}'),
         )
-        cls.db.executescript((ROOT / "migrations/0003_booking_queue_and_archive_occurrences.sql").read_text())
-        cls.db.execute(
-            "INSERT INTO account_records (id, record_type, employee_uid, date, period_type, period_key, created_at, payload_json) VALUES (?, ?, '', '', ?, ?, ?, ?)",
-            ("legacy-settlement", "settlement", "day", "2026-11-08", "2026-11-08T18:00:00Z", '{"employeeUid":"staff-a","periodType":"day","periodKey":"2026-11-08"}'),
-        )
         cls.db.execute(
             "INSERT INTO bookings (id, appointment_date, queue_number, status, created_at, updated_at, archived_reschedule_history_json) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
@@ -91,6 +86,11 @@ class AccountReadOptimizationTests(unittest.TestCase):
                 "2026-11-08T17:00:00Z",
                 '[{"fromDate":"2026-11-05","toDate":"2026-11-09","fromQueueNumber":8,"toQueueNumber":11,"at":"2026-11-08T12:00:00Z"}]',
             ),
+        )
+        cls.db.executescript((ROOT / "migrations/0003_booking_queue_and_archive_occurrences.sql").read_text())
+        cls.db.execute(
+            "INSERT INTO account_records (id, record_type, employee_uid, date, period_type, period_key, created_at, payload_json) VALUES (?, ?, '', '', ?, ?, ?, ?)",
+            ("legacy-settlement", "settlement", "day", "2026-11-08", "2026-11-08T18:00:00Z", '{"employeeUid":"staff-a","periodType":"day","periodKey":"2026-11-08"}'),
         )
         cls.db.executescript((ROOT / "migrations/0004_custody_employee_lookup_index.sql").read_text())
         cls.db.executescript((ROOT / "migrations/0005_archive_sort_timestamp.sql").read_text())
