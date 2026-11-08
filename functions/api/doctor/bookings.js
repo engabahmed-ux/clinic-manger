@@ -323,7 +323,7 @@ async function listBookingChanges(env, since) {
   return rows.map(decodeBooking);
 }
 async function listCompletedBookingsForDate(env, date) {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(date || ""))) return [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) return [];
   const [year, month, day] = date.split("-").map(Number);
   const startDate = new Date(Date.UTC(year, month - 1, day - 1)).toISOString().slice(0, 10);
   const endDate = new Date(Date.UTC(year, month - 1, day + 2)).toISOString().slice(0, 10);
