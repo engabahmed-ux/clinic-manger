@@ -157,8 +157,8 @@ async function writeBooking(env, booking, additionalStatements = []) {
   if (booking.isArchived || ["cancelled", "archived"].includes(booking.status)) {
     const archiveDate = String(booking.appointmentDate || "").slice(0, 10);
     statements.push({
-      sql: "INSERT OR REPLACE INTO booking_archive_occurrences (id,booking_id,appointment_date,queue_number,status,archived_at,archived_by_uid,archived_by_name,is_reschedule,reschedule_to_date,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-      params: ["primary:" + booking.id,booking.id,archiveDate,booking.queueNumber || "",booking.status || "pending",booking.archivedAt || booking.updatedAt || booking.createdAt || "",booking.archivedByUid || "",booking.archivedByName || "",0,"",booking.createdAt || ""]
+      sql: "INSERT OR REPLACE INTO booking_archive_occurrences (id,booking_id,appointment_date,queue_number,status,archived_at,archived_by_uid,archived_by_name,is_reschedule,reschedule_to_date,created_at,sort_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      params: ["primary:" + booking.id,booking.id,archiveDate,booking.queueNumber || "",booking.status || "pending",booking.archivedAt || "",booking.archivedByUid || "",booking.archivedByName || "",0,"",booking.createdAt || "",booking.archivedAt || booking.updatedAt || booking.createdAt || ""]
     });
   }
   if (statements.length) {
@@ -301,7 +301,7 @@ async function listArchivePage(env, cursor = null, pageSize = 10) {
     ? Number(cursor.offset)
     : 0;
   const rows = await d1All(database,
-    "SELECT b.*, a.appointment_date AS archive_appointment_date, a.queue_number AS archive_queue_number, a.status AS archive_status, a.archived_at AS archive_archived_at, a.archived_by_uid AS archive_archived_by_uid, a.archived_by_name AS archive_archived_by_name, a.is_reschedule AS archive_is_reschedule, a.reschedule_to_date AS archive_reschedule_to_date FROM booking_archive_occurrences a INNER JOIN bookings b ON b.id = a.booking_id ORDER BY a.archived_at DESC, a.id DESC LIMIT ? OFFSET ?",
+    "SELECT b.*, a.appointment_date AS archive_appointment_date, a.queue_number AS archive_queue_number, a.status AS archive_status, a.archived_at AS archive_archived_at, a.archived_by_uid AS archive_archived_by_uid, a.archived_by_name AS archive_archived_by_name, a.is_reschedule AS archive_is_reschedule, a.reschedule_to_date AS archive_reschedule_to_date FROM booking_archive_occurrences a INNER JOIN bookings b ON b.id = a.booking_id ORDER BY a.sort_at DESC, a.id DESC LIMIT ? OFFSET ?",
     [limit + 1, offset]
   );
   const hasMore = rows.length > limit;
@@ -874,8 +874,8 @@ async function onRequestInternal(context) {
               params: [archivedAt,archivedByUid,archivedByName,occurrence.id]
             },
             {
-              sql: "INSERT OR REPLACE INTO booking_archive_occurrences (id,booking_id,appointment_date,queue_number,status,archived_at,archived_by_uid,archived_by_name,is_reschedule,reschedule_to_date,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-              params: ["history:" + occurrence.id,booking.id,occurrence.from_date,occurrence.from_queue_number || "","postponed",archivedAt,archivedByUid,archivedByName,1,occurrence.to_date,booking.createdAt || archivedAt]
+              sql: "INSERT OR REPLACE INTO booking_archive_occurrences (id,booking_id,appointment_date,queue_number,status,archived_at,archived_by_uid,archived_by_name,is_reschedule,reschedule_to_date,created_at,sort_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+              params: ["history:" + occurrence.id,booking.id,occurrence.from_date,occurrence.from_queue_number || "","postponed",archivedAt,archivedByUid,archivedByName,1,occurrence.to_date,booking.createdAt || archivedAt,archivedAt]
             }
           ]);
           if (!alreadyArchived) archivedCount += 1;
