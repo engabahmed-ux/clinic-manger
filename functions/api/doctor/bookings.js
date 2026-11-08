@@ -778,58 +778,89 @@ async function onRequestInternal(context) {
 
       case "archiveDay": {
         const date = typeof data.date === "string" ? data.date : "";
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00`))) {
+        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00`))) {
           return jsonResponse({ message: "تاريخ الأرشفة غير صحيح." }, 400);
         }
-        const all = await listBookings(env);
+        const [year, month, day] = date.split("-").map(Number);
+        const nextDate = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+        const database = getClinicDatabase(env);
         let archivedCount = 0;
         const archivedAt = new Date().toISOString();
         const archivedByUid = access.uid || "";
         const archivedByName = access.displayName || (access.accountType === "doctor" ? "الدكتور" : "الموظف");
-        for (const booking of all) {
-          const currentDateMatches = String(booking.appointmentDate || "").slice(0, 10) === date;
-          if (currentDateMatches && !booking.isArchived) {
-            await writeBooking(env, {
-              ...booking, isArchived:true, archivedAt, archivedByUid, archivedByName, updatedAt:archivedAt
-            });
-            archivedCount += 1;
-            continue;
-          }
 
-          // Archive the old appointment occurrence, not the whole booking, so its new date remains active.
-          const matchingEntries = historyForBooking(booking).filter(entry => entry.fromDate === date);
-          if (!matchingEntries.length) continue;
+        const currentRows = await d1All(database,
+          "SELECT * FROM bookings WHERE appointment_date >= ? AND appointment_date < ? AND is_archived = 0 ORDER BY appointment_date ASC, created_at ASC, id ASC",
+          [date, nextDate]
+        );
+        for (const row of currentRows) {
+          const booking = decodeBooking(row);
+          if (booking.isArchived) continue;
+          const updatedBooking = {
+            ...booking,
+            isArchived: true,
+            archivedAt,
+            archivedByUid,
+            archivedByName,
+            updatedAt: archivedAt
+          };
+          await writeBooking(env, updatedBooking, [{
+            sql: "INSERT OR REPLACE INTO booking_archive_occurrences (id,booking_id,appointment_date,queue_number,status,archived_at,archived_by_uid,archived_by_name,is_reschedule,reschedule_to_date,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            params: ["primary:" + booking.id,booking.id,date,booking.queueNumber || "",booking.status || "pending",archivedAt,archivedByUid,archivedByName,0,"",booking.createdAt || archivedAt]
+          }]);
+          archivedCount += 1;
+        }
+
+        // Historical occurrences are indexed by their original date; the active booking keeps its new date.
+        const historyRows = await d1All(database,
+          "SELECT * FROM booking_reschedule_occurrences WHERE from_date = ? AND archived_at = '' ORDER BY occurred_at ASC, id ASC",
+          [date]
+        );
+        for (const occurrence of historyRows) {
+          const current = await d1First(database,
+            "SELECT * FROM bookings WHERE id = ? LIMIT 1",
+            [occurrence.booking_id]
+          );
+          if (!current) continue;
+          const booking = decodeBooking(current);
           let archivedHistory = [];
           try {
             const parsed = JSON.parse(booking.archivedRescheduleHistory || "[]");
             if (Array.isArray(parsed)) archivedHistory = parsed;
           } catch {}
-          let changed = false;
-          for (const entry of matchingEntries) {
-            const alreadyArchived = archivedHistory.some(item =>
-              item && item.fromDate === entry.fromDate &&
-              item.toDate === entry.toDate &&
-              item.at === entry.at
-            );
-            if (alreadyArchived) continue;
+          const alreadyArchived = archivedHistory.some(item =>
+            item && item.fromDate === occurrence.from_date &&
+            item.toDate === occurrence.to_date &&
+            String(item.at || "") === String(occurrence.occurred_at || "")
+          );
+          if (!alreadyArchived) {
             archivedHistory.push({
-              fromDate: entry.fromDate,
-              toDate: entry.toDate,
-              fromQueueNumber: entry.fromQueueNumber || "",
-              toQueueNumber: entry.toQueueNumber || "",
-              at: entry.at || "",
+              fromDate: occurrence.from_date,
+              toDate: occurrence.to_date,
+              fromQueueNumber: occurrence.from_queue_number || "",
+              toQueueNumber: occurrence.to_queue_number || "",
+              at: occurrence.occurred_at || "",
               status: "postponed",
               archivedAt,
               archivedByUid,
               archivedByName
             });
-            changed = true;
-            archivedCount += 1;
           }
-          if (!changed) continue;
           await writeBooking(env, {
-            ...booking, archivedRescheduleHistory:JSON.stringify(archivedHistory), updatedAt:archivedAt
-          });
+            ...booking,
+            archivedRescheduleHistory: JSON.stringify(archivedHistory),
+            updatedAt: archivedAt
+          }, [
+            {
+              sql: "UPDATE booking_reschedule_occurrences SET archived_at = ?, archived_by_uid = ?, archived_by_name = ? WHERE id = ? AND archived_at = ''",
+              params: [archivedAt,archivedByUid,archivedByName,occurrence.id]
+            },
+            {
+              sql: "INSERT OR REPLACE INTO booking_archive_occurrences (id,booking_id,appointment_date,queue_number,status,archived_at,archived_by_uid,archived_by_name,is_reschedule,reschedule_to_date,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+              params: ["history:" + occurrence.id,booking.id,occurrence.from_date,occurrence.from_queue_number || "","postponed",archivedAt,archivedByUid,archivedByName,1,occurrence.to_date,booking.createdAt || archivedAt]
+            }
+          ]);
+          if (!alreadyArchived) archivedCount += 1;
         }
         return jsonResponse({ archivedCount, date });
       }
