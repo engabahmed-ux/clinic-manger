@@ -1506,9 +1506,9 @@ async function loadDoctorCustody(){
 refreshDoctorCustodyButton?.addEventListener("click",loadDoctorCustody);
 async function loadDoctorSettlements(){
   try{
-    const result=await accountsApiRequest("listSettlements");
-    const expenses=Array.isArray(result.expenses)?result.expenses:[];
     const month=doctorAccountsMonth?.value||((doctorAccountsDate?.value||"").slice(0,7));
+    const result=await accountsApiRequest("listSettlements",{month});
+    const expenses=Array.isArray(result.expenses)?result.expenses:[];
     if(doctorAccountsMonth&&!doctorAccountsMonth.value)doctorAccountsMonth.value=month;
     if(doctorMonthlyExpensesList){
       doctorMonthlyExpensesList.replaceChildren();
