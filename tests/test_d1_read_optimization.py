@@ -205,11 +205,12 @@ class AccountReadOptimizationTests(unittest.TestCase):
 
     def test_archive_page_uses_archive_order_index_and_booking_point_lookup(self):
         plan = self.db.execute(
-            "EXPLAIN QUERY PLAN SELECT b.*, a.appointment_date AS archive_appointment_date FROM booking_archive_occurrences a INNER JOIN bookings b ON b.id = a.booking_id ORDER BY a.sort_at DESC, a.id DESC LIMIT 6 OFFSET 0"
+            "EXPLAIN QUERY PLAN SELECT b.*, a.appointment_date AS archive_appointment_date FROM booking_archive_occurrences a INNER JOIN bookings b ON b.id = a.booking_id ORDER BY a.sort_at DESC, a.created_at ASC, a.booking_id ASC, a.is_reschedule ASC, a.id ASC LIMIT 6 OFFSET 0"
         ).fetchall()
         detail = " ".join(row["detail"] for row in plan)
         self.assertIn("idx_booking_archive_order", detail)
         self.assertIn("sqlite_autoindex_bookings_1", detail)
+        self.assertNotIn("USE TEMP B-TREE", detail)
 
     def test_archive_day_finds_current_bookings_by_date_index(self):
         plan = self.db.execute(
