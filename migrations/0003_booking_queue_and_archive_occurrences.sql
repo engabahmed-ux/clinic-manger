@@ -66,7 +66,7 @@ WHERE json_extract(j.value, '$.fromDate') IS NOT NULL
 UPDATE booking_reschedule_occurrences
 SET archived_at = COALESCE(
   (
-    SELECT COALESCE(json_extract(a.value, '$.archivedAt'), b.updated_at, b.created_at, '')
+    SELECT COALESCE(NULLIF(json_extract(a.value, '$.archivedAt'), ''), NULLIF(b.updated_at, ''), b.created_at, '')
     FROM bookings b,
     json_each(CASE WHEN json_valid(b.archived_reschedule_history_json) THEN b.archived_reschedule_history_json ELSE '[]' END) a
     WHERE b.id = booking_reschedule_occurrences.booking_id
@@ -134,7 +134,7 @@ SELECT
   substr(appointment_date, 1, 10),
   queue_number,
   status,
-  COALESCE(NULLIF(archived_at, ''), updated_at, created_at, ''),
+  COALESCE(NULLIF(archived_at, ''), NULLIF(updated_at, ''), created_at, ''),
   archived_by_uid,
   archived_by_name,
   0,
@@ -151,7 +151,7 @@ SELECT
   json_extract(j.value, '$.fromDate'),
   COALESCE(json_extract(j.value, '$.fromQueueNumber'), b.queue_number, ''),
   'postponed',
-  COALESCE(json_extract(j.value, '$.archivedAt'), b.updated_at, b.created_at, ''),
+  COALESCE(NULLIF(json_extract(j.value, '$.archivedAt'), ''), NULLIF(b.updated_at, ''), b.created_at, ''),
   COALESCE(json_extract(j.value, '$.archivedByUid'), ''),
   COALESCE(json_extract(j.value, '$.archivedByName'), ''),
   1,
