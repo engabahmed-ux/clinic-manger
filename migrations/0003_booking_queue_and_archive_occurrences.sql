@@ -149,7 +149,7 @@ SELECT
   'history:' || b.id || ':' || j.key,
   b.id,
   json_extract(j.value, '$.fromDate'),
-  COALESCE(json_extract(j.value, '$.fromQueueNumber'), b.queue_number, ''),
+  COALESCE(NULLIF(json_extract(j.value, '$.fromQueueNumber'), ''), b.queue_number, ''),
   'postponed',
   COALESCE(json_extract(j.value, '$.archivedAt'), ''),
   COALESCE(json_extract(j.value, '$.archivedByUid'), ''),
