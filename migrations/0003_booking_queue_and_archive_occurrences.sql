@@ -104,6 +104,18 @@ WITH queue_numbers AS (
   FROM bookings b,
        json_each(CASE WHEN json_valid(b.reschedule_history_json) THEN b.reschedule_history_json ELSE '[]' END) j
   WHERE CAST(json_extract(j.value, '$.toQueueNumber') AS INTEGER) > 0
+  UNION ALL
+  SELECT json_extract(j.value, '$.fromDate'),
+         CAST(json_extract(j.value, '$.fromQueueNumber') AS INTEGER)
+  FROM bookings b,
+       json_each(CASE WHEN json_valid(b.archived_reschedule_history_json) THEN b.archived_reschedule_history_json ELSE '[]' END) j
+  WHERE CAST(json_extract(j.value, '$.fromQueueNumber') AS INTEGER) > 0
+  UNION ALL
+  SELECT json_extract(j.value, '$.toDate'),
+         CAST(json_extract(j.value, '$.toQueueNumber') AS INTEGER)
+  FROM bookings b,
+       json_each(CASE WHEN json_valid(b.archived_reschedule_history_json) THEN b.archived_reschedule_history_json ELSE '[]' END) j
+  WHERE CAST(json_extract(j.value, '$.toQueueNumber') AS INTEGER) > 0
 )
 INSERT INTO booking_queue_counters(appointment_date, last_queue_number, updated_at)
 SELECT appointment_date, MAX(queue_number), strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
