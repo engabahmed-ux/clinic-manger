@@ -150,5 +150,8 @@ json_each(CASE WHEN json_valid(b.archived_reschedule_history_json) THEN b.archiv
 WHERE json_extract(j.value, '$.fromDate') IS NOT NULL
   AND json_extract(j.value, '$.toDate') IS NOT NULL;
 
+CREATE INDEX IF NOT EXISTS idx_bookings_status_completed_at
+ON bookings(status, completed_at);
+
 INSERT OR IGNORE INTO schema_migrations(version, applied_at)
 VALUES ('0003_booking_queue_and_archive_occurrences', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
