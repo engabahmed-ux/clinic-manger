@@ -84,7 +84,7 @@ class AccountReadOptimizationTests(unittest.TestCase):
                 "waiting",
                 "2026-11-08T07:00:00Z",
                 "2026-11-08T17:00:00Z",
-                '[{"fromDate":"2026-11-05","toDate":"2026-11-09","fromQueueNumber":8,"toQueueNumber":11,"at":"2026-11-08T12:00:00Z"}]',
+                '[{"fromDate":"2026-11-05","toDate":"2026-11-09","fromQueueNumber":"","toQueueNumber":11,"at":"2026-11-08T12:00:00Z"}]',
             ),
         )
         cls.db.executescript((ROOT / "migrations/0003_booking_queue_and_archive_occurrences.sql").read_text())
@@ -187,10 +187,11 @@ class AccountReadOptimizationTests(unittest.TestCase):
 
     def test_archive_display_timestamp_stays_empty_while_sort_uses_legacy_fallback(self):
         row = self.db.execute(
-            "SELECT archived_at, sort_at FROM booking_archive_occurrences WHERE id = 'history:booking-history-no-archived-at:0'"
+            "SELECT archived_at, sort_at, queue_number FROM booking_archive_occurrences WHERE id = 'history:booking-history-no-archived-at:0'"
         ).fetchone()
         self.assertEqual(row["archived_at"], "")
         self.assertEqual(row["sort_at"], "2026-11-08T17:00:00Z")
+        self.assertEqual(row["queue_number"], "11")
 
     def test_restoring_primary_occurrence_keeps_archived_reschedule_history(self):
         self.db.execute("SAVEPOINT restore_primary_test")
