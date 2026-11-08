@@ -34,7 +34,7 @@ function decodeRecord(row) {
     categoryId:row.category_id||payload.categoryId||"",personName:row.person_name||payload.personName||"",amount:row.amount||payload.amount||"",
     date:row.date||payload.date||"",notes:row.notes||payload.notes||"",createdAt:row.created_at||payload.createdAt||"",
     updatedAt:row.updated_at||payload.updatedAt||"",status:row.status||payload.status||"",enteredBy:row.entered_by||payload.enteredBy||"",
-    enteredByName:row.entered_by_name||payload.enteredByName||"",employeeUid:row.employee_uid||payload.employeeUid||"",
+    enteredByName:row.entered_by_name||payload.enteredByName||"",employeeUid:row.employee_uid||payload.employeeUid||payload.previousEmployeeUid||"",
     employeeName:row.employee_name||payload.employeeName||"",closedAt:row.closed_at||payload.closedAt||"",
     totalReceipts:row.total_receipts||payload.totalReceipts||"",totalExpenses:row.total_expenses||payload.totalExpenses||"",
     netTotal:row.net_total||payload.netTotal||"",bookingCount:row.booking_count||payload.bookingCount||""};
@@ -43,7 +43,7 @@ function recordValues(id,record) {
   return [id,record.type||"",record.name||"",record.kind||"",record.categoryId||"",record.personName||"",record.amount||"",record.date||"",record.notes||"",
     record.createdAt||"",record.updatedAt||"",record.status||"",record.enteredBy||"",record.enteredByName||"",record.approvedBy||"",record.approvedByName||"",
     record.approvedAt||"",record.reviewedBy||"",record.reviewedByName||"",record.reviewedAt||"",record.rejectionReason||"",record.periodType||"",
-    record.periodKey||"",record.employeeUid||"",record.employeeName||"",record.closedBy||"",record.closedByName||"",record.closedAt||"",
+    record.periodKey||"",record.employeeUid||record.previousEmployeeUid||"",record.employeeName||"",record.closedBy||"",record.closedByName||"",record.closedAt||"",
     record.totalReceipts||"",record.totalExpenses||"",record.netTotal||"",record.bookingCount||"",JSON.stringify(record)];
 }
 const RECORD_COLUMNS="id,record_type,name,kind,category_id,person_name,amount,date,notes,created_at,updated_at,status,entered_by,entered_by_name,approved_by,approved_by_name,approved_at,reviewed_by,reviewed_by_name,reviewed_at,rejection_reason,period_type,period_key,employee_uid,employee_name,closed_by,closed_by_name,closed_at,total_receipts,total_expenses,net_total,booking_count,payload_json";
@@ -97,9 +97,27 @@ async function deleteRecord(ctx,id) {
   await d1Run(getClinicDatabase(ctx.env),"DELETE FROM account_records WHERE id = ?",[id]);
   return null;
 }
-async function listCustodyRecords(ctx,types=["custodyHandover","custodyDoctorSettlement"]) {
-  const db=getClinicDatabase(ctx.env),placeholders=types.map(()=>"?").join(",");
-  const rows=await d1All(db,"SELECT * FROM account_records WHERE record_type IN ("+placeholders+") ORDER BY created_at DESC",types);
+async function listCustodyRecords(ctx,types=["custodyHandover","custodyDoctorSettlement"],employeeUid="",date="") {
+  const db=getClinicDatabase(ctx.env),rows=[];
+  if(!employeeUid){
+    const placeholders=types.map(()=>"?").join(",");
+    const all=await d1All(db,"SELECT * FROM account_records WHERE record_type IN ("+placeholders+") ORDER BY created_at DESC",types);
+    return all.map(decodeRecord);
+  }
+  const custodyTypes=types.filter(type=>type!=="dailyExpense");
+  if(custodyTypes.length){
+    const placeholders=custodyTypes.map(()=>"?").join(",");
+    const employeeRows=await d1All(db,"SELECT * FROM account_records WHERE record_type IN ("+placeholders+") AND employee_uid = ? ORDER BY created_at DESC",[...custodyTypes,employeeUid]);
+    rows.push(...employeeRows);
+  }
+  if(types.includes("dailyExpense")){
+    const expenseSql=date
+      ? "SELECT * FROM account_records WHERE record_type = 'dailyExpense' AND entered_by = ? AND date = ? ORDER BY created_at DESC"
+      : "SELECT * FROM account_records WHERE record_type = 'dailyExpense' AND entered_by = ? ORDER BY created_at DESC";
+    const expenseRows=await d1All(db,expenseSql,date?[employeeUid,date]:[employeeUid]);
+    rows.push(...expenseRows);
+  }
+  rows.sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")));
   return rows.map(decodeRecord);
 }
 
@@ -115,7 +133,7 @@ async function onRequestPostInternal({request,env}) {
       const history=await readDoc(ctx,"custody-last-closed");
       const selectedDate=String(data.date||"");
       const handoverDate=selectedDate||cairoDate(now);
-      const records=ctx.role==="staff"?await listCustodyRecords(ctx):[];
+      const records=ctx.role==="staff"?await listCustodyRecords(ctx,undefined,ctx.uid,handoverDate):[];
       const dayHandovers=records.filter(x=>x.type==="custodyHandover"&&x.previousEmployeeUid===ctx.uid&&(String(x.date||cairoDate(x.createdAt))===handoverDate));
       const daySettlements=records.filter(x=>x.type==="custodyDoctorSettlement"&&x.employeeUid===ctx.uid&&cairoDate(x.previousHandoverAt)===handoverDate).sort((a,b)=>String(b.previousHandoverAt||"").localeCompare(String(a.previousHandoverAt||"")));
       const latestSettlement=daySettlements[0]||null;
@@ -155,7 +173,7 @@ async function onRequestPostInternal({request,env}) {
       if(!history.previousEmployeeUid||!history.closedAt)return reply({message:"لا توجد عهدة مسلّمة تنتظر التصفية."},409);
       if(history.settledAt)return reply({message:"تمت تصفية هذه العهدة بالفعل.",settlement:history},409);
       const handoverDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Cairo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(history.closedAt));
-      const custodyRecords=await listCustodyRecords(ctx,["dailyExpense","custodyDoctorSettlement","custodyHandover"]);
+      const custodyRecords=await listCustodyRecords(ctx,["dailyExpense","custodyDoctorSettlement","custodyHandover"],history.previousEmployeeUid,handoverDate);
       const pending=custodyRecords.filter(x=>x.type==="dailyExpense"&&x.enteredBy===history.previousEmployeeUid&&x.date===handoverDate&&(x.status||"approved")==="pending");
       if(pending.length)return reply({message:"لا يمكن تصفية العهدة قبل معالجة المصروفات المعلقة للموظف."},409);
       const settlements=custodyRecords.filter(x=>x.type==="custodyDoctorSettlement"&&x.employeeUid===history.previousEmployeeUid&&cairoDate(x.previousHandoverAt)===handoverDate&&String(x.previousHandoverAt||"")<String(history.closedAt||"")).sort((a,b)=>String(b.previousHandoverAt||"").localeCompare(String(a.previousHandoverAt||"")));
