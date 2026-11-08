@@ -162,6 +162,13 @@ json_each(CASE WHEN json_valid(b.archived_reschedule_history_json) THEN b.archiv
 WHERE json_extract(j.value, '$.fromDate') IS NOT NULL
   AND json_extract(j.value, '$.toDate') IS NOT NULL;
 
+UPDATE bookings
+SET completed_at = json_extract(source_payload_json, '$.completedAt')
+WHERE status = 'completed'
+  AND (completed_at IS NULL OR completed_at = '')
+  AND json_valid(source_payload_json)
+  AND json_extract(source_payload_json, '$.completedAt') IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_bookings_status_completed_at
 ON bookings(status, completed_at);
 
