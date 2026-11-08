@@ -9,6 +9,7 @@ on:
       - "functions/**/*.js"
       - "migrations/**/*.sql"
       - "tests/**/*.py"
+      - "tests/**/*.mjs"
       - ".github/workflows/validate-d1-optimization.yml"
   pull_request:
     paths:
