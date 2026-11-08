@@ -232,7 +232,7 @@ export async function onRequestPost({ request, env }) {
       const pending = expenses.filter(x=>(x.status || "approved")==="pending");
       if (pending.length) return jsonResponse({message:"لا يمكن تصفية عهدة الموظف قبل اعتماد أو رفض كل مصروفاته المعلقة."},409);
       const approvedExpenses = expenses.filter(x=>(x.status || "approved")==="approved").reduce((sum,x)=>sum+(Number(x.amount)||0),0);
-      const bookings = (await listEmployeeBookings(env, employeeUid))
+      const bookings = (await listEmployeeBookings(env, employeeUid, range.start, range.end))
         .filter(x=>inPeriod(x.date) && x.paid>0);
       const receipts = bookings.reduce((sum,x)=>sum+x.paid,0);
       const now = new Date().toISOString();
