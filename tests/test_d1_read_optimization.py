@@ -52,6 +52,22 @@ class AccountReadOptimizationTests(unittest.TestCase):
             "INSERT INTO bookings (id, appointment_date, queue_number, status, is_archived, archived_at, created_at, updated_at) VALUES ('booking-archived','2026-11-08T08:00:00','4','completed',1,'2026-11-08T14:00:00Z','2026-11-08T07:00:00Z','2026-11-08T14:00:00Z')"
         )
         cls.db.execute(
+            "INSERT INTO bookings (id, appointment_date, queue_number, status, is_archived, created_at, updated_at) VALUES ('booking-cancelled','2026-11-08T09:00:00','5','cancelled',0,'2026-11-08T07:00:00Z','2026-11-08T14:30:00Z')"
+        )
+        cls.db.execute(
+            "INSERT INTO bookings (id, appointment_date, queue_number, status, created_at, updated_at, reschedule_history_json, archived_reschedule_history_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "booking-archived-history-only",
+                "2026-11-09T12:00:00",
+                "10",
+                "waiting",
+                "2026-11-08T07:00:00Z",
+                "2026-11-08T13:00:00Z",
+                "[]",
+                '[{"fromDate":"2026-11-06","toDate":"2026-11-09","fromQueueNumber":9,"toQueueNumber":10,"at":"2026-11-08T12:00:00Z","archivedAt":"2026-11-08T13:00:00Z"}]',
+            ),
+        )
+        cls.db.execute(
             "INSERT INTO account_records (id, record_type, employee_uid, created_at, payload_json) VALUES (?, ?, '', ?, ?)",
             ("legacy-handover", "custodyHandover", "2026-11-08T15:00:00Z", '{"previousEmployeeUid":"staff-a","previousEmployeeName":"Staff A"}'),
         )
@@ -115,6 +131,14 @@ class AccountReadOptimizationTests(unittest.TestCase):
         self.assertEqual(counters["2026-11-07"], 2)
         self.assertEqual(counters["2026-11-08"], 4)
 
+    def test_queue_counters_include_archived_history_payloads(self):
+        rows = self.db.execute(
+            "SELECT appointment_date, last_queue_number FROM booking_queue_counters ORDER BY appointment_date"
+        ).fetchall()
+        counters = {row["appointment_date"]: row["last_queue_number"] for row in rows}
+        self.assertEqual(counters["2026-11-06"], 9)
+        self.assertEqual(counters["2026-11-09"], 10)
+
     def test_queue_counter_allocation_is_atomic_and_monotonic(self):
         sql = (
             "INSERT INTO booking_queue_counters (appointment_date,last_queue_number,updated_at) VALUES (?,1,?) "
@@ -136,6 +160,24 @@ class AccountReadOptimizationTests(unittest.TestCase):
         self.assertEqual(history["queue_number"], "2")
         self.assertEqual(history["is_reschedule"], 1)
         self.assertEqual(history["reschedule_to_date"], "2026-11-08")
+
+    def test_archive_migration_keeps_cancelled_bookings(self):
+        row = self.db.execute(
+            "SELECT status, is_reschedule FROM booking_archive_occurrences WHERE id = 'primary:booking-cancelled'"
+        ).fetchone()
+        self.assertEqual(row["status"], "cancelled")
+        self.assertEqual(row["is_reschedule"], 0)
+
+    def test_restoring_primary_occurrence_keeps_archived_reschedule_history(self):
+        self.db.execute("SAVEPOINT restore_primary_test")
+        self.db.execute("UPDATE bookings SET is_archived = 0 WHERE id = 'booking-archived'")
+        self.db.execute("DELETE FROM booking_archive_occurrences WHERE id = 'primary:booking-archived' AND is_reschedule = 0")
+        rows = self.db.execute(
+            "SELECT id FROM booking_archive_occurrences WHERE booking_id = 'booking-rescheduled'"
+        ).fetchall()
+        self.assertIn("history:booking-rescheduled:0", {row["id"] for row in rows})
+        self.db.execute("ROLLBACK TO restore_primary_test")
+        self.db.execute("RELEASE restore_primary_test")
 
     def test_archive_page_uses_archive_order_index_and_booking_point_lookup(self):
         plan = self.db.execute(
