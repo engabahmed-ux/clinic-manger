@@ -70,7 +70,6 @@ function staffRow(uid, bookings, accounts, active = 1) {
 
 function context(uid, staff = {}) {
   currentUid = uid;
-  rejectToken = false;
   const database = new MockD1(staff);
   const env = {
     FIREBASE_API_KEY: "synthetic-test-key",
