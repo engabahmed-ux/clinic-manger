@@ -28,21 +28,34 @@ class MockStatement {
   bind(...params) { this.params = params; return this; }
   async first() { return this.database.first(this.sql, this.params); }
   async all() { return { success: true, results: this.database.all(this.sql, this.params) }; }
-  async run() { return { success: true, meta: { changes: 1 } }; }
+  async run() {
+    this.database.writes.push({ sql: this.sql, params: this.params });
+    return { success: true, meta: { changes: 1 } };
+  }
 }
 
 class MockD1 {
   constructor(staff) {
     this.staff = staff;
     this.queueCounters = new Map();
+    this.bookings = {};
+    this.bookingListRows = [];
+    this.archiveCurrentRows = [];
+    this.rescheduleRows = [];
+    this.archivePageRows = [];
+    this.reads = [];
+    this.writes = [];
+    this.batches = [];
   }
   prepare(sql) { return new MockStatement(this, sql); }
   async batch(statements) {
+    this.batches.push(statements.map(statement => ({ sql: statement.sql, params: statement.params })));
     const results = [];
     for (const statement of statements) results.push(await statement.run());
     return results;
   }
   first(sql, params) {
+    this.reads.push({ sql, params });
     if (sql.includes("FROM staff WHERE uid = ?")) return this.staff[params[0]] || null;
     if (sql.includes("booking_queue_counters")) {
       const date = params[0];
@@ -50,11 +63,42 @@ class MockD1 {
       this.queueCounters.set(date, next);
       return { last_queue_number: next };
     }
-    if (sql.includes("FROM bookings WHERE id = ?")) return null;
+    if (sql.includes("FROM bookings WHERE id = ?")) return this.bookings[params[0]] || null;
     if (sql.includes("FROM account_records WHERE id = ?")) return null;
     return null;
   }
-  all() { return []; }
+  all(sql, params) {
+    this.reads.push({ sql, params });
+    if (sql.includes("FROM bookings WHERE appointment_date")) return this.archiveCurrentRows;
+    if (sql.includes("FROM booking_reschedule_occurrences")) return this.rescheduleRows;
+    if (sql.includes("FROM booking_archive_occurrences a INNER JOIN bookings b")) return this.archivePageRows;
+    if (sql.includes("FROM bookings ORDER BY")) return this.bookingListRows;
+    return [];
+  }
+}
+
+function bookingRow(id, appointmentDate, queueNumber, status = "waiting") {
+  return {
+    id,
+    patient_name: "Synthetic Patient",
+    patient_id: "",
+    patient_phone: "TEST-000",
+    appointment_date: appointmentDate,
+    service: "Synthetic Service",
+    service_price: "100",
+    paid_amount: "0",
+    queue_number: queueNumber,
+    status,
+    is_archived: 0,
+    archived_at: "",
+    archived_by_uid: "",
+    archived_by_name: "",
+    reschedule_history_json: "[]",
+    archived_reschedule_history_json: "[]",
+    created_at: "2026-11-08T08:00:00Z",
+    updated_at: "2026-11-08T08:00:00Z",
+    source_payload_json: "{}"
+  };
 }
 
 function staffRow(uid, bookings, accounts, active = 1) {
@@ -78,13 +122,15 @@ function context(uid, staff = {}) {
   };
   return {
     env,
+    database,
     waitUntil() {},
     request: null
   };
 }
 
-async function invoke(handler, uid, body, staff = {}, token = "synthetic-token") {
+async function invoke(handler, uid, body, staff = {}, token = "synthetic-token", configureDatabase = null) {
   const ctx = context(uid, staff);
+  if (typeof configureDatabase === "function") configureDatabase(ctx.database);
   ctx.request = new Request("https://clinic.test/api", {
     method: "POST",
     headers: {
@@ -94,7 +140,7 @@ async function invoke(handler, uid, body, staff = {}, token = "synthetic-token")
     body: JSON.stringify(body)
   });
   const response = await handler(ctx);
-  return { status: response.status, body: await response.json() };
+  return { status: response.status, body: await response.json(), database: ctx.database };
 }
 
 test("all nine staff permission combinations enforce independent booking and account rights", async () => {
@@ -158,6 +204,81 @@ test("all nine staff permission combinations enforce independent booking and acc
       );
     }
   }
+});
+
+test("creating a booking allocates a queue number without scanning the bookings table", async () => {
+  const result = await invoke(bookingsRequest, DOCTOR_UID, {
+    action: "create",
+    booking: {
+      patientName: "Synthetic Patient",
+      patientPhone: "TEST-101",
+      appointmentDate: "2026-11-08T09:00:00",
+      service: "Synthetic Service",
+      servicePrice: "100"
+    }
+  });
+  assert.equal(result.status, 201);
+  assert.equal(result.body.booking.queueNumber, "1");
+  assert.equal(result.database.queueCounters.get("2026-11-08"), 1);
+  assert.equal(result.database.reads.some(read => read.sql.includes("SELECT * FROM bookings ORDER BY")), false);
+  assert.equal(result.database.writes.some(write => write.sql.includes("INSERT INTO bookings")), true);
+});
+
+test("rescheduling uses an atomic counter and writes its history without a full booking scan", async () => {
+  const uid = DOCTOR_UID;
+  const result = await invoke(bookingsRequest, uid, {
+    action: "update",
+    booking: { id: "synthetic-reschedule", appointmentDate: "2026-11-09T09:00:00" }
+  }, {}, "synthetic-token", database => {
+    database.bookings["synthetic-reschedule"] = bookingRow("synthetic-reschedule", "2026-11-08T09:00:00", "2");
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.booking.appointmentDate, "2026-11-09T09:00:00");
+  assert.equal(result.body.booking.queueNumber, "1");
+  const statements = result.database.batches.flat();
+  assert.equal(statements.some(statement => statement.sql.includes("INSERT INTO booking_reschedule_occurrences")), true);
+  assert.equal(result.database.reads.some(read => read.sql.includes("SELECT * FROM bookings ORDER BY")), false);
+});
+
+test("cancelling a booking writes its primary archive occurrence in the same D1 batch", async () => {
+  const result = await invoke(bookingsRequest, DOCTOR_UID, {
+    action: "cancel",
+    id: "synthetic-cancel"
+  }, {}, "synthetic-token", database => {
+    database.bookings["synthetic-cancel"] = bookingRow("synthetic-cancel", "2026-11-08T10:00:00", "3");
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.booking.status, "cancelled");
+  const statements = result.database.batches.flat();
+  const archive = statements.find(statement => statement.sql.includes("INSERT OR REPLACE INTO booking_archive_occurrences"));
+  assert.ok(archive);
+  assert.equal(archive.params[0], "primary:synthetic-cancel");
+  assert.equal(archive.params[4], "cancelled");
+});
+
+test("archiving a day uses date and history indexes instead of listing all bookings", async () => {
+  const result = await invoke(bookingsRequest, DOCTOR_UID, {
+    action: "archiveDay",
+    date: "2026-11-08"
+  }, {}, "synthetic-token", database => {
+    database.archiveCurrentRows = [bookingRow("synthetic-current", "2026-11-08T10:00:00", "4")];
+    database.rescheduleRows = [{
+      id: "synthetic-occurrence",
+      booking_id: "synthetic-history",
+      from_date: "2026-11-08",
+      to_date: "2026-11-09",
+      from_queue_number: "5",
+      to_queue_number: "1",
+      occurred_at: "2026-11-07T10:00:00Z"
+    }];
+    database.bookings["synthetic-history"] = bookingRow("synthetic-history", "2026-11-09T10:00:00", "1");
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.archivedCount, 2);
+  const statements = result.database.batches.flat();
+  assert.equal(statements.some(statement => statement.sql.includes("INSERT OR REPLACE INTO booking_archive_occurrences") && statement.params[0] === "primary:synthetic-current"), true);
+  assert.equal(statements.some(statement => statement.sql.includes("INSERT OR REPLACE INTO booking_archive_occurrences") && statement.params[0] === "history:synthetic-occurrence"), true);
+  assert.equal(result.database.reads.some(read => read.sql.includes("SELECT * FROM bookings ORDER BY")), false);
 });
 
 test("active staff can read their own custody status without account edit rights", async () => {
