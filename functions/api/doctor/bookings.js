@@ -154,7 +154,7 @@ async function writeBooking(env, booking, additionalStatements = []) {
     values.map(()=>"?").join(",")+") ON CONFLICT(id) DO UPDATE SET "+
     "patient_name=excluded.patient_name,patient_id=excluded.patient_id,patient_phone=excluded.patient_phone,blood_pressure=excluded.blood_pressure,weight=excluded.weight,blood_sugar=excluded.blood_sugar,pre_visit_notes=excluded.pre_visit_notes,appointment_date=excluded.appointment_date,service=excluded.service,service_price=excluded.service_price,paid_amount=excluded.paid_amount,completed_fee=excluded.completed_fee,completed_at=excluded.completed_at,completed_by_uid=excluded.completed_by_uid,completed_by_name=excluded.completed_by_name,payment_entered_by_uid=excluded.payment_entered_by_uid,payment_entered_by_name=excluded.payment_entered_by_name,payment_updated_at=excluded.payment_updated_at,reschedule_history_json=excluded.reschedule_history_json,archived_reschedule_history_json=excluded.archived_reschedule_history_json,queue_number=excluded.queue_number,is_archived=excluded.is_archived,archived_at=excluded.archived_at,archived_by_uid=excluded.archived_by_uid,archived_by_name=excluded.archived_by_name,notes=excluded.notes,status=excluded.status,created_at=excluded.created_at,updated_at=excluded.updated_at,source_payload_json=excluded.source_payload_json";
   const statements = [...additionalStatements];
-  if (booking.isArchived || booking.status === "cancelled") {
+  if (booking.isArchived || ["cancelled", "archived"].includes(booking.status)) {
     const archiveDate = String(booking.appointmentDate || "").slice(0, 10);
     statements.push({
       sql: "INSERT OR REPLACE INTO booking_archive_occurrences (id,booking_id,appointment_date,queue_number,status,archived_at,archived_by_uid,archived_by_name,is_reschedule,reschedule_to_date,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
@@ -569,7 +569,7 @@ async function updateBooking(env, data, actorUid = "", actorAccountType = "docto
     sql: "INSERT INTO booking_reschedule_occurrences (id,booking_id,from_date,to_date,from_queue_number,to_queue_number,occurred_at,created_at) VALUES (?,?,?,?,?,?,?,?)",
     params: [rescheduleOccurrence.id,rescheduleOccurrence.bookingId,rescheduleOccurrence.fromDate,rescheduleOccurrence.toDate,rescheduleOccurrence.fromQueueNumber,rescheduleOccurrence.toQueueNumber,rescheduleOccurrence.occurredAt,rescheduleOccurrence.createdAt]
   }] : [];
-  if (existing.status === "cancelled" && booking.status !== "cancelled" && !booking.isArchived) {
+  if (["cancelled", "archived"].includes(existing.status) && !["cancelled", "archived"].includes(booking.status) && !booking.isArchived) {
     additionalStatements.push({
       sql: "DELETE FROM booking_archive_occurrences WHERE id = ? AND is_reschedule = 0",
       params: ["primary:" + booking.id]
