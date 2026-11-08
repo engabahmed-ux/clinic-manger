@@ -301,7 +301,7 @@ async function listArchivePage(env, cursor = null, pageSize = 10) {
     ? Number(cursor.offset)
     : 0;
   const rows = await d1All(database,
-    "SELECT b.*, a.appointment_date AS archive_appointment_date, a.queue_number AS archive_queue_number, a.status AS archive_status, a.archived_at AS archive_archived_at, a.archived_by_uid AS archive_archived_by_uid, a.archived_by_name AS archive_archived_by_name, a.is_reschedule AS archive_is_reschedule, a.reschedule_to_date AS archive_reschedule_to_date FROM booking_archive_occurrences a INNER JOIN bookings b ON b.id = a.booking_id ORDER BY a.sort_at DESC, a.id DESC LIMIT ? OFFSET ?",
+    "SELECT b.*, a.appointment_date AS archive_appointment_date, a.queue_number AS archive_queue_number, a.status AS archive_status, a.archived_at AS archive_archived_at, a.archived_by_uid AS archive_archived_by_uid, a.archived_by_name AS archive_archived_by_name, a.is_reschedule AS archive_is_reschedule, a.reschedule_to_date AS archive_reschedule_to_date FROM booking_archive_occurrences a INNER JOIN bookings b ON b.id = a.booking_id ORDER BY a.sort_at DESC, a.created_at ASC, a.booking_id ASC, a.is_reschedule ASC, a.id ASC LIMIT ? OFFSET ?",
     [limit + 1, offset]
   );
   const hasMore = rows.length > limit;
